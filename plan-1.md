@@ -1,4 +1,58 @@
-# Plan 1: Canvas for the turtle
+# Plan 1: Logo playground
+
+## Scope and phases
+
+The goal is a really good GUI for writing **new** Logo programs, not running the existing body of old Logo programs. So we implement a subset of UCBLogo, in phases.
+
+`our-logo.kdl` is the source of truth for which commands we support. It has every command from the Berkeley Logo manual, and each one has:
+
+- **`obsolete` / `obsolete_reason`:** 103 commands are obsolete and will never be supported. Most of them are replaced by the GUI: printing out definitions, workspace listings, `EDIT`, `HELP`, `TRACE`/`STEP`, `PAUSE`, screen layout and console fonts. The rest are about old hardware or the UCBLogo installation (memory, file paths, aspect-ratio correction), or are superseded within the language (`TEST`/`IFTRUE`, `GOTO`).
+- **`phase`:** 1 to 4 for the remaining 257, or `#null` for obsolete commands.
+
+The file has the manual's description of every command, so the GUI's reference/help panel can be generated from it.
+
+### Phase 1: Turtle drawing (83 commands)
+
+The smallest Logo that is fun to draw with:
+
+- **Turtle and pen:** all movement and position commands, `ARC`, `HOME`, show/hide turtle, `CLEAN`/`CLEARSCREEN`, `WRAP`/`WINDOW`/`FENCE`, and pen up/down, colour, size and background.
+- **Language:** `TO`/`END` with inputs and recursion, `MAKE`/`LOCAL`/`LOCALMAKE`/`THING`, `REPEAT`/`REPCOUNT`/`FOREVER`, `IF`/`IFELSE`, `STOP`/`OUTPUT`, `WAIT`, `PRINT`/`TYPE`/`SHOW`.
+- **Arithmetic and logic:** arithmetic, `SIN`/`COS`/`ARCTAN`, `RANDOM`, comparisons, `AND`/`OR`/`NOT`.
+- **Lists:** only what drawing needs, mainly for `POS`/`SETPOS`: `LIST`, `SENTENCE`, `FIRST`, `LAST`, `BUTFIRST`, `BUTLAST`, `ITEM`, `COUNT`, `EMPTYP`.
+- **Syntax that isn't a command in the manual:** `END`, the infix operators `+ - * / = < > <= >= <>`, `:var` and `"word`, `[...]` lists, `(...)` for variable numbers of inputs, `;` comments. It's described in the manual's Introduction (chapter 1), which `our-logo.kdl` leaves out.
+
+In the GUI and runtime, phase 1 includes:
+
+- **The canvas and pixel buffer.** The pixel buffer is part of the design from the start, even though `FILL` and the pen modes that require it arrive in phase 2.
+- **The turtle speed system:** speed slider, Pause, Step, Stop, line highlighting and `SETSPEED`. This is the playground's headline feature.
+- **Events:** `Move`, `Turn`, `Arc`, `Clean`, `SetBackground`, `ShowTurtle`/`HideTurtle`, `Print`, `Wait`, `SetSpeed`, `Line` and `Sync`.
+- **The CLI** rendering the event stream to a file.
+
+### Phase 2: Complete core language and richer drawing (86 commands)
+
+- **Data:** the rest of the word, list and array commands, multi-dimensional arrays, `PUSH`/`POP`/`QUEUE`/`DEQUEUE`, type and membership predicates, `ASCII`/`CHAR`, `LOWERCASE`/`UPPERCASE`.
+- **Control:** `RUN`/`RUNRESULT`, `FOR`, `WHILE`/`UNTIL`/`DO.WHILE`/`DO.UNTIL`, `CASE`/`COND`, `CATCH`/`THROW`/`ERROR`/`ERRACT`, `IGNORE`.
+- **Higher-order procedures:** `APPLY`, `INVOKE`, `FOREACH`, `MAP`, `MAP.SE`, `FILTER`, `FIND`, `REDUCE`.
+- **Arithmetic:** `EXP`/`LN`/`LOG10`, the radian trig functions, `ISEQ`/`RSEQ`, `RERANDOM`, `FORM`.
+- **Drawing:** `FILL`, `FILLED`, `LABEL`/`SETLABELHEIGHT`/`LABELSIZE`, the pen modes `PENPAINT`/`PENERASE`/`PENREVERSE`, `SETPALETTE`/`PALETTE`, `SETPEN`/`PEN`. These add the `Fill`, `Filled` and `Label` events and the pen mode in `Move`.
+- **Settings:** `NAME`, `GLOBAL`, `CASEIGNOREDP`, `FULLPRINTP`, `PRINTDEPTHLIMIT`/`PRINTWIDTHLIMIT`, `LOGOVERSION`.
+
+### Phase 3: Interactive programs (14 commands)
+
+- **Mouse:** `MOUSEPOS`, `CLICKPOS`, `BUTTONP`/`BUTTON`, and the `BUTTONACT`/`KEYACT` handlers.
+- **Keyboard and console:** `READLIST`, `READWORD`, `READRAWLINE`, `READCHAR`, `READCHARS`, `KEYP`, `LINEP`, `CLEARTEXT`.
+
+These need the parts of the speed design that synchronise with the GUI: sync points before input, shared mouse state in turtle coordinates, and a console mode for when the program is waiting for input. It's worth building them as a separate step.
+
+### Phase 4: Advanced and niche (74 commands)
+
+- **Language features:** objects (`KINDOF`, `ASK`, `TALKTO`, `USUAL`…), macros and backquote, property lists.
+- **I/O:** file access, `SHELL`.
+- **Low-level:** bitwise operations.
+- **Introspection and metaprogramming:** `DEFINE`, `TEXT`, `COPYDEF`, `ARITY`, `PROCEDUREP` and similar.
+- **Obscure library procedures:** `CASCADE`, `TRANSFER`, `CROSSMAP`.
+- **Tokenizer details:** `PARSE`, `RUNPARSE`, `VBARREDP`, `RAWASCII`.
+- **Settings:** `ALLOWGETSET`, `REDEFP`, `COMMANDLINE`.
 
 ## Question
 
@@ -76,7 +130,7 @@ Have the interpreter output a stream of turtle events in its own coordinate syst
 - `Print(text)`, so console output stays in step with the drawing (see "Turtle speed" below).
 - `Wait(duration)` and `SetSpeed(speed)`.
 
-The interpreter does all the geometry: `SETSCRUNCH` scaling, splitting a move into several segments when it wraps at an edge, and `FENCE` stops. The GUI only scales and flips coordinates.
+The interpreter does all the geometry: splitting a move into several segments when it wraps at an edge, and `FENCE` stops. (`SETSCRUNCH` scaling is obsolete.) The GUI only scales and flips coordinates.
 
 How each side uses it:
 
@@ -127,6 +181,7 @@ interpreter thread ──(bounded channel of events)──▶ animator (UI threa
 - **Speed slider**: changes only the animator's speed.
 - **Pause / Resume**: the animator stops taking events, the channel fills up, and the interpreter blocks.
 - **Step**: while paused, run exactly one line of code, the same way UCBLogo's `STEP` command does. All the drawing and output that line produces plays at the current speed, then the program pauses again with the next line highlighted.
+- **Stop**: set a cancel flag that the interpreter checks on every evaluation step, and drop the channel so a blocked interpreter wakes up and exits. This should behave like UCBLogo's `THROW "TOPLEVEL`, which ends all running procedures, but the program's own `CATCH` must not be able to intercept it.
 
 #### How line stepping works
 
@@ -138,7 +193,6 @@ Before running each instruction line, the interpreter sends a `Line { span }` ev
 This matters because the channel lets the interpreter run several events ahead of the drawing. If `Line` were only a marker, a paused program could already have run a few lines past the highlighted one, including effects that aren't events, such as `MAKE` or file writes. Waiting at each line keeps the highlighted line and the program's real position in step, which a later variable inspector would also rely on.
 
 Stepping therefore needs the source spans described below. They're required, not optional.
-- **Stop**: set a cancel flag that the interpreter checks on every evaluation step, and drop the channel so a blocked interpreter wakes up and exits. This should behave like UCBLogo's `THROW "TOPLEVEL`, which ends all running procedures, but the program's own `CATCH` must not be able to intercept it.
 
 The Pause button is not the same as Logo's `PAUSE` command. Logo's `PAUSE` stops the program inside a procedure and opens a prompt where its local variables can be inspected, and UCBLogo also opens one of these when the user presses its quit key. Logo's `PAUSE` and `CONTINUE` are marked obsolete. A later version could offer "Pause and inspect" in the GUI instead, but the first version's Pause button only stops the animator.
 

@@ -1,4 +1,15 @@
 // Generated from refs/logo/Berkeley-Logo-Reference-Manual.html
+// Phases (the `phase` node on each command):
+//   1  Turtle drawing: turtle and pen commands, procedures and recursion, variables,
+//      REPEAT / IF / STOP / OUTPUT, arithmetic, printing, and the few list commands
+//      needed for POS / SETPOS.
+//   2  Complete core language and richer drawing: the rest of words, lists and arrays,
+//      loops, CATCH / THROW, MAP / FILTER / FOREACH and friends, fills, labels,
+//      pen modes and the palette.
+//   3  Interactive programs: mouse, keyboard and console input, BUTTONACT / KEYACT.
+//   4  Advanced and niche: objects, macros, property lists, file I/O, SHELL, bitwise
+//      operations, introspection / metaprogramming and obscure library procedures.
+//   #null  Obsolete: not planned (see obsolete_reason).
 logo {
   data-structure-primitives {
     constructors {
@@ -10,6 +21,7 @@ logo {
         desc "outputs a word formed by concatenating its inputs."
         supported #true
         obsolete #false
+        phase 2
       }
       list {
         eg """
@@ -19,6 +31,7 @@ logo {
         desc "outputs a list whose members are its inputs, which can be any Logo datum (word, list, or array)."
         supported #true
         obsolete #false
+        phase 1
       }
       sentence {
         eg """
@@ -30,18 +43,21 @@ logo {
         desc "outputs a list whose members are its inputs, if those inputs are not lists, or the members of its inputs, if those inputs are lists."
         supported #true
         obsolete #false
+        phase 1
       }
       fput {
         eg "FPUT thing list"
         desc "outputs a list equal to its second input with one extra member, the first input, at the beginning. If the second input is a word, then the first input must be a one-letter word, and FPUT is equivalent to WORD."
         supported #true
         obsolete #false
+        phase 2
       }
       lput {
         eg "LPUT thing list"
         desc "outputs a list equal to its second input with one extra member, the first input, at the end. If the second input is a word, then the first input must be a one-letter word, and LPUT is equivalent to WORD with its inputs in the other order."
         supported #true
         obsolete #false
+        phase 2
       }
       array {
         eg """
@@ -52,6 +68,7 @@ logo {
         see "item" "setitem"
         supported #true
         obsolete #false
+        phase 2
       }
       mdarray {
         eg """
@@ -65,6 +82,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
       listtoarray {
         eg """
@@ -74,12 +92,14 @@ logo {
         desc "outputs an array of the same size as the input list, whose members are the members of the input list."
         supported #true
         obsolete #false
+        phase 2
       }
       arraytolist {
         eg "ARRAYTOLIST array"
         desc "outputs a list whose members are the members of the input array. The first member of the output is the first member of the array, regardless of the array’s origin."
         supported #true
         obsolete #false
+        phase 2
       }
       combine {
         eg "COMBINE thing1 thing2  (library procedure)"
@@ -87,18 +107,21 @@ logo {
         see "word" "fput"
         supported #true
         obsolete #false
+        phase 2
       }
       reverse {
         eg "REVERSE list  (library procedure)"
         desc "outputs a list whose members are the members of the input list, in reverse order."
         supported #true
         obsolete #false
+        phase 2
       }
       gensym {
         eg "GENSYM  (library procedure)"
         desc "outputs a unique word each time it’s invoked. The words are of the form G1, G2, etc."
         supported #true
         obsolete #false
+        phase 4
       }
     }
     data-selectors {
@@ -107,6 +130,7 @@ logo {
         desc "if the input is a word, outputs the first character of the word. If the input is a list, outputs the first member of the list. If the input is an array, outputs the origin of the array (that is, the index of the first member of the array)."
         supported #true
         obsolete #false
+        phase 1
       }
       firsts {
         eg "FIRSTS list"
@@ -126,12 +150,14 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
       last {
         eg "LAST wordorlist"
         desc "if the input is a word, outputs the last character of the word. If the input is a list, outputs the last member of the list."
         supported #true
         obsolete #false
+        phase 1
       }
       butfirst {
         eg """
@@ -141,6 +167,7 @@ logo {
         desc "if the input is a word, outputs a word containing all but the first character of the input. If the input is a list, outputs a list containing all but the first member of the input."
         supported #true
         obsolete #false
+        phase 1
       }
       butfirsts {
         eg """
@@ -158,6 +185,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
       butlast {
         eg """
@@ -167,42 +195,49 @@ logo {
         desc "if the input is a word, outputs a word containing all but the last character of the input. If the input is a list, outputs a list containing all but the last member of the input."
         supported #true
         obsolete #false
+        phase 1
       }
       item {
         eg "ITEM index thing"
         desc "if the thing is a word, outputs the indexth character of the word. If the thing is a list, outputs the indexth member of the list. If the thing is an array, outputs the indexth member of the array. Index starts at 1 for words and lists; the starting index of an array is specified when the array is created."
         supported #true
         obsolete #false
+        phase 1
       }
       mditem {
         eg "MDITEM indexlist array  (library procedure)"
         desc "outputs the member of the multidimensional array selected by the list of numbers indexlist."
         supported #true
         obsolete #false
+        phase 2
       }
       pick {
         eg "PICK list  (library procedure)"
         desc "outputs a randomly chosen member of the input list."
         supported #true
         obsolete #false
+        phase 2
       }
       remove {
         eg "REMOVE thing list  (library procedure)"
         desc "outputs a copy of list with every member equal to thing removed."
         supported #true
         obsolete #false
+        phase 2
       }
       remdup {
         eg "REMDUP list  (library procedure)"
         desc "outputs a copy of list with duplicate members removed. If two or more members of the input are equal, the rightmost of those members is the one that remains in the output."
         supported #true
         obsolete #false
+        phase 2
       }
       quoted {
         eg "QUOTED thing  (library procedure)"
         desc "outputs its input, if a list; outputs its input with a quotation mark prepended, if a word."
         supported #true
         obsolete #false
+        phase 2
       }
     }
     data-mutators {
@@ -211,12 +246,14 @@ logo {
         desc "command. Replaces the indexth member of array with the new value. Ensures that the resulting array is not circular, i.e., value may not be a list or array that contains array."
         supported #true
         obsolete #false
+        phase 2
       }
       mdsetitem {
         eg "MDSETITEM indexlist array value  (library procedure)"
         desc "command. Replaces the member of array chosen by indexlist with the new value."
         supported #true
         obsolete #false
+        phase 2
       }
       .setfirst {
         eg ".SETFIRST list value"
@@ -227,6 +264,7 @@ logo {
         """
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Unsafe low-level list mutation (can create circular lists). Not needed for new programs; SETITEM on arrays covers safe mutation."
       }
       .setbf {
@@ -238,6 +276,7 @@ logo {
         """
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Unsafe low-level list mutation (can create circular lists). Not needed for new programs; SETITEM on arrays covers safe mutation."
       }
       .setitem {
@@ -250,6 +289,7 @@ logo {
         see "setitem"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Unchecked version of SETITEM for speed. SETITEM is enough."
       }
       push {
@@ -257,24 +297,28 @@ logo {
         desc "command. Adds the thing to the stack that is the value of the variable whose name is stackname. This variable must have a list as its value; the initial value should be the empty list. New members are added at the front of the list."
         supported #true
         obsolete #false
+        phase 2
       }
       pop {
         eg "POP stackname  (library procedure)"
         desc "outputs the most recently PUSHed member of the stack that is the value of the variable whose name is stackname and removes that member from the stack."
         supported #true
         obsolete #false
+        phase 2
       }
       queue {
         eg "QUEUE queuename thing  (library procedure)"
         desc "command. Adds the thing to the queue that is the value of the variable whose name is queuename. This variable must have a list as its value; the initial value should be the empty list. New members are added at the back of the list."
         supported #true
         obsolete #false
+        phase 2
       }
       dequeue {
         eg "DEQUEUE queuename  (library procedure)"
         desc "outputs the least recently QUEUEd member of the queue that is the value of the variable whose name is queuename and removes that member from the queue."
         supported #true
         obsolete #false
+        phase 2
       }
     }
     predicates {
@@ -286,6 +330,7 @@ logo {
         desc "outputs TRUE if the input is a word, FALSE otherwise."
         supported #true
         obsolete #false
+        phase 2
       }
       listp {
         eg """
@@ -295,6 +340,7 @@ logo {
         desc "outputs TRUE if the input is a list, FALSE otherwise."
         supported #true
         obsolete #false
+        phase 2
       }
       arrayp {
         eg """
@@ -304,6 +350,7 @@ logo {
         desc "outputs TRUE if the input is an array, FALSE otherwise."
         supported #true
         obsolete #false
+        phase 2
       }
       emptyp {
         eg """
@@ -313,6 +360,7 @@ logo {
         desc "outputs TRUE if the input is the empty word or the empty list, FALSE otherwise."
         supported #true
         obsolete #false
+        phase 1
       }
       equalp {
         eg """
@@ -324,6 +372,7 @@ logo {
         see "caseignoredp" "setitem"
         supported #true
         obsolete #false
+        phase 1
       }
       notequalp {
         eg """
@@ -334,6 +383,7 @@ logo {
         desc "outputs FALSE if the inputs are equal, TRUE otherwise. See EQUALP for the meaning of equality for different data types."
         supported #true
         obsolete #false
+        phase 1
       }
       beforep {
         eg """
@@ -344,6 +394,7 @@ logo {
         see "caseignoredp" "lessp"
         supported #true
         obsolete #false
+        phase 2
       }
       .eq {
         eg ".EQ thing1 thing2"
@@ -354,6 +405,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 4
       }
       memberp {
         eg """
@@ -364,6 +416,7 @@ logo {
         see "equalp"
         supported #true
         obsolete #false
+        phase 2
       }
       substringp {
         eg """
@@ -374,6 +427,7 @@ logo {
         see "equalp"
         supported #true
         obsolete #false
+        phase 2
       }
       numberp {
         eg """
@@ -383,6 +437,7 @@ logo {
         desc "outputs TRUE if the input is a number, FALSE otherwise."
         supported #true
         obsolete #false
+        phase 2
       }
       vbarredp {
         eg """
@@ -398,6 +453,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 4
       }
     }
     queries {
@@ -406,18 +462,21 @@ logo {
         desc "outputs the number of characters in the input, if the input is a word; outputs the number of members in the input, if it is a list or an array. (For an array, this may or may not be the index of the last member, depending on the array’s origin.)"
         supported #true
         obsolete #false
+        phase 1
       }
       ascii {
         eg "ASCII char"
         desc "outputs the integer (between 0 and 255) that represents the input character in the ASCII code. Interprets control characters as representing vbarred punctuation, and returns the character code for the corresponding punctuation character without vertical bars. (Compare RAWASCII.)"
         supported #true
         obsolete #false
+        phase 2
       }
       rawascii {
         eg "RAWASCII char"
         desc "outputs the integer (between 0 and 255) that represents the input character in the ASCII code. Interprets control characters as representing themselves. To find out the ASCII code of an arbitrary keystroke, use RAWASCII RC."
         supported #true
         obsolete #false
+        phase 4
       }
       char {
         eg "CHAR int"
@@ -425,6 +484,7 @@ logo {
         see "ascii"
         supported #true
         obsolete #false
+        phase 2
       }
       member {
         eg "MEMBER thing1 thing2"
@@ -432,18 +492,21 @@ logo {
         see "memberp"
         supported #true
         obsolete #false
+        phase 2
       }
       lowercase {
         eg "LOWERCASE word"
         desc "outputs a copy of the input word, but with all uppercase letters changed to the corresponding lowercase letter."
         supported #true
         obsolete #false
+        phase 2
       }
       uppercase {
         eg "UPPERCASE word"
         desc "outputs a copy of the input word, but with all lowercase letters changed to the corresponding uppercase letter."
         supported #true
         obsolete #false
+        phase 2
       }
       standout {
         eg "STANDOUT thing"
@@ -462,6 +525,7 @@ logo {
         """
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Produces terminal escape codes for bold/inverse text. The GUI console isn't a terminal."
       }
       parse {
@@ -470,12 +534,14 @@ logo {
         see "readlist"
         supported #true
         obsolete #false
+        phase 4
       }
       runparse {
         eg "RUNPARSE wordorlist"
         desc "outputs the list that would result if the input word or list were entered as an instruction line; characters such as infix operators and parentheses are separate members of the output. Note that sublists of a runparsed list are not themselves runparsed."
         supported #true
         obsolete #false
+        phase 4
       }
     }
   }
@@ -490,12 +556,14 @@ logo {
         desc "creates and outputs an object whose parent is object, or whose parents are object1, object2, etc., or the elements of objectlist. There must be at least one input, and if a list, it may not be empty."
         supported #true
         obsolete #false
+        phase 4
       }
       something {
         eg "SOMETHING"
         desc "creates and outputs an object whose parent is the Logo object. make \"foo something is equivalent to make \"foo kindof logo."
         supported #true
         obsolete #false
+        phase 4
       }
       oneof {
         eg """
@@ -512,6 +580,7 @@ logo {
         see "exist"
         supported #true
         obsolete #false
+        phase 4
       }
     }
     mutators {
@@ -541,6 +610,7 @@ logo {
         see "oneof" "usual" "havemake"
         supported #true
         obsolete #false
+        phase 4
       }
       have {
         eg """
@@ -551,6 +621,7 @@ logo {
         see "havemake"
         supported #true
         obsolete #false
+        phase 4
       }
       havemake {
         eg "HAVEMAKE name value"
@@ -562,6 +633,7 @@ logo {
         see "have" "make"
         supported #true
         obsolete #false
+        phase 4
       }
     }
     selectors {
@@ -570,6 +642,7 @@ logo {
         desc "outputs the current object (not its name!)."
         supported #true
         obsolete #false
+        phase 4
       }
       parents {
         eg "PARENTS"
@@ -589,12 +662,14 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 4
       }
       mynames {
         eg "MYNAMES"
         desc "output a list of the names of the object variables owned (not inherited) by the current object."
         supported #true
         obsolete #false
+        phase 4
       }
       mynamep {
         eg """
@@ -605,12 +680,14 @@ logo {
         see "mynames"
         supported #true
         obsolete #false
+        phase 4
       }
       myprocs {
         eg "MYPROCS"
         desc "outputs a list of the names of the procedures (methods) owned by (not inherited by) the current object."
         supported #true
         obsolete #false
+        phase 4
       }
       myprocp {
         eg """
@@ -621,6 +698,7 @@ logo {
         see "myprocs"
         supported #true
         obsolete #false
+        phase 4
       }
     }
     messages {
@@ -630,6 +708,7 @@ logo {
         see "ask"
         supported #true
         obsolete #false
+        phase 4
       }
       ask {
         eg "ASK object runlist"
@@ -637,6 +716,7 @@ logo {
         see "talkto"
         supported #true
         obsolete #false
+        phase 4
       }
     }
     queries {
@@ -645,12 +725,14 @@ logo {
         desc "outputs the object that owns the currently accessible variable named name. If there is no such accessible variable, or it’s a procedure-local variable, an error is signalled."
         supported #true
         obsolete #false
+        phase 4
       }
       whoseproc {
         eg "WHOSEPROC name"
         desc "outputs the object that owns the currently accessible procedure named name. If there is no such procedure, an error is signalled."
         supported #true
         obsolete #false
+        phase 4
       }
     }
     usual {
@@ -696,6 +778,7 @@ logo {
       """
       supported #true
       obsolete #false
+      phase 4
     }
   }
   communication {
@@ -710,6 +793,7 @@ logo {
         desc "command. Prints the input or inputs to the current write stream (initially the screen). All the inputs are printed on a single line, separated by spaces, ending with a newline. If an input is a list, square brackets are not printed around it, but brackets are printed around sublists. Braces are always printed around arrays."
         supported #true
         obsolete #false
+        phase 1
       }
       type {
         eg """
@@ -720,6 +804,7 @@ logo {
         see "setcursor" "wait"
         supported #true
         obsolete #false
+        phase 1
       }
       show {
         eg """
@@ -730,6 +815,7 @@ logo {
         see "print"
         supported #true
         obsolete #false
+        phase 1
       }
     }
     receivers {
@@ -741,6 +827,7 @@ logo {
         desc "reads a line from the read stream (initially the keyboard) and outputs that line as a list. The line is separated into members as though it were typed in square brackets in an instruction. If the read stream is a file, and the end of file is reached, READLIST outputs the empty word (not the empty list). READLIST processes backslash, vertical bar, and tilde characters in the read stream; the output list will not contain these characters but they will have had their usual effect. READLIST does not, however, treat semicolon as a comment character."
         supported #true
         obsolete #false
+        phase 3
       }
       readword {
         eg """
@@ -750,6 +837,7 @@ logo {
         desc "reads a line from the read stream and outputs that line as a word. The output is a single word even if the line contains spaces, brackets, etc. If the read stream is a file, and the end of file is reached, READWORD outputs the empty list (not the empty word). READWORD processes backslash, vertical bar, and tilde characters in the read stream. In the case of a tilde used for line continuation, the output word does include the tilde and the newline characters, so that the user program can tell exactly what the user entered. Vertical bars in the line are also preserved in the output. Backslash characters are not preserved in the output."
         supported #true
         obsolete #false
+        phase 3
       }
       readrawline {
         eg "READRAWLINE"
@@ -757,6 +845,7 @@ logo {
         see "readword"
         supported #true
         obsolete #false
+        phase 3
       }
       readchar {
         eg """
@@ -767,6 +856,7 @@ logo {
         see "readlist"
         supported #true
         obsolete #false
+        phase 3
       }
       readchars {
         eg """
@@ -777,6 +867,7 @@ logo {
         see "readlist" "readword"
         supported #true
         obsolete #false
+        phase 3
       }
       shell {
         eg """
@@ -800,6 +891,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 4
       }
     }
     file-access {
@@ -809,6 +901,7 @@ logo {
         see "openread" "openwrite" "openappend" "openupdate" "load" "save"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "A working-directory prefix for old file systems. File paths will be relative to the program's own file."
       }
       prefix {
@@ -817,6 +910,7 @@ logo {
         see "setprefix"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "A working-directory prefix for old file systems. File paths will be relative to the program's own file."
       }
       openread {
@@ -824,6 +918,7 @@ logo {
         desc "command. Opens the named file for reading. The read position is initially at the beginning of the file."
         supported #true
         obsolete #false
+        phase 4
       }
       openwrite {
         eg "OPENWRITE filename"
@@ -847,12 +942,14 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 4
       }
       openappend {
         eg "OPENAPPEND filename"
         desc "command. Opens the named file for writing. If the file already exists, the write position is initially set to the end of the old file, so that newly written data will be appended to it."
         supported #true
         obsolete #false
+        phase 4
       }
       openupdate {
         eg "OPENUPDATE filename"
@@ -860,18 +957,21 @@ logo {
         see "reader" "writer" "setreadpos" "setwritepos"
         supported #true
         obsolete #false
+        phase 4
       }
       close {
         eg "CLOSE filename"
         desc "command. Closes the named file. If the file was currently the reader or writer, then the reader or writer is changed to the keyboard or screen, as if SETREAD [] or SETWRITE [] had been done."
         supported #true
         obsolete #false
+        phase 4
       }
       allopen {
         eg "ALLOPEN"
         desc "outputs a list whose members are the names of all files currently open. This list does not include the dribble file, if any."
         supported #true
         obsolete #false
+        phase 4
       }
       closeall {
         eg "CLOSEALL  (library procedure)"
@@ -879,6 +979,7 @@ logo {
         see "foreach" "close"
         supported #true
         obsolete #false
+        phase 4
       }
       erasefile {
         eg """
@@ -888,6 +989,7 @@ logo {
         desc "command. Erases (deletes, removes) the named file, which should not currently be open."
         supported #true
         obsolete #false
+        phase 4
       }
       dribble {
         eg "DRIBBLE filename"
@@ -895,6 +997,7 @@ logo {
         see "openwrite" "writer"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Records a transcript of the terminal session. The GUI console can be saved or copied."
       }
       nodribble {
@@ -902,6 +1005,7 @@ logo {
         desc "command. Stops copying information into the dribble file, and closes the file."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Records a transcript of the terminal session. The GUI console can be saved or copied."
       }
       setread {
@@ -910,6 +1014,7 @@ logo {
         see "readlist" "openread" "openupdate"
         supported #true
         obsolete #false
+        phase 4
       }
       setwrite {
         eg "SETWRITE filename"
@@ -921,18 +1026,21 @@ logo {
         see "print" "openwrite" "openappend" "openupdate"
         supported #true
         obsolete #false
+        phase 4
       }
       reader {
         eg "READER"
         desc "outputs the name of the current read stream file, or the empty list if the read stream is the terminal."
         supported #true
         obsolete #false
+        phase 4
       }
       writer {
         eg "WRITER"
         desc "outputs the name of the current write stream file, or the empty list if the write stream is the screen."
         supported #true
         obsolete #false
+        phase 4
       }
       setreadpos {
         eg "SETREADPOS charpos"
@@ -940,6 +1048,7 @@ logo {
         see "readlist"
         supported #true
         obsolete #false
+        phase 4
       }
       setwritepos {
         eg "SETWRITEPOS charpos"
@@ -947,18 +1056,21 @@ logo {
         see "print"
         supported #true
         obsolete #false
+        phase 4
       }
       readpos {
         eg "READPOS"
         desc "outputs the file position of the current read stream file."
         supported #true
         obsolete #false
+        phase 4
       }
       writepos {
         eg "WRITEPOS"
         desc "outputs the file position of the current write stream file."
         supported #true
         obsolete #false
+        phase 4
       }
       eofp {
         eg """
@@ -968,6 +1080,7 @@ logo {
         desc "predicate, outputs TRUE if there are no more characters to be read in the read stream file, FALSE otherwise."
         supported #true
         obsolete #false
+        phase 4
       }
       filep {
         eg """
@@ -977,6 +1090,7 @@ logo {
         desc "predicate, outputs TRUE if a file of the specified name exists and can be read, FALSE otherwise."
         supported #true
         obsolete #false
+        phase 4
       }
     }
     terminal-access {
@@ -989,6 +1103,7 @@ logo {
         see "eofp" "readlist"
         supported #true
         obsolete #false
+        phase 3
       }
       linep {
         eg """
@@ -999,6 +1114,7 @@ logo {
         see "eofp"
         supported #true
         obsolete #false
+        phase 3
       }
       cleartext {
         eg """
@@ -1008,12 +1124,14 @@ logo {
         desc "command. Clears the text window."
         supported #true
         obsolete #false
+        phase 3
       }
       setcursor {
         eg "SETCURSOR vector"
         desc "command. The input is a list of two numbers, the x and y coordinates of a text window position (origin in the upper left corner, positive direction is southeast). The text cursor is moved to the requested position. This command also forces the immediate printing of any buffered characters."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "The GUI console is a scrolling text pane, not a terminal, so text-cursor positioning doesn't apply."
       }
       cursor {
@@ -1021,6 +1139,7 @@ logo {
         desc "outputs a list containing the current x and y coordinates of the text cursor. Logo may get confused about the current cursor position if, e.g., you type in a long line that wraps around or your program prints escape codes that affect the screen strangely."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "The GUI console is a scrolling text pane, not a terminal, so text-cursor positioning doesn't apply."
       }
       setmargins {
@@ -1029,6 +1148,7 @@ logo {
         see "setcursor"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Adds margins for projecting a terminal screen onto a wall. Not applicable to a GUI."
       }
       settextcolor {
@@ -1044,6 +1164,7 @@ logo {
         see "standout"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Console fonts and colours are GUI settings, not something programs control."
       }
       increasefont {
@@ -1054,6 +1175,7 @@ logo {
         desc "command (wxWidgets only). Increase or decrease the size of the font used in the text and edit windows to the next larger or smaller available size."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Console fonts and colours are GUI settings, not something programs control."
       }
       settextsize {
@@ -1061,6 +1183,7 @@ logo {
         desc "command (wxWidgets only). Set the \"point size\" of the font used in the text and edit windows to the given integer input. The desired size may not be available, in which case the nearest available size will be used. Note: There is only a slight correlation between these integers and pixel sizes. Our rough estimate is that the number of pixels of height is about 1.5 times the point size, but it varies for different fonts. See SETLABELHEIGHT for a different approach used for the graphics window."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Console fonts and colours are GUI settings, not something programs control."
       }
       textsize {
@@ -1068,6 +1191,7 @@ logo {
         desc "(wxWidgets only) outputs the \"point size\" of the font used in the text and edit windows. See SETTEXTSIZE for a discussion of font sizing. See LABELSIZE for a different approach used for the graphics window."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Console fonts and colours are GUI settings, not something programs control."
       }
       setfont {
@@ -1075,6 +1199,7 @@ logo {
         desc "command (wxWidgets only). Set the font family used in all windows to the one named by the input. Try Courier or Monospace as likely possibilities. Not all computers have the same fonts installed. It’s a good idea to stick with monospace fonts (ones in which all characters have the same width)."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Console fonts and colours are GUI settings, not something programs control."
       }
       font {
@@ -1082,6 +1207,7 @@ logo {
         desc "(wxWidgets only) outputs the name of the font family used in all windows."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Console fonts and colours are GUI settings, not something programs control."
       }
     }
@@ -1097,6 +1223,7 @@ logo {
         desc "outputs the sum of its inputs."
         supported #true
         obsolete #false
+        phase 1
       }
       difference {
         eg """
@@ -1106,6 +1233,7 @@ logo {
         desc "outputs the difference of its inputs. Minus sign means infix difference in ambiguous contexts (when preceded by a complete expression), unless it is preceded by a space and followed by a nonspace. (See also MINUS.)"
         supported #true
         obsolete #false
+        phase 1
       }
       minus {
         eg """
@@ -1120,6 +1248,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 1
       }
       product {
         eg """
@@ -1130,6 +1259,7 @@ logo {
         desc "outputs the product of its inputs."
         supported #true
         obsolete #false
+        phase 1
       }
       quotient {
         eg """
@@ -1140,84 +1270,98 @@ logo {
         desc "outputs the quotient of its inputs. The quotient of two integers is an integer if and only if the dividend is a multiple of the divisor. (In other words, QUOTIENT 5 2 is 2.5, not 2, but QUOTIENT 4 2 is 2, not 2.0 — it does the right thing.) With a single input, QUOTIENT outputs the reciprocal of the input."
         supported #true
         obsolete #false
+        phase 1
       }
       remainder {
         eg "REMAINDER num1 num2"
         desc "outputs the remainder on dividing num1 by num2; both must be integers and the result is an integer with the same sign as num1."
         supported #true
         obsolete #false
+        phase 1
       }
       modulo {
         eg "MODULO num1 num2"
         desc "outputs the remainder on dividing num1 by num2; both must be integers and the result is an integer with the same sign as num2."
         supported #true
         obsolete #false
+        phase 1
       }
       int {
         eg "INT num"
         desc "outputs its input with fractional part removed, i.e., an integer with the same sign as the input, whose absolute value is the largest integer less than or equal to the absolute value of the input."
         supported #true
         obsolete #false
+        phase 1
       }
       round {
         eg "ROUND num"
         desc "outputs the nearest integer to the input."
         supported #true
         obsolete #false
+        phase 1
       }
       sqrt {
         eg "SQRT num"
         desc "outputs the square root of the input, which must be nonnegative."
         supported #true
         obsolete #false
+        phase 1
       }
       power {
         eg "POWER num1 num2"
         desc "outputs num1 to the num2 power. If num1 is negative, then num2 must be an integer."
         supported #true
         obsolete #false
+        phase 1
       }
       exp {
         eg "EXP num"
         desc "outputs e (2.718281828+) to the input power."
         supported #true
         obsolete #false
+        phase 2
       }
       log10 {
         eg "LOG10 num"
         desc "outputs the common logarithm of the input."
         supported #true
         obsolete #false
+        phase 2
       }
       ln {
         eg "LN num"
         desc "outputs the natural logarithm of the input."
         supported #true
         obsolete #false
+        phase 2
       }
       sin {
         eg "SIN degrees"
         desc "outputs the sine of its input, which is taken in degrees."
         supported #true
         obsolete #false
+        phase 1
       }
       radsin {
         eg "RADSIN radians"
         desc "outputs the sine of its input, which is taken in radians."
         supported #true
         obsolete #false
+        phase 2
       }
       cos {
         eg "COS degrees"
         desc "outputs the cosine of its input, which is taken in degrees."
         supported #true
         obsolete #false
+        phase 1
       }
       radcos {
         eg "RADCOS radians"
         desc "outputs the cosine of its input, which is taken in radians."
         supported #true
         obsolete #false
+        phase 2
       }
       arctan {
         eg """
@@ -1227,6 +1371,7 @@ logo {
         desc "outputs the arctangent, in degrees, of its input. With two inputs, outputs the arctangent of y/x, if x is nonzero, or 90 or –90 depending on the sign of y, if x is zero."
         supported #true
         obsolete #false
+        phase 1
       }
       radarctan {
         eg """
@@ -1240,6 +1385,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
       iseq {
         eg "ISEQ from to  (library procedure)"
@@ -1253,6 +1399,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
       rseq {
         eg "RSEQ from to count  (library procedure)"
@@ -1266,6 +1413,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
     }
     numeric-predicates {
@@ -1278,6 +1426,7 @@ logo {
         desc "outputs TRUE if its first input is strictly less than its second."
         supported #true
         obsolete #false
+        phase 1
       }
       greaterp {
         eg """
@@ -1288,6 +1437,7 @@ logo {
         desc "outputs TRUE if its first input is strictly greater than its second."
         supported #true
         obsolete #false
+        phase 1
       }
       lessequalp {
         eg """
@@ -1298,6 +1448,7 @@ logo {
         desc "outputs TRUE if its first input is less than or equal to its second."
         supported #true
         obsolete #false
+        phase 1
       }
       greaterequalp {
         eg """
@@ -1308,6 +1459,7 @@ logo {
         desc "outputs TRUE if its first input is greater than or equal to its second."
         supported #true
         obsolete #false
+        phase 1
       }
     }
     random-numbers {
@@ -1323,6 +1475,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 1
       }
       rerandom {
         eg """
@@ -1332,6 +1485,7 @@ logo {
         desc "command. Makes the results of RANDOM reproducible. Ordinarily the sequence of random numbers is different each time Logo is used. If you need the same sequence of pseudo-random numbers repeatedly, e.g. to debug a program, say RERANDOM before the first invocation of RANDOM. If you need more than one repeatable sequence, you can give RERANDOM an integer input; each possible input selects a unique sequence of numbers."
         supported #true
         obsolete #false
+        phase 2
       }
     }
     print-formatting {
@@ -1350,6 +1504,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
     }
     bitwise-operations {
@@ -1362,6 +1517,7 @@ logo {
         see "and"
         supported #true
         obsolete #false
+        phase 4
       }
       bitor {
         eg """
@@ -1372,6 +1528,7 @@ logo {
         see "or"
         supported #true
         obsolete #false
+        phase 4
       }
       bitxor {
         eg """
@@ -1381,6 +1538,7 @@ logo {
         desc "outputs the bitwise exclusive or of its inputs, which must be integers."
         supported #true
         obsolete #false
+        phase 4
       }
       bitnot {
         eg "BITNOT num"
@@ -1388,18 +1546,21 @@ logo {
         see "not"
         supported #true
         obsolete #false
+        phase 4
       }
       ashift {
         eg "ASHIFT num1 num2"
         desc "outputs num1 arithmetic-shifted to the left by num2 bits. If num2 is negative, the shift is to the right with sign extension. The inputs must be integers."
         supported #true
         obsolete #false
+        phase 4
       }
       lshift {
         eg "LSHIFT num1 num2"
         desc "outputs num1 logical-shifted to the left by num2 bits. If num2 is negative, the shift is to the right with zero fill. The inputs must be integers."
         supported #true
         obsolete #false
+        phase 4
       }
     }
   }
@@ -1418,6 +1579,7 @@ logo {
       """
       supported #true
       obsolete #false
+      phase 1
     }
     or {
       eg """
@@ -1433,12 +1595,14 @@ logo {
       """
       supported #true
       obsolete #false
+      phase 1
     }
     not {
       eg "NOT tf"
       desc "outputs TRUE if the input is FALSE, and vice versa. The input can be a list, in which case it is taken as an expression to run; that expression must produce a TRUE or FALSE value."
       supported #true
       obsolete #false
+      phase 1
     }
   }
   graphics {
@@ -1451,6 +1615,7 @@ logo {
         desc "moves the turtle forward, in the direction that it’s facing, by the specified distance (measured in turtle steps)."
         supported #true
         obsolete #false
+        phase 1
       }
       back {
         eg """
@@ -1460,6 +1625,7 @@ logo {
         desc "moves the turtle backward, i.e., exactly opposite to the direction that it’s facing, by the specified distance. (The heading of the turtle does not change.)"
         supported #true
         obsolete #false
+        phase 1
       }
       left {
         eg """
@@ -1469,6 +1635,7 @@ logo {
         desc "turns the turtle counterclockwise by the specified angle, measured in degrees (1/360 of a circle)."
         supported #true
         obsolete #false
+        phase 1
       }
       right {
         eg """
@@ -1478,30 +1645,35 @@ logo {
         desc "turns the turtle clockwise by the specified angle, measured in degrees (1/360 of a circle)."
         supported #true
         obsolete #false
+        phase 1
       }
       setpos {
         eg "SETPOS pos"
         desc "moves the turtle to an absolute position in the graphics window. The input is a list of two numbers, the X and Y coordinates."
         supported #true
         obsolete #false
+        phase 1
       }
       setxy {
         eg "SETXY xcor ycor"
         desc "moves the turtle to an absolute position in the graphics window. The two inputs are numbers, the X and Y coordinates."
         supported #true
         obsolete #false
+        phase 1
       }
       setx {
         eg "SETX xcor"
         desc "moves the turtle horizontally from its old position to a new absolute horizontal coordinate. The input is the new X coordinate."
         supported #true
         obsolete #false
+        phase 1
       }
       sety {
         eg "SETY ycor"
         desc "moves the turtle vertically from its old position to a new absolute vertical coordinate. The input is the new Y coordinate."
         supported #true
         obsolete #false
+        phase 1
       }
       setheading {
         eg """
@@ -1511,6 +1683,7 @@ logo {
         desc "turns the turtle to a new absolute heading. The input is a number, the heading in degrees clockwise from the positive Y axis."
         supported #true
         obsolete #false
+        phase 1
       }
       home {
         eg "HOME"
@@ -1518,12 +1691,14 @@ logo {
         see "setpos" "setheading"
         supported #true
         obsolete #false
+        phase 1
       }
       arc {
         eg "ARC angle radius"
         desc "draws an arc of a circle, with the turtle at the center, with the specified radius, starting at the turtle’s heading and extending clockwise through the specified angle. The turtle does not move."
         supported #true
         obsolete #false
+        phase 1
       }
     }
     turtle-motion-queries {
@@ -1532,30 +1707,35 @@ logo {
         desc "outputs the turtle’s current position, as a list of two numbers, the X and Y coordinates."
         supported #true
         obsolete #false
+        phase 1
       }
       xcor {
         eg "XCOR  (library procedure)"
         desc "outputs a number, the turtle’s X coordinate."
         supported #true
         obsolete #false
+        phase 1
       }
       ycor {
         eg "YCOR  (library procedure)"
         desc "outputs a number, the turtle’s Y coordinate."
         supported #true
         obsolete #false
+        phase 1
       }
       heading {
         eg "HEADING"
         desc "outputs a number, the turtle’s heading in degrees."
         supported #true
         obsolete #false
+        phase 1
       }
       towards {
         eg "TOWARDS pos"
         desc "outputs a number, the heading at which the turtle should be facing so that it would point from its current position to the position given as the input."
         supported #true
         obsolete #false
+        phase 1
       }
       scrunch {
         eg "SCRUNCH"
@@ -1563,6 +1743,7 @@ logo {
         see "setscrunch"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Corrects the aspect ratio of old monitors. Modern displays have square pixels."
       }
     }
@@ -1575,6 +1756,7 @@ logo {
         desc "makes the turtle visible."
         supported #true
         obsolete #false
+        phase 1
       }
       hideturtle {
         eg """
@@ -1584,12 +1766,14 @@ logo {
         desc "makes the turtle invisible. It’s a good idea to do this while you’re in the middle of a complicated drawing, because hiding the turtle speeds up the drawing substantially."
         supported #true
         obsolete #false
+        phase 1
       }
       clean {
         eg "CLEAN"
         desc "erases all lines that the turtle has drawn on the graphics window. The turtle’s state (position, heading, pen mode, etc.) is not changed."
         supported #true
         obsolete #false
+        phase 1
       }
       clearscreen {
         eg """
@@ -1600,6 +1784,7 @@ logo {
         see "home"
         supported #true
         obsolete #false
+        phase 1
       }
       wrap {
         eg "WRAP"
@@ -1607,12 +1792,14 @@ logo {
         see "fence"
         supported #true
         obsolete #false
+        phase 1
       }
       window {
         eg "WINDOW"
         desc "tells the turtle to enter window mode: From now on, if the turtle is asked to move past the boundary of the graphics window, it will move offscreen. The visible graphics window is considered as just part of an infinite graphics plane; the turtle can be anywhere on the plane. (If you lose the turtle, HOME will bring it back to the center of the window.) Compare WRAP and FENCE."
         supported #true
         obsolete #false
+        phase 1
       }
       fence {
         eg "FENCE"
@@ -1620,30 +1807,35 @@ logo {
         see "wrap"
         supported #true
         obsolete #false
+        phase 1
       }
       fill {
         eg "FILL"
         desc "fills in a region of the graphics window containing the turtle and bounded by lines that have been drawn earlier. This is not portable; it doesn’t work for all machines, and may not work exactly the same way on different machines."
         supported #true
         obsolete #false
+        phase 2
       }
       filled {
         eg "FILLED color instructions"
         desc "runs the instructions, remembering all points visited by turtle motion commands, starting and ending with the turtle’s initial position. Then draws (ignoring penmode) the resulting polygon, in the current pen color, filling the polygon with the given color, which can be a color number or an RGB list. The instruction list cannot include another FILLED invocation. (wxWidgets only)"
         supported #true
         obsolete #false
+        phase 2
       }
       label {
         eg "LABEL text"
         desc "takes a word or list as input, and prints the input on the graphics window, starting at the turtle’s position."
         supported #true
         obsolete #false
+        phase 2
       }
       setlabelheight {
         eg "SETLABELHEIGHT height"
         desc "command (wxWidgets only). Takes a positive integer argument and tries to set the font size so that the character height (including descenders) is that many turtle steps. This will be different from the number of screen pixels if SETSCRUNCH has been used. Also, note that SETSCRUNCH changes the font size to try to preserve this height in turtle steps. Note that the query operation corresponding to this command is LABELSIZE, not LABELHEIGHT, because it tells you the width as well as the height of characters in the current font."
         supported #true
         obsolete #false
+        phase 2
       }
       textscreen {
         eg """
@@ -1654,6 +1846,7 @@ logo {
         see "splitscreen"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Rearranges a single full-screen display between text and graphics. The GUI has a fixed layout with a canvas and a console."
       }
       fullscreen {
@@ -1670,6 +1863,7 @@ logo {
         """
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Rearranges a single full-screen display between text and graphics. The GUI has a fixed layout with a canvas and a console."
       }
       splitscreen {
@@ -1681,6 +1875,7 @@ logo {
         see "textscreen"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Rearranges a single full-screen display between text and graphics. The GUI has a fixed layout with a canvas and a console."
       }
       setscrunch {
@@ -1692,6 +1887,7 @@ logo {
         """
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Corrects the aspect ratio of old monitors. Modern displays have square pixels; if stretched drawing is wanted, add a proper transform later."
       }
       refresh {
@@ -1699,6 +1895,7 @@ logo {
         desc "(command) tells Logo to remember the turtle’s motions so that they can be used for high-resolution printing (wxWidgets) or to refresh the graphics window if it is moved, resized, or overlayed (non-wxWidgets). This is the default."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Tells Logo whether to remember drawing to save memory. The GUI always keeps the drawing."
       }
       norefresh {
@@ -1706,6 +1903,7 @@ logo {
         desc "(command) tells Logo not to remember the turtle’s motions, which may be useful to save time and memory if your program is interactive or animated, rather than drawing a static picture you’ll want to print later (wxWidgets). In non-wxWidgets versions, using NOREFRESH may prevent Logo from restoring the graphics image after the window is moved, resized, or overlayed."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Tells Logo whether to remember drawing to save memory. The GUI always keeps the drawing."
       }
     }
@@ -1719,12 +1917,14 @@ logo {
         see "showturtle" "hideturtle"
         supported #true
         obsolete #false
+        phase 1
       }
       screenmode {
         eg "SCREENMODE"
         desc "outputs the word TEXTSCREEN, SPLITSCREEN, or FULLSCREEN depending on the current screen mode."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Rearranges a single full-screen display between text and graphics. The GUI has a fixed layout with a canvas and a console."
       }
       turtlemode {
@@ -1732,12 +1932,14 @@ logo {
         desc "outputs the word WRAP, FENCE, or WINDOW depending on the current turtle mode."
         supported #true
         obsolete #false
+        phase 1
       }
       labelsize {
         eg "LABELSIZE"
         desc "(wxWidgets only) outputs a list of two positive integers, the width and height of characters displayed by LABEL measured in turtle steps (which will be different from screen pixels if SETSCRUNCH has been used). There is no SETLABELSIZE because the width and height of a font are not separately controllable, so the inverse of this operation is SETLABELHEIGHT, which takes just one number for the desired height."
         supported #true
         obsolete #false
+        phase 2
       }
     }
     pen-and-background-control {
@@ -1749,6 +1951,7 @@ logo {
         desc "sets the pen’s position to DOWN, without changing its mode."
         supported #true
         obsolete #false
+        phase 1
       }
       penup {
         eg """
@@ -1758,6 +1961,7 @@ logo {
         desc "sets the pen’s position to UP, without changing its mode."
         supported #true
         obsolete #false
+        phase 1
       }
       penpaint {
         eg """
@@ -1767,6 +1971,7 @@ logo {
         desc "sets the pen’s position to DOWN and mode to PAINT."
         supported #true
         obsolete #false
+        phase 2
       }
       penerase {
         eg """
@@ -1776,6 +1981,7 @@ logo {
         desc "sets the pen’s position to DOWN and mode to ERASE."
         supported #true
         obsolete #false
+        phase 2
       }
       penreverse {
         eg """
@@ -1785,6 +1991,7 @@ logo {
         desc "sets the pen’s position to DOWN and mode to REVERSE. (This may interact in system-dependent ways with use of color.)"
         supported #true
         obsolete #false
+        phase 2
       }
       setpencolor {
         eg """
@@ -1803,24 +2010,28 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 1
       }
       setpalette {
         eg "SETPALETTE colornumber rgblist"
         desc "sets the actual color corresponding to a given number, if allowed by the hardware and operating system. Colornumber must be an integer greater than or equal to 8. (Logo tries to keep the first 8 colors constant.) The second input is a list of three nonnegative numbers less than 100 specifying the percent saturation of red, green, and blue in the desired color."
         supported #true
         obsolete #false
+        phase 2
       }
       setpensize {
         eg "SETPENSIZE size"
         desc "sets the thickness of the pen. The input is either a single positive integer or a list of two positive integers (for horizontal and vertical thickness). Some versions pay no attention to the second number, but always have a square pen."
         supported #true
         obsolete #false
+        phase 1
       }
       setpenpattern {
         eg "SETPENPATTERN pattern"
         desc "sets hardware-dependent pen characteristics. This command is not guaranteed compatible between implementations on different machines."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Hardware-dependent pen settings with no defined behaviour."
       }
       setpen {
@@ -1829,6 +2040,7 @@ logo {
         see "pen"
         supported #true
         obsolete #false
+        phase 2
       }
       setbackground {
         eg """
@@ -1839,6 +2051,7 @@ logo {
         see "setpencolor"
         supported #true
         obsolete #false
+        phase 1
       }
     }
     pen-queries {
@@ -1850,12 +2063,14 @@ logo {
         desc "outputs TRUE if the pen is down, FALSE if it’s up."
         supported #true
         obsolete #false
+        phase 1
       }
       penmode {
         eg "PENMODE"
         desc "outputs one of the words PAINT, ERASE, or REVERSE according to the current pen mode."
         supported #true
         obsolete #false
+        phase 2
       }
       pencolor {
         eg """
@@ -1874,12 +2089,14 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 1
       }
       palette {
         eg "PALETTE colornumber"
         desc "outputs a list of three nonnegative numbers less than 100 specifying the percent saturation of red, green, and blue in the color associated with the given number."
         supported #true
         obsolete #false
+        phase 2
       }
       pensize {
         eg "PENSIZE"
@@ -1892,6 +2109,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 1
       }
       pen {
         eg "PEN  (library procedure)"
@@ -1899,6 +2117,7 @@ logo {
         see "setpen"
         supported #true
         obsolete #false
+        phase 2
       }
       background {
         eg """
@@ -1908,6 +2127,7 @@ logo {
         desc "outputs the graphics background color, either as a slot number or as an RGB list, whichever way it was set. (See PENCOLOR.)"
         supported #true
         obsolete #false
+        phase 1
       }
     }
     saving-and-loading-pictures {
@@ -1916,6 +2136,7 @@ logo {
         desc "command. Writes a file with the specified name containing the state of the graphics window, including any nonstandard color palette settings, in Logo’s internal format. This picture can be restored to the screen using LOADPICT. The format is not portable between platforms, nor is it readable by other programs. EPSPICT to export Logo graphics for other programs."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Saves or loads pictures in UCBLogo's own format. The GUI will have export (PNG/SVG) and the source is the way to reproduce a drawing."
       }
       loadpict {
@@ -1924,6 +2145,7 @@ logo {
         see "savepict"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Saves or loads pictures in UCBLogo's own format. The GUI will have export (PNG/SVG) and the source is the way to reproduce a drawing."
       }
       epspict {
@@ -1931,6 +2153,7 @@ logo {
         desc "command. Writes a file with the specified name, containing an Encapsulated Postscript (EPS) representation of the state of the graphics window. This file can be imported into other programs that understand EPS format. Restrictions: the drawing cannot use FILL, PENERASE, or PENREVERSE; any such instructions will be ignored in the translation to Postscript form."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Exports Encapsulated PostScript. The GUI will export PNG and SVG instead."
       }
     }
@@ -1940,12 +2163,14 @@ logo {
         desc "outputs the coordinates of the mouse, provided that it’s within the graphics window, in turtle coordinates. If the mouse is outside the graphics window, then the last position within the window is returned. Exception: If a mouse button is pressed within the graphics window and held while the mouse is dragged outside the window, the mouse’s position is returned as if the window were big enough to include it."
         supported #true
         obsolete #false
+        phase 3
       }
       clickpos {
         eg "CLICKPOS"
         desc "outputs the coordinates that the mouse was at when a mouse button was most recently pushed, provided that that position was within the graphics window, in turtle coordinates. (wxWidgets only)"
         supported #true
         obsolete #false
+        phase 3
       }
       buttonp {
         eg """
@@ -1955,12 +2180,14 @@ logo {
         desc "outputs TRUE if a mouse button is down and the mouse is over the graphics window. Once the button is down, BUTTONP remains true until the button is released, even if the mouse is dragged out of the graphics window."
         supported #true
         obsolete #false
+        phase 3
       }
       button {
         eg "BUTTON"
         desc "outputs 0 if no mouse button has been pushed inside the Logo window since the last call to BUTTON. Otherwise, it outputs an integer between 1 and 3 indicating which button was most recently pressed. Ordinarily 1 means left, 2 means right, and 3 means center, but operating systems may reconfigure these."
         supported #true
         obsolete #false
+        phase 3
       }
     }
   }
@@ -2036,6 +2263,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 1
       }
       define {
         eg "DEFINE procname text"
@@ -2043,12 +2271,14 @@ logo {
         see "redefp"
         supported #true
         obsolete #false
+        phase 4
       }
       text {
         eg "TEXT procname"
         desc "outputs the text of the procedure named procname in the form expected by DEFINE: a list of lists, the first of which describes the inputs to the procedure and the rest of which are the lines of its body. The text does not reflect formatting information used when the procedure was defined, such as continuation lines and extra spaces."
         supported #true
         obsolete #false
+        phase 4
       }
       fulltext {
         eg "FULLTEXT procname"
@@ -2056,6 +2286,7 @@ logo {
         see "text"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Gives a procedure's text with its formatting so the editor can show it. The GUI editor already has the source."
       }
       copydef {
@@ -2068,6 +2299,7 @@ logo {
         see "redefp" "save" "po" "pot"
         supported #true
         obsolete #false
+        phase 4
       }
     }
     variable-definition {
@@ -2076,12 +2308,14 @@ logo {
         desc "command. Assigns the value value to the variable named varname, which must be a word. Variable names are case-insensitive. If a variable with the same name already exists, the value of that variable is changed. If not, a new global variable is created."
         supported #true
         obsolete #false
+        phase 1
       }
       name {
         eg "NAME value varname  (library procedure)"
         desc "command. Same as MAKE but with the inputs in reverse order."
         supported #true
         obsolete #false
+        phase 2
       }
       local {
         eg """
@@ -2093,6 +2327,7 @@ logo {
         see "make"
         supported #true
         obsolete #false
+        phase 1
       }
       localmake {
         eg "LOCALMAKE varname value  (library procedure)"
@@ -2100,6 +2335,7 @@ logo {
         see "local" "make"
         supported #true
         obsolete #false
+        phase 1
       }
       thing {
         eg """
@@ -2115,6 +2351,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 1
       }
       global {
         eg """
@@ -2125,6 +2362,7 @@ logo {
         desc "command. Accepts as inputs one or more words, or a list of words. A global variable is created for each of these words, with that word as its name. The only reason this is necessary is that you might want to use the \"setter\" notation SETXYZ for a variable XYZ that does not already have a value; GLOBAL \"XYZ makes that legal. Note: If there is currently a local variable of the same name, this command does *not* make Logo use the global value instead of the local one."
         supported #true
         obsolete #false
+        phase 2
       }
     }
     property-lists {
@@ -2133,24 +2371,28 @@ logo {
         desc "command. Adds a property to the plistname property list with name propname and value value."
         supported #true
         obsolete #false
+        phase 4
       }
       gprop {
         eg "GPROP plistname propname"
         desc "outputs the value of the propname property in the plistname property list, or the empty list if there is no such property."
         supported #true
         obsolete #false
+        phase 4
       }
       remprop {
         eg "REMPROP plistname propname"
         desc "command. Removes the property named propname from the property list named plistname."
         supported #true
         obsolete #false
+        phase 4
       }
       plist {
         eg "PLIST plistname"
         desc "outputs a list whose odd-numbered members are the names, and whose even-numbered members are the values, of the properties in the property list named plistname. The output is a copy of the actual property list; changing properties later will not magically change a list output earlier by PLIST."
         supported #true
         obsolete #false
+        phase 4
       }
     }
     workspace-predicates {
@@ -2162,6 +2404,7 @@ logo {
         desc "outputs TRUE if the input is the name of a procedure."
         supported #true
         obsolete #false
+        phase 4
       }
       primitivep {
         eg """
@@ -2171,6 +2414,7 @@ logo {
         desc "outputs TRUE if the input is the name of a primitive procedure (one built into Logo). Note that some of the procedures described in this document are library procedures, not primitives."
         supported #true
         obsolete #false
+        phase 4
       }
       definedp {
         eg """
@@ -2180,6 +2424,7 @@ logo {
         desc "outputs TRUE if the input is the name of a user-defined procedure, including a library procedure."
         supported #true
         obsolete #false
+        phase 4
       }
       namep {
         eg """
@@ -2189,6 +2434,7 @@ logo {
         desc "outputs TRUE if the input is the name of a variable."
         supported #true
         obsolete #false
+        phase 4
       }
       plistp {
         eg """
@@ -2198,6 +2444,7 @@ logo {
         desc "outputs TRUE if the input is the name of a nonempty property list. (In principle every word is the name of a property list; if you haven’t put any properties in it, PLIST of that name outputs an empty list, rather than giving an error message.)"
         supported #true
         obsolete #false
+        phase 4
       }
     }
     workspace-queries {
@@ -2206,6 +2453,7 @@ logo {
         desc "outputs a \"contents list,\" i.e., a list of three lists containing names of defined procedures, variables, and property lists respectively. This list includes all unburied named items in the workspace."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
       }
       buried {
@@ -2213,6 +2461,7 @@ logo {
         desc "outputs a contents list including all buried named items in the workspace."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
       }
       traced {
@@ -2220,6 +2469,7 @@ logo {
         desc "outputs a contents list including all traced named items in the workspace."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
       }
       stepped {
@@ -2227,6 +2477,7 @@ logo {
         desc "outputs a contents list including all stepped named items in the workspace."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
       }
       procedures {
@@ -2234,6 +2485,7 @@ logo {
         desc "outputs a list of the names of all unburied user-defined procedures in the workspace. Note that this is a list of names, not a contents list. (However, procedures that require a contents list as input will accept this list.)"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
       }
       primitives {
@@ -2241,6 +2493,7 @@ logo {
         desc "outputs a list of the names of all primitive procedures in the workspace. Note that this is a list of names, not a contents list. (However, procedures that require a contents list as input will accept this list.)"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Lists every built-in procedure. The GUI's reference/help panel covers this."
       }
       names {
@@ -2248,6 +2501,7 @@ logo {
         desc "outputs a contents list consisting of an empty list (indicating no procedure names) followed by a list of all unburied variable names in the workspace."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
       }
       plists {
@@ -2255,6 +2509,7 @@ logo {
         desc "outputs a contents list consisting of two empty lists (indicating no procedures or variables) followed by a list of all unburied nonempty property lists in the workspace."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
       }
       namelist {
@@ -2265,6 +2520,7 @@ logo {
         desc "outputs a contents list consisting of an empty list followed by a list of the name or names given as input. This is useful in conjunction with workspace control procedures that require a contents list as input."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
       }
       pllist {
@@ -2276,6 +2532,7 @@ logo {
         see "contents"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
       }
       arity {
@@ -2283,12 +2540,14 @@ logo {
         desc "outputs a list of three numbers: the minimum, default, and maximum number of inputs for the procedure whose name is the input. It is an error if there is no such procedure. A maximum of -1 means that the number of inputs is unlimited."
         supported #true
         obsolete #false
+        phase 4
       }
       nodes {
         eg "NODES"
         desc "outputs a list of two numbers. The first represents the number of nodes of memory currently in use. The second shows the maximum number of nodes that have been in use at any time since the last invocation of NODES. (A node is a small block of computer memory as used by Logo. Each number uses one node. Each non-numeric word uses one node, plus some non-node memory for the characters in the word. Each array takes one node, plus some non-node memory, as well as the memory required by its elements. Each list requires one node per element, as well as the memory within the elements.) If you want to track the memory use of an algorithm, it is best if you invoke GC at the beginning of each iteration, since otherwise the maximum will include storage that is unused but not yet collected."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Manual memory management for 1980s machines. A modern runtime handles this itself."
       }
     }
@@ -2301,6 +2560,7 @@ logo {
         desc "command. Prints to the write stream the definitions of all procedures, variables, and property lists named in the input contents list."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
       }
       poall {
@@ -2309,6 +2569,7 @@ logo {
         see "contents"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
       }
       pops {
@@ -2317,6 +2578,7 @@ logo {
         see "po" "procedures"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
       }
       pons {
@@ -2325,6 +2587,7 @@ logo {
         see "po" "names"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
       }
       popls {
@@ -2333,6 +2596,7 @@ logo {
         see "po" "plists"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
       }
       pon {
@@ -2348,6 +2612,7 @@ logo {
         see "po" "namelist"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
       }
       popl {
@@ -2363,6 +2628,7 @@ logo {
         see "po" "pllist"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
       }
       pot {
@@ -2371,6 +2637,7 @@ logo {
         see "pprop" "po"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
       }
       pots {
@@ -2379,6 +2646,7 @@ logo {
         see "procedures"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
       }
     }
@@ -2392,6 +2660,7 @@ logo {
         see "redefp"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
       }
       erall {
@@ -2400,6 +2669,7 @@ logo {
         see "contents"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
       }
       erps {
@@ -2412,6 +2682,7 @@ logo {
         see "erase" "procedures"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
       }
       erns {
@@ -2420,6 +2691,7 @@ logo {
         see "erase" "names"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
       }
       erpls {
@@ -2432,6 +2704,7 @@ logo {
         see "erase" "plists"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
       }
       ern {
@@ -2443,6 +2716,7 @@ logo {
         see "erase" "namelist"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
       }
       erpl {
@@ -2454,6 +2728,7 @@ logo {
         see "erase" "pllist"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
       }
       bury {
@@ -2462,6 +2737,7 @@ logo {
         see "contents" "procedures" "pons" "plists" "poall" "save"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
       }
       buryall {
@@ -2470,6 +2746,7 @@ logo {
         see "contents"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
       }
       buryname {
@@ -2481,6 +2758,7 @@ logo {
         see "bury" "namelist"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
       }
       unbury {
@@ -2489,6 +2767,7 @@ logo {
         see "contents"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
       }
       unburyall {
@@ -2497,6 +2776,7 @@ logo {
         see "buried"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
       }
       unburyname {
@@ -2508,6 +2788,7 @@ logo {
         see "unbury" "namelist"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
       }
       buriedp {
@@ -2518,6 +2799,7 @@ logo {
         desc "outputs TRUE if the first procedure, variable, or property list named in the contents list is buried, FALSE if not. Only the first thing in the list is tested; the most common use will be with a word as input, naming a procedure, but a contents list is allowed so that you can BURIEDP [[] [variable]] or BURIEDP [[] [] [proplist]]."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
       }
       trace {
@@ -2526,6 +2808,7 @@ logo {
         see "stop" "output" "make" "pprop"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see plan-1.md)."
       }
       untrace {
@@ -2533,6 +2816,7 @@ logo {
         desc "command. Turns off tracing for the named items."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see plan-1.md)."
       }
       tracedp {
@@ -2543,6 +2827,7 @@ logo {
         desc "outputs TRUE if the first procedure, variable, or property list named in the contents list is traced, FALSE if not. Only the first thing in the list is tested; the most common use will be with a word as input, naming a procedure, but a contents list is allowed so that you can TRACEDP [[] [variable]] or TRACEDP [[] [] [proplist]]."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see plan-1.md)."
       }
       step {
@@ -2551,6 +2836,7 @@ logo {
         see "local"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see plan-1.md)."
       }
       unstep {
@@ -2558,6 +2844,7 @@ logo {
         desc "command. Turns off stepping for the named items."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see plan-1.md)."
       }
       steppedp {
@@ -2568,6 +2855,7 @@ logo {
         desc "outputs TRUE if the first procedure, variable, or property list named in the contents list is stepped, FALSE if not. Only the first thing in the list is tested; the most common use will be with a word as input, naming a procedure, but a contents list is allowed so that you can STEPPEDP [[] [variable]] or STEPPEDP [[] [] [proplist]]."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see plan-1.md)."
       }
       edit {
@@ -2589,6 +2877,7 @@ logo {
         see "loadnoisily" "editfile"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Opens an external text editor. The GUI has its own editor."
       }
       editfile {
@@ -2602,6 +2891,7 @@ logo {
         """
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Opens an external text editor. The GUI has its own editor."
       }
       edall {
@@ -2610,6 +2900,7 @@ logo {
         see "contents"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Opens an external text editor. The GUI has its own editor."
       }
       edps {
@@ -2618,6 +2909,7 @@ logo {
         see "edit" "procedures"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Opens an external text editor. The GUI has its own editor."
       }
       edns {
@@ -2626,6 +2918,7 @@ logo {
         see "edit" "names"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Opens an external text editor. The GUI has its own editor."
       }
       edpls {
@@ -2634,6 +2927,7 @@ logo {
         see "edit" "plists"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Opens an external text editor. The GUI has its own editor."
       }
       edn {
@@ -2645,6 +2939,7 @@ logo {
         see "edit" "namelist"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Opens an external text editor. The GUI has its own editor."
       }
       edpl {
@@ -2656,6 +2951,7 @@ logo {
         see "edit" "pllist"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Opens an external text editor. The GUI has its own editor."
       }
       save {
@@ -2677,6 +2973,7 @@ logo {
         """
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Saves or loads the whole workspace as a file. The GUI opens and saves program files instead. If modules are needed later, design a proper import."
       }
       savel {
@@ -2684,6 +2981,7 @@ logo {
         desc "command. Saves the definitions of the procedures, variables, and property lists specified by contentslist to the file named filename."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Saves or loads the whole workspace as a file. The GUI opens and saves program files instead. If modules are needed later, design a proper import."
       }
       load {
@@ -2692,6 +2990,7 @@ logo {
         see "startup" "loadnoisily"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Saves or loads the whole workspace as a file. The GUI opens and saves program files instead. If modules are needed later, design a proper import."
       }
       cslsload {
@@ -2700,6 +2999,7 @@ logo {
         see "load"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Loads example programs from the Computer Science Logo Style books. Not applicable."
       }
       help {
@@ -2716,6 +3016,7 @@ logo {
         """
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Prints manual entries at the prompt. The GUI will have a reference panel (which can be built from this file)."
       }
       seteditor {
@@ -2723,6 +3024,7 @@ logo {
         desc "command. Tells Logo to use the specified program as its editor instead of the default editor. The format of a path depends on your operating system."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Configures where UCBLogo finds its own support files (editor, library, help, temp files). Not applicable."
       }
       setlibloc {
@@ -2730,6 +3032,7 @@ logo {
         desc "command. Tells Logo to use the specified directory as its library instead of the default. (Note that many Logo \"primitive\" procedures are actually found in the library, so they may become unavailable if your new library does not include them!) The format of a path depends on your operating system."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Configures where UCBLogo finds its own support files (editor, library, help, temp files). Not applicable."
       }
       setcslsloc {
@@ -2738,6 +3041,7 @@ logo {
         see "cslsload"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Configures where UCBLogo finds its own support files (editor, library, help, temp files). Not applicable."
       }
       sethelploc {
@@ -2745,6 +3049,7 @@ logo {
         desc "command. Tells Logo to look in the specified directory for the information provided by the HELP command, instead of the default directory. The format of a path depends on your operating system."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Configures where UCBLogo finds its own support files (editor, library, help, temp files). Not applicable."
       }
       settemploc {
@@ -2752,6 +3057,7 @@ logo {
         desc "command. Tells Logo to write editor temporary files in the specified directory rather than in the default directory. You must have write permission for this directory. The format of a path depends on your operating system."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Configures where UCBLogo finds its own support files (editor, library, help, temp files). Not applicable."
       }
       gc {
@@ -2762,6 +3068,7 @@ logo {
         desc "command. Runs the garbage collector, reclaiming unused nodes. Logo does this when necessary anyway, but you may want to use this command to control exactly when Logo does it. In particular, the numbers output by the NODES operation will not be very meaningful unless garbage has been collected. Another reason to use GC is that a garbage collection takes a noticeable fraction of a second, and you may want to schedule collections for times before or after some time-critical animation. If invoked with an argument (of any value), GC runs a full garbage collection, including GCTWA (Garbage Collect Truly Worthless Atoms, which means that it removes from Logo’s memory words that used to be procedure or variable names but aren’t any more); without an argument, GC does a generational garbage collection, which means that only recently created nodes are examined. (The latter is usually good enough.)"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Manual memory management for 1980s machines. A modern runtime handles this itself."
       }
       .setsegmentsize {
@@ -2769,6 +3076,7 @@ logo {
         desc "command. Sets the number of nodes that Logo allocates from the operating system at once to num, which must be a positive integer. The name is dotted because bad things will happen if you use a number that’s too small or too large for your computer. The initial value is 16,000 for most systems, but is smaller for 68000-based Macs. Making it larger will speed up computations (by reducing the number of garbage collections) at the cost of allocating more memory than necessary."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Manual memory management for 1980s machines. A modern runtime handles this itself."
       }
     }
@@ -2781,6 +3089,7 @@ logo {
         see "readword" "readlist"
         supported #true
         obsolete #false
+        phase 2
       }
       runresult {
         eg "RUNRESULT instructionlist"
@@ -2794,12 +3103,14 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
       repeat {
         eg "REPEAT num instructionlist"
         desc "command. Runs the instructionlist repeatedly, num times."
         supported #true
         obsolete #false
+        phase 1
       }
       forever {
         eg "FOREVER instructionlist"
@@ -2807,6 +3118,7 @@ logo {
         see "stop" "throw"
         supported #true
         obsolete #false
+        phase 1
       }
       repcount {
         eg "REPCOUNT"
@@ -2817,6 +3129,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 1
       }
       if {
         eg """
@@ -2830,12 +3143,14 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 1
       }
       ifelse {
         eg "IFELSE tf instructionlist1 instructionlist2"
         desc "command or operation. If the first input has the value TRUE, then IFELSE runs the second input. If the first input has the value FALSE, then IFELSE runs the third input. IFELSE outputs a value if the instructionlist contains an expression that outputs a value."
         supported #true
         obsolete #false
+        phase 1
       }
       test {
         eg "TEST tf"
@@ -2843,6 +3158,7 @@ logo {
         see "iffalse"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Superseded by IFELSE. TEST stores hidden state that IFTRUE / IFFALSE read later, which is confusing."
       }
       iftrue {
@@ -2853,6 +3169,7 @@ logo {
         desc "command. Runs its input if the most recent TEST instruction had a TRUE input. The TEST must have been in the same procedure or a superprocedure."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Superseded by IFELSE. TEST stores hidden state that IFTRUE / IFFALSE read later, which is confusing."
       }
       iffalse {
@@ -2864,6 +3181,7 @@ logo {
         see "test"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Superseded by IFELSE. TEST stores hidden state that IFTRUE / IFFALSE read later, which is confusing."
       }
       stop {
@@ -2871,6 +3189,7 @@ logo {
         desc "command. Ends the running of the procedure in which it appears. Control is returned to the context in which that procedure was invoked. The stopped procedure does not output a value."
         supported #true
         obsolete #false
+        phase 1
       }
       output {
         eg """
@@ -2880,6 +3199,7 @@ logo {
         desc "command. Ends the running of the procedure in which it appears. That procedure outputs the value value to the context in which it was invoked. Don’t be confused: OUTPUT itself is a command, but the procedure that invokes OUTPUT is an operation."
         supported #true
         obsolete #false
+        phase 1
       }
       catch {
         eg "CATCH tag instructionlist"
@@ -2891,6 +3211,7 @@ logo {
         see "error" "erract" "pause"
         supported #true
         obsolete #false
+        phase 2
       }
       throw {
         eg """
@@ -2908,12 +3229,14 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
       error {
         eg "ERROR"
         desc "outputs a list describing the error just caught, if any. If there was not an error caught since the last use of ERROR, the empty list will be output. The error list contains four members: an integer code corresponding to the type of error, the text of the error message (as a single word including spaces), the name of the procedure in which the error occurred, and the instruction line on which the error occurred."
         supported #true
         obsolete #false
+        phase 2
       }
       pause {
         eg "PAUSE"
@@ -2927,6 +3250,7 @@ logo {
         see "erract"
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Opens an interactive prompt inside a running procedure. The GUI's pause button and variable inspector replace it."
       }
       continue {
@@ -2943,6 +3267,7 @@ logo {
         """
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Ends an interactive PAUSE, which is obsolete."
       }
       wait {
@@ -2950,12 +3275,14 @@ logo {
         desc "command. Delays further execution for time 60ths of a second. Also causes any buffered characters destined for the terminal to be printed immediately. WAIT 0 can be used to achieve this buffer flushing without actually waiting."
         supported #true
         obsolete #false
+        phase 1
       }
       bye {
         eg "BYE"
         desc "command. Exits from Logo; returns to the operating system."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Exits Logo. In the GUI you close the window; the CLI ends when the program does."
       }
       .maybeoutput {
@@ -2977,12 +3304,14 @@ logo {
         see "output" "stop" "runresult"
         supported #true
         obsolete #false
+        phase 4
       }
       goto {
         eg "GOTO word"
         desc "command. Looks for a TAG command with the same input in the same procedure, and continues running the procedure from the location of that TAG. It is meaningless to use GOTO outside of a procedure."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Unstructured jumps. Loops, recursion and STOP/OUTPUT cover every use in new programs."
       }
       tag {
@@ -2990,6 +3319,7 @@ logo {
         desc "command. Does nothing. The input must be a literal word following a quotation mark (\"), not the result of a computation. Tags are used by the GOTO command."
         supported #false
         obsolete #true
+        phase #null
         obsolete_reason "Only exists as a target for GOTO, which is obsolete."
       }
       ignore {
@@ -2997,6 +3327,7 @@ logo {
         desc "command. Does nothing. Used when an expression is evaluated for a side effect and its actual value is unimportant."
         supported #true
         obsolete #false
+        phase 2
       }
       ` {
         eg "` list  (library procedure)"
@@ -3025,6 +3356,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 4
       }
       for {
         eg "FOR forcontrol instructionlist  (library procedure)"
@@ -3043,30 +3375,35 @@ logo {
         see "run"
         supported #true
         obsolete #false
+        phase 2
       }
       do.while {
         eg "DO.WHILE instructionlist tfexpression  (library procedure)"
         desc "command. Repeatedly evaluates the instructionlist as long as the evaluated remains TRUE. Evaluates the first input first, so the instructionlist is always run at least once. The tfexpression must be an expressionlist whose value when evaluated is TRUE or FALSE."
         supported #true
         obsolete #false
+        phase 2
       }
       while {
         eg "WHILE tfexpression instructionlist  (library procedure)"
         desc "command. Repeatedly evaluates the instructionlist as long as the evaluated remains TRUE. Evaluates the first input first, so the instructionlist may never be run at all. The tfexpression must be an expressionlist whose value when evaluated is TRUE or FALSE."
         supported #true
         obsolete #false
+        phase 2
       }
       do.until {
         eg "DO.UNTIL instructionlist tfexpression  (library procedure)"
         desc "command. Repeatedly evaluates the instructionlist as long as the evaluated remains FALSE. Evaluates the first input first, so the instructionlist is always run at least once. The tfexpression must be an expressionlist whose value when evaluated is TRUE or FALSE."
         supported #true
         obsolete #false
+        phase 2
       }
       until {
         eg "UNTIL tfexpression instructionlist  (library procedure)"
         desc "command. Repeatedly evaluates the instructionlist as long as the evaluated remains FALSE. Evaluates the first input first, so the instructionlist may never be run at all. The tfexpression must be an expressionlist whose value when evaluated is TRUE or FALSE."
         supported #true
         obsolete #false
+        phase 2
       }
       case {
         eg "CASE value clauses  (library procedure)"
@@ -3079,6 +3416,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
       cond {
         eg "COND clauses  (library procedure)"
@@ -3094,6 +3432,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
     }
     template-based-iteration {
@@ -3102,6 +3441,7 @@ logo {
         desc "command or operation. Runs the template, filling its slots with the members of inputlist. The number of members in inputlist must be an acceptable number of slots for template. It is illegal to apply the primitive TO as a template, but anything else is okay. APPLY outputs what template outputs, if anything."
         supported #true
         obsolete #false
+        phase 2
       }
       invoke {
         eg """
@@ -3111,6 +3451,7 @@ logo {
         desc "command or operation. Exactly like APPLY except that the inputs are provided as separate expressions rather than in a list."
         supported #true
         obsolete #false
+        phase 2
       }
       foreach {
         eg """
@@ -3126,6 +3467,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
       map {
         eg """
@@ -3142,6 +3484,7 @@ logo {
         see "word"
         supported #true
         obsolete #false
+        phase 2
       }
       map.se {
         eg """
@@ -3158,6 +3501,7 @@ logo {
         see "sentence"
         supported #true
         obsolete #false
+        phase 2
       }
       filter {
         eg "FILTER tftemplate data  (library procedure)"
@@ -3174,6 +3518,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
       find {
         eg "FIND tftemplate data  (library procedure)"
@@ -3186,6 +3531,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
       reduce {
         eg "REDUCE template data  (library procedure)"
@@ -3210,6 +3556,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 2
       }
       crossmap {
         eg """
@@ -3228,6 +3575,7 @@ logo {
         see "map"
         supported #true
         obsolete #false
+        phase 4
       }
       cascade {
         eg """
@@ -3267,12 +3615,14 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 4
       }
       cascade.2 {
         eg "CASCADE.2 endtest temp1 startval1 temp2 startval2  (library procedure)"
         desc "outputs the result of invoking CASCADE with the same inputs. The only difference is that the default number of inputs is five instead of three."
         supported #true
         obsolete #false
+        phase 4
       }
       transfer {
         eg "TRANSFER endtest template inbasket  (library procedure)"
@@ -3285,6 +3635,7 @@ logo {
         """
         supported #true
         obsolete #false
+        phase 4
       }
     }
   }
@@ -3397,11 +3748,13 @@ logo {
       see "to" "define" "apply" "stop" "output"
       supported #true
       obsolete #false
+      phase 4
     }
     .defmacro {
       see ".macro"
       supported #true
       obsolete #false
+      phase 4
     }
     macrop {
       eg """
@@ -3411,6 +3764,7 @@ logo {
       desc "outputs TRUE if its input is the name of a macro."
       supported #true
       obsolete #false
+      phase 4
     }
     macroexpand {
       eg "MACROEXPAND expr  (library procedure)"
@@ -3426,6 +3780,7 @@ logo {
       """
       supported #true
       obsolete #false
+      phase 4
     }
   }
   special-variables {
@@ -3434,6 +3789,7 @@ logo {
       desc "if TRUE, indicates that an attempt to use a procedure that doesn’t exist should be taken as an implicit getter or setter procedure (setter if the first three letters of the name are SET) for a variable of the same name (without the SET if appropriate)."
       supported #true
       obsolete #false
+      phase 4
     }
     buttonact {
       eg "BUTTONACT  (variable)"
@@ -3450,6 +3806,7 @@ logo {
       """
       supported #true
       obsolete #false
+      phase 3
     }
     caseignoredp {
       eg "CASEIGNOREDP  (variable)"
@@ -3457,12 +3814,14 @@ logo {
       see "equalp" "beforep" "memberp"
       supported #true
       obsolete #false
+      phase 2
     }
     commandline {
       eg "COMMANDLINE  (variable)"
       desc "contains any text appearing after a hyphen on the command line used to start Logo."
       supported #true
       obsolete #false
+      phase 4
     }
     erract {
       eg "ERRACT  (variable)"
@@ -3470,12 +3829,14 @@ logo {
       see "pause"
       supported #true
       obsolete #false
+      phase 2
     }
     fullprintp {
       eg "FULLPRINTP  (variable)"
       desc "if TRUE, then words that were created using backslash or vertical bar (to include characters that would otherwise not be treated as part of a word) are printed with the backslashes or vertical bars shown, so that the printed result could be re-read by Logo to produce the same value. If FULLPRINTP is TRUE then the empty word (however it was created) prints as ||. (Otherwise it prints as nothing at all.)"
       supported #true
       obsolete #false
+      phase 2
     }
     keyact {
       eg "KEYACT  (variable)"
@@ -3492,6 +3853,7 @@ logo {
       """
       supported #true
       obsolete #false
+      phase 3
     }
     loadnoisily {
       eg "LOADNOISILY  (variable)"
@@ -3499,6 +3861,7 @@ logo {
       see "edit"
       supported #false
       obsolete #true
+      phase #null
       obsolete_reason "Controls messages printed by LOAD, which is obsolete."
     }
     printdepthlimit {
@@ -3507,6 +3870,7 @@ logo {
       see "print"
       supported #true
       obsolete #false
+      phase 2
     }
     printwidthlimit {
       eg "PRINTWIDTHLIMIT  (variable)"
@@ -3514,6 +3878,7 @@ logo {
       see "print"
       supported #true
       obsolete #false
+      phase 2
     }
     redefp {
       eg "REDEFP  (variable)"
@@ -3521,6 +3886,7 @@ logo {
       see "erase" "copydef"
       supported #true
       obsolete #false
+      phase 4
     }
     startup {
       eg "STARTUP  (variable)"
@@ -3528,6 +3894,7 @@ logo {
       see "load"
       supported #false
       obsolete #true
+      phase #null
       obsolete_reason "Runs instructions after LOAD of a saved workspace, which is obsolete."
     }
     unburyonedit {
@@ -3536,6 +3903,7 @@ logo {
       see "edit" "load" "save"
       supported #false
       obsolete #true
+      phase #null
       obsolete_reason "Controls burying and EDIT, which are obsolete."
     }
     usealternatenames {
@@ -3547,6 +3915,7 @@ logo {
       """
       supported #false
       obsolete #true
+      phase #null
       obsolete_reason "Swaps TRUE/FALSE/END for translated words. Translation, if wanted, belongs in the GUI and error messages, not in the language."
     }
     logoversion {
@@ -3554,12 +3923,14 @@ logo {
       desc "a real number indicating the Logo version number, e.g., 5.5"
       supported #true
       obsolete #false
+      phase 2
     }
     logoplatform {
       eg "LOGOPLATFORM  (variable)"
       desc "one of the following words: wxWidgets, X11, Windows, or Unix-nographics."
       supported #false
       obsolete #true
+      phase #null
       obsolete_reason "Lets programs adapt to UCBLogo's different builds (wxWidgets, X11, ...). There's only one platform here."
     }
   }

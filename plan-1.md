@@ -73,7 +73,7 @@ Have the interpreter output a stream of turtle events in its own coordinate syst
 - `Arc { center, radius, start_heading, angle }`. `ARC` draws around the turtle without moving it.
 - `Label { at, text }`, drawn with gpui's `shape_line` + `ShapedLine::paint`.
 - `Fill`, `Filled { color, points }`, `Clean`, `SetBackground`, `ShowTurtle` / `HideTurtle`.
-- `Print(text)`, so console output stays in step with the drawing (see "Turtle speed" below). Output from `TRACE` and `STEP` goes the same way.
+- `Print(text)`, so console output stays in step with the drawing (see "Turtle speed" below).
 - `Wait(duration)` and `SetSpeed(speed)`.
 
 The interpreter does all the geometry: `SETSCRUNCH` scaling, splitting a move into several segments when it wraps at an edge, and `FENCE` stops. The GUI only scales and flips coordinates.
@@ -140,7 +140,7 @@ This matters because the channel lets the interpreter run several events ahead o
 Stepping therefore needs the source spans described below. They're required, not optional.
 - **Stop**: set a cancel flag that the interpreter checks on every evaluation step, and drop the channel so a blocked interpreter wakes up and exits. This should behave like UCBLogo's `THROW "TOPLEVEL`, which ends all running procedures, but the program's own `CATCH` must not be able to intercept it.
 
-The Pause button is not the same as Logo's `PAUSE` command. Logo's `PAUSE` stops the program inside a procedure and opens a prompt where its local variables can be inspected, and UCBLogo also opens one of these when the user presses its quit key. A later version could offer "Pause and inspect" that does the same, but the first version's Pause button only stops the animator.
+The Pause button is not the same as Logo's `PAUSE` command. Logo's `PAUSE` stops the program inside a procedure and opens a prompt where its local variables can be inspected, and UCBLogo also opens one of these when the user presses its quit key. Logo's `PAUSE` and `CONTINUE` are marked obsolete. A later version could offer "Pause and inspect" in the GUI instead, but the first version's Pause button only stops the animator.
 
 ### Highlighting the running code
 
@@ -165,7 +165,7 @@ The CLI reads the same event stream with no timing and renders it to a file. `WA
 
 - **Speed scale and units:** Python-style levels from 0 to 10, or a slider in pixels per second?
 - **What counts as a "line":** UCBLogo's `STEP` works on the lines of a procedure body. Our editor has its own lines. Do we step by source line, by top-level instruction, or by each instruction inside a line? For example, `REPEAT 4 [FD 50 RT 90]` is one line: is it one step, or does stepping go into the brackets?
-- **Does `STEP` itself work?** UCBLogo's `STEP proc` only steps named procedures. Should our `STEP` command behave the same way, and use the same mechanism as the Step button?
+- ~~Does `STEP` itself work?~~ No: `STEP`, `TRACE` and their relatives are marked obsolete in `our-logo.kdl`. Stepping and tracing are debugger controls in the GUI.
 - **Channel size:** how big should it be? Small keeps the turtle closely in step. Larger makes Instant mode more efficient.
 
 ## Checked against the Berkeley Logo manual
@@ -188,6 +188,4 @@ These checks were made against `refs/logo/Berkeley-Logo-Reference-Manual.html`.
 - **`FILLED color [instructions]`** runs the instructions, remembers every point the turtle visits, then fills the resulting polygon. It's marked as wxWidgets-only. To animate it, play the moves first, then send the fill as one `Filled` event at the end.
 - **Mouse queries** `MOUSEPOS`, `CLICKPOS` and `BUTTONP` are polled and return turtle coordinates. The GUI keeps the latest mouse state somewhere the interpreter can read it, such as `Arc<Mutex<_>>`, converted to turtle coordinates. Each query is a sync point, so a loop like `FOREVER [SETPOS MOUSEPOS]` runs at most once per frame, which is the right speed for following the mouse.
 - **Keyboard input** with `READCHAR`, `READLIST` and `KEYP` reads from what the manual calls the "read stream". In the GUI that's the console, so the console needs a mode where the running program is waiting for input.
-- **`REFRESH` / `NOREFRESH`** control whether Logo remembers turtle motions so it can redraw them later. With a pixel buffer we always keep the picture. `NOREFRESH` can be a no-op, or let us discard the motion history kept for zooming and export.
-- **`SAVEPICT`, `LOADPICT` and `EPSPICT`** save and load pictures. `EPSPICT` ignores `FILL`, `PENERASE` and `PENREVERSE`, and an SVG export from the event stream would have the same limits. PNG export from the pixel buffer would not.
-- **`TEXTSCREEN`, `SPLITSCREEN` and `FULLSCREEN`** rearrange the text and graphics windows. They can be events the GUI turns into layout changes. The CLI ignores them.
+- **Obsolete, not supported** (see `our-logo.kdl`): `REFRESH` / `NOREFRESH` (we always keep the picture), `SAVEPICT` / `LOADPICT` / `EPSPICT` (replaced by GUI export), and `TEXTSCREEN` / `SPLITSCREEN` / `FULLSCREEN` (the GUI layout is fixed). Note for export: `EPSPICT` ignored `FILL`, `PENERASE` and `PENREVERSE`, and an SVG export from the event stream would have the same limits. PNG export from the pixel buffer would not.

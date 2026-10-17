@@ -1,0 +1,12 @@
+logo {
+  turtle-motion {
+    forward  {
+      eg  """
+      FORWARD dist
+      FD dist
+      """
+      desc  "moves the turtle forward, in the direction that it’s facing, by the specified distance (measured in turtle steps). "
+      supported #true
+    }
+  }
+}

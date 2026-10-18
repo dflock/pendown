@@ -4,12 +4,18 @@
 
 The goal is a really good GUI for writing **new** Logo programs, not running the existing body of old Logo programs. So we implement a subset of UCBLogo, in phases.
 
+The headline features are:
+
+- You can set the speed of the turtle, and the source code is highlighted instruction by instruction as it executes, making a direct visual link between what the turtle is doing and the code.
+- Extensive help, with reference/help panel generated from the our-logo.kdl
+- Built-in tutorial & example code for each command
+
 `our-logo.kdl` is the source of truth for which commands we support. It has every command from the Berkeley Logo manual, and each one has:
 
 - **`obsolete` / `obsolete_reason`:** 103 commands are obsolete and will never be supported. Most of them are replaced by the GUI: printing out definitions, workspace listings, `EDIT`, `HELP`, `TRACE`/`STEP`, `PAUSE`, screen layout and console fonts. The rest are about old hardware or the UCBLogo installation (memory, file paths, aspect-ratio correction), or are superseded within the language (`TEST`/`IFTRUE`, `GOTO`).
-- **`phase`:** 1 to 4 for the remaining 263 (257 from the manual plus 6 of our own), or `#null` for obsolete commands.
+- **`phase`:** 1, 2, 4 or 5 for the remaining 263 (257 from the manual plus 6 of our own), or `#null` for obsolete commands.
 
-The file has the manual's description of every command, so the GUI's reference/help panel can be generated from it.
+The file has the manual's description of every command, so the GUI's reference/help panel can be generated from it (phase 3).
 
 ### Phase 1: Turtle drawing (87 commands)
 
@@ -25,8 +31,8 @@ The smallest Logo that is fun to draw with:
 In the GUI and runtime, phase 1 includes:
 
 - **The canvas and pixel buffer.** The pixel buffer is part of the design from the start, even though `FILL` and the pen modes that require it arrive in phase 2.
-- **The turtle speed system:** speed slider, Pause, Step, Stop, line highlighting and `SETSPEED`. This is the playground's headline feature.
-- **Events:** `Move`, `Turn`, `Arc`, `Ellipse`, `Rect`, `Clean`, `SetBackground`, `ShowTurtle`/`HideTurtle`, `Print`, `Wait`, `SetSpeed`, `Line` and `Sync`.
+- **The turtle speed system:** speed slider, Pause, Step, Stop, highlighting the running instruction, and `SETSPEED`. This is the playground's headline feature.
+- **Events:** `Move`, `Turn`, `Arc`, `Ellipse`, `Rect`, `Clean`, `SetBackground`, `ShowTurtle`/`HideTurtle`, `Print`, `Wait`, `SetSpeed`, `Instruction` and `Sync`.
 - **The CLI** rendering the event stream to a file.
 
 ### Phase 2: Complete core language and richer drawing (88 commands)
@@ -39,14 +45,36 @@ In the GUI and runtime, phase 1 includes:
 - **Filled shapes (our extension):** `SETFILLCOLOR`/`FILLCOLOR`, which make the shapes draw filled.
 - **Settings:** `NAME`, `GLOBAL`, `CASEIGNOREDP`, `FULLPRINTP`, `PRINTDEPTHLIMIT`/`PRINTWIDTHLIMIT`, `LOGOVERSION`.
 
-### Phase 3: Interactive programs (14 commands)
+### Phase 3: Help, examples and tutorial (no new commands)
+
+Two of the headline features. They come after phase 2 so they cover the complete core language, and so the commands they document have settled down.
+
+- **Help panel:** a reference panel generated from `our-logo.kdl`.
+  - The GUI embeds the file at build time (`include_str!`) and parses it with the `kdl` crate (version 6, as used by the validator).
+  - Browse by chapter and section, search by name and alias, and show help for the command under the editor's cursor.
+  - It lists the commands the interpreter implements. Obsolete commands can be shown on request, with their `obsolete_reason`.
+- **Our own descriptions:** each command's `desc` is the manual's text, which describes UCBLogo: it mentions wxWidgets, percentage RGB values, `SETSCRUNCH` and so on. Add a `help` node to each supported command with our own description, written for our dialect, with the `differs` notes folded in. `desc` stays as the manual's reference for whoever implements the command. Writing them is real work: about 175 commands in phases 1 and 2.
+- **Errors for obsolete commands:** use `obsolete_reason` in the error when someone runs an obsolete command, for example "EDIT isn't supported: use the editor", not just "I don't know how to EDIT". This is cheap and could be done earlier.
+- **Examples:** add one or more `example` nodes to each supported command. Each holds a short runnable program, with an optional title. This is different from `eg`, which only shows how to call the command. In the help panel, each example has **Run** and **Copy to editor** buttons.
+- **Examples are tests:** a test runs every example through the interpreter and the CLI renderer and compares the result with a saved PNG. That keeps the documentation and the interpreter in agreement. Examples that use `RANDOM` need a fixed seed, so their output is repeatable.
+- **Tutorial:** a sequence of lessons, each with text and code. The code loads into the editor and runs from there. The lessons follow the phase 1 commands: moving and turning, `REPEAT`, procedures, inputs and variables, recursion, then colours and shapes.
+- **GUI:** a side panel next to the editor, with tabs for Help and Tutorial.
+
+Open questions:
+
+- **Markup:** what format the `help` text and tutorial text use, for example a small subset of markdown with code spans and links between commands.
+- **Tutorial format:** a `tutorial.kdl` alongside `our-logo.kdl`, or a folder of markdown files?
+- **Where examples run:** on the main canvas (replacing the user's drawing), or on a small canvas in the help panel?
+- **Pictures:** show a pre-rendered picture of each example's output in the help panel? The snapshot tests already produce them.
+
+### Phase 4: Interactive programs (14 commands)
 
 - **Mouse:** `MOUSEPOS`, `CLICKPOS`, `BUTTONP`/`BUTTON`, and the `BUTTONACT`/`KEYACT` handlers.
 - **Keyboard and console:** `READLIST`, `READWORD`, `READRAWLINE`, `READCHAR`, `READCHARS`, `KEYP`, `LINEP`, `CLEARTEXT`.
 
 These need the parts of the speed design that synchronise with the GUI: sync points before input, shared mouse state in turtle coordinates, and a console mode for when the program is waiting for input. It's worth building them as a separate step.
 
-### Phase 4: Advanced and niche (74 commands)
+### Phase 5: Advanced and niche (74 commands)
 
 - **Language features:** objects (`KINDOF`, `ASK`, `TALKTO`, `USUAL`…), macros and backquote, property lists.
 - **I/O:** file access, `SHELL`.
@@ -58,7 +86,7 @@ These need the parts of the speed design that synchronise with the GUI: sync poi
 
 ## Dialect and extensions
 
-We implement **UCBLogo**: it's the closest thing Logo has to a standard, it's the best documented, and most later Logos (FMSLogo, jsLogo) follow it. Where the dialects differ, it's mostly in commands we've marked obsolete or put in phase 4.
+We implement **UCBLogo**: it's the closest thing Logo has to a standard, it's the best documented, and most later Logos (FMSLogo, jsLogo) follow it. Where the dialects differ, it's mostly in commands we've marked obsolete or put in phase 5.
 
 "Our Logo" is UCBLogo's core plus a few deliberate changes and extensions, listed here. They're recorded in `our-logo.kdl` too, so the help panel covers them:
 
@@ -247,17 +275,17 @@ interpreter thread ──(bounded channel of events)──▶ animator (UI threa
 
 - **Speed slider**: changes only the animator's speed.
 - **Pause / Resume**: the animator stops taking events, the channel fills up, and the interpreter blocks.
-- **Step**: while paused, run exactly one line of code, the same way UCBLogo's `STEP` command does. All the drawing and output that line produces plays at the current speed, then the program pauses again with the next line highlighted.
+- **Step**: while paused, run exactly one line of code, the same way UCBLogo's `STEP` command does. All the drawing and output that line produces plays at the current speed, with each instruction highlighted as it runs, then the program pauses again at the start of the next line.
 - **Stop**: set a cancel flag that the interpreter checks on every evaluation step, and drop the channel so a blocked interpreter wakes up and exits. This should behave like UCBLogo's `THROW "TOPLEVEL`, which ends all running procedures, but the program's own `CATCH` must not be able to intercept it.
 
-#### How line stepping works
+#### How highlighting and stepping work
 
-Before running each instruction line, the interpreter sends a `Line { span }` event.
+Before running each instruction, the interpreter sends an `Instruction { span, starts_line }` event. `span` covers just that instruction, so in `REPEAT 4 [FD 50 RT 90]` the highlight moves from `REPEAT` to `FD 50` to `RT 90` and round again. `starts_line` is set on the first instruction run from each line.
 
-- **Running normally:** `Line` is an ordinary event. The animator only uses it to move the highlight in the editor.
-- **Paused or stepping:** the GUI sets a shared `stepping` flag, an atomic the interpreter reads. While it's set, the interpreter treats each `Line` like `Sync`: it waits for the animator to reply before running that line.
+- **Running normally:** `Instruction` is an ordinary event. The animator only uses it to move the highlight in the editor.
+- **Paused or stepping:** the GUI sets a shared `stepping` flag, an atomic the interpreter reads. While it's set, the interpreter treats each `Instruction` with `starts_line` like `Sync`: it waits for the animator to reply before running that line.
 
-This matters because the channel lets the interpreter run several events ahead of the drawing. If `Line` were only a marker, a paused program could already have run a few lines past the highlighted one, including effects that aren't events, such as `MAKE` or file writes. Waiting at each line keeps the highlighted line and the program's real position in step, which a later variable inspector would also rely on.
+This matters because the channel lets the interpreter run several events ahead of the drawing. If `Instruction` were only a marker, a paused program could already have run a few lines past the highlighted one, including effects that aren't events, such as `MAKE` or file writes. Waiting at each line keeps the highlight and the program's real position in step, which a later variable inspector would also rely on.
 
 Stepping therefore needs the source spans described below. They're required, not optional.
 
@@ -265,7 +293,7 @@ The Pause button is not the same as Logo's `PAUSE` command. Logo's `PAUSE` stops
 
 ### Highlighting the running code
 
-Stepping depends on source spans, and every node in the parsed program needs one from the start. With them, the editor can also highlight the line the turtle is drawing at slow speeds, using the `Line` events.
+Highlighting and stepping depend on source spans, and every node in the parsed program needs one from the start. With them, the editor highlights the instruction the turtle is carrying out, using the `Instruction` events. At slow speeds that's the direct link between the code and the drawing.
 
 For procedures, the span must point into the text where the procedure was defined. A program might call a procedure that was defined in the editor, typed at the console, or loaded from a file, so a span needs to record which source it came from as well as the position.
 
@@ -285,7 +313,8 @@ The CLI reads the same event stream with no timing and renders it to a file. `WA
 ### Open questions
 
 - **Speed scale and units:** Python-style levels from 0 to 10, or a slider in pixels per second?
-- **What counts as a "line":** UCBLogo's `STEP` works on the lines of a procedure body. Our editor has its own lines. Do we step by source line, by top-level instruction, or by each instruction inside a line? For example, `REPEAT 4 [FD 50 RT 90]` is one line: is it one step, or does stepping go into the brackets?
+- ~~What does the highlight show?~~ The running instruction, not the whole line.
+- **What does Step step over:** Step currently runs one source line, so `REPEAT 4 [FD 50 RT 90]` is one step, with the highlight moving through its instructions as it plays. Would a second "Step instruction" button, which stops inside the brackets, be useful as well?
 - ~~Does `STEP` itself work?~~ No: `STEP`, `TRACE` and their relatives are marked obsolete in `our-logo.kdl`. Stepping and tracing are debugger controls in the GUI.
 - **Channel size:** how big should it be? Small keeps the turtle closely in step. Larger makes Instant mode more efficient.
 

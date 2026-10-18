@@ -7,15 +7,16 @@ The goal is a really good GUI for writing **new** Logo programs, not running the
 `our-logo.kdl` is the source of truth for which commands we support. It has every command from the Berkeley Logo manual, and each one has:
 
 - **`obsolete` / `obsolete_reason`:** 103 commands are obsolete and will never be supported. Most of them are replaced by the GUI: printing out definitions, workspace listings, `EDIT`, `HELP`, `TRACE`/`STEP`, `PAUSE`, screen layout and console fonts. The rest are about old hardware or the UCBLogo installation (memory, file paths, aspect-ratio correction), or are superseded within the language (`TEST`/`IFTRUE`, `GOTO`).
-- **`phase`:** 1 to 4 for the remaining 257, or `#null` for obsolete commands.
+- **`phase`:** 1 to 4 for the remaining 263 (257 from the manual plus 6 of our own), or `#null` for obsolete commands.
 
 The file has the manual's description of every command, so the GUI's reference/help panel can be generated from it.
 
-### Phase 1: Turtle drawing (83 commands)
+### Phase 1: Turtle drawing (87 commands)
 
 The smallest Logo that is fun to draw with:
 
-- **Turtle and pen:** all movement and position commands, `ARC`, `HOME`, show/hide turtle, `CLEAN`/`CLEARSCREEN`, `WRAP`/`WINDOW`/`FENCE`, and pen up/down, colour, size and background.
+- **Turtle and pen:** all movement and position commands, `ARC` (our version, see "Dialect and extensions"), `HOME`, show/hide turtle, `CLEAN`/`CLEARSCREEN`, `WRAP`/`WINDOW`/`FENCE`, and pen up/down, colour, size and background.
+- **Shapes and colours (our extensions):** `CIRCLE`, `ELLIPSE`, `SQUARE` and `RECTANGLE` outlines, and every colour form (palette number, RGB or RGBA list, CSS name, hex) everywhere a colour is accepted.
 - **Language:** `TO`/`END` with inputs and recursion, `MAKE`/`LOCAL`/`LOCALMAKE`/`THING`, `REPEAT`/`REPCOUNT`/`FOREVER`, `IF`/`IFELSE`, `STOP`/`OUTPUT`, `WAIT`, `PRINT`/`TYPE`/`SHOW`.
 - **Arithmetic and logic:** arithmetic, `SIN`/`COS`/`ARCTAN`, `RANDOM`, comparisons, `AND`/`OR`/`NOT`.
 - **Lists:** only what drawing needs, mainly for `POS`/`SETPOS`: `LIST`, `SENTENCE`, `FIRST`, `LAST`, `BUTFIRST`, `BUTLAST`, `ITEM`, `COUNT`, `EMPTYP`.
@@ -25,16 +26,17 @@ In the GUI and runtime, phase 1 includes:
 
 - **The canvas and pixel buffer.** The pixel buffer is part of the design from the start, even though `FILL` and the pen modes that require it arrive in phase 2.
 - **The turtle speed system:** speed slider, Pause, Step, Stop, line highlighting and `SETSPEED`. This is the playground's headline feature.
-- **Events:** `Move`, `Turn`, `Arc`, `Clean`, `SetBackground`, `ShowTurtle`/`HideTurtle`, `Print`, `Wait`, `SetSpeed`, `Line` and `Sync`.
+- **Events:** `Move`, `Turn`, `Arc`, `Ellipse`, `Rect`, `Clean`, `SetBackground`, `ShowTurtle`/`HideTurtle`, `Print`, `Wait`, `SetSpeed`, `Line` and `Sync`.
 - **The CLI** rendering the event stream to a file.
 
-### Phase 2: Complete core language and richer drawing (86 commands)
+### Phase 2: Complete core language and richer drawing (88 commands)
 
 - **Data:** the rest of the word, list and array commands, multi-dimensional arrays, `PUSH`/`POP`/`QUEUE`/`DEQUEUE`, type and membership predicates, `ASCII`/`CHAR`, `LOWERCASE`/`UPPERCASE`.
 - **Control:** `RUN`/`RUNRESULT`, `FOR`, `WHILE`/`UNTIL`/`DO.WHILE`/`DO.UNTIL`, `CASE`/`COND`, `CATCH`/`THROW`/`ERROR`/`ERRACT`, `IGNORE`.
 - **Higher-order procedures:** `APPLY`, `INVOKE`, `FOREACH`, `MAP`, `MAP.SE`, `FILTER`, `FIND`, `REDUCE`.
 - **Arithmetic:** `EXP`/`LN`/`LOG10`, the radian trig functions, `ISEQ`/`RSEQ`, `RERANDOM`, `FORM`.
 - **Drawing:** `FILL`, `FILLED`, `LABEL`/`SETLABELHEIGHT`/`LABELSIZE`, the pen modes `PENPAINT`/`PENERASE`/`PENREVERSE`, `SETPALETTE`/`PALETTE`, `SETPEN`/`PEN`. These add the `Fill`, `Filled` and `Label` events and the pen mode in `Move`.
+- **Filled shapes (our extension):** `SETFILLCOLOR`/`FILLCOLOR`, which make the shapes draw filled.
 - **Settings:** `NAME`, `GLOBAL`, `CASEIGNOREDP`, `FULLPRINTP`, `PRINTDEPTHLIMIT`/`PRINTWIDTHLIMIT`, `LOGOVERSION`.
 
 ### Phase 3: Interactive programs (14 commands)
@@ -53,6 +55,68 @@ These need the parts of the speed design that synchronise with the GUI: sync poi
 - **Obscure library procedures:** `CASCADE`, `TRANSFER`, `CROSSMAP`.
 - **Tokenizer details:** `PARSE`, `RUNPARSE`, `VBARREDP`, `RAWASCII`.
 - **Settings:** `ALLOWGETSET`, `REDEFP`, `COMMANDLINE`.
+
+## Dialect and extensions
+
+We implement **UCBLogo**: it's the closest thing Logo has to a standard, it's the best documented, and most later Logos (FMSLogo, jsLogo) follow it. Where the dialects differ, it's mostly in commands we've marked obsolete or put in phase 4.
+
+"Our Logo" is UCBLogo's core plus a few deliberate changes and extensions, listed here. They're recorded in `our-logo.kdl` too, so the help panel covers them:
+
+- **New commands** have `extension #true` and a `source` naming where the idea came from. They're in a `shapes` section and in the pen sections of `graphics`.
+- **Changed commands** keep the manual's `desc` and add a `differs` node describing how ours behaves.
+
+References in `refs/`: `ucblogo-code` (the C source, for checking exact behaviour), `jslogo` (a UCBLogo-compatible interpreter with a canvas, the closest prior art to this playground) and `logo-rust`.
+
+### Kept from UCBLogo: dynamic scope
+
+A procedure can see the local variables of whatever procedure called it, not just globals. Every Logo works this way, and Logo teaching material relies on it.
+
+- **Implementation:** a stack of frames. Looking up a variable walks from the current frame down through its callers to the globals. `MAKE` sets the nearest existing variable with that name, or creates a global if there isn't one.
+- **GUI:** a later variable inspector should show the whole chain of frames, since that's what a running line can actually see.
+
+### Colours
+
+Everywhere a colour is accepted (`SETPENCOLOR`, `SETBACKGROUND`, `SETFILLCOLOR`, `SETPALETTE`, `FILLED`), all of these forms work:
+
+- **Palette number:** 0 to 15, with UCBLogo's default colours: 0 black, 1 blue, 2 green, 3 cyan, 4 red, 5 magenta, 6 yellow, 7 white, 8 brown, 9 tan, 10 forest, 11 aqua, 12 salmon, 13 purple, 14 orange, 15 grey. `SETPALETTE` (phase 2) can redefine numbers from 8 up, as in UCBLogo.
+- **RGB list:** `[r g b]` with each value **from 0 to 255**. This is a deliberate change: UCBLogo uses percentages from 0 to 99, but 0 to 255 is what everyone knows from CSS and image editors. FMSLogo also uses 0 to 255.
+- **RGBA list:** `[r g b a]`, where `a` is the opacity, also from 0 to 255 (0 is invisible, 255 is solid). The pixel buffer blends it.
+- **CSS colour name:** `SETPENCOLOR "red`, `SETBACKGROUND "cornflowerblue`, the 148 CSS named colours, case-insensitive. jsLogo does the same.
+- **Hex:** `"#ff8800`, plus the CSS short form `"#f80` and the forms with opacity, `"#ff880080` and `"#f808`. `#` is allowed in a Logo word, so no new syntax is needed.
+
+The forms can't be confused: a number is always a palette index, a list is always RGB or RGBA, a word starting with `#` is hex, and any other word is a name. An unknown name or bad hex is an error, and an unknown name suggests the closest known names.
+
+The background is always drawn solid, so the opacity of a background colour is ignored.
+
+Reporters (`PENCOLOR`, `BACKGROUND`, `FILLCOLOR`) output the colour in the form it was set, so `SETPENCOLOR PENCOLOR` always works. Events carry the resolved RGBA, so the GUI and CLI never need to know about palettes, names or hex.
+
+### `ARC`: the turtle walks along the arc
+
+In UCBLogo, `ARC angle radius` draws an arc *around* the turtle, with the turtle as the centre, and the turtle doesn't move. That surprises nearly everyone. Ours does what you'd draw by hand:
+
+- **`ARC angle radius`** moves the turtle along an arc of a circle with that radius, turning through `angle` degrees as it goes. A positive angle curves right (clockwise, like `RT`), and a negative angle curves left.
+- It finishes at the end of the arc, with its heading changed by `angle`. So `ARC 360 50` draws a full circle and returns the turtle to where it started, and `REPEAT 4 [ARC 90 50]` also draws a full circle.
+- It draws only when the pen is down, like `FD`, and it's affected by `WRAP`/`FENCE` like any other move.
+- For a positive angle, it's the same as `REPEAT angle [FD (2 * PI * radius / 360) RT 1]`, but drawn as a smooth curve.
+
+UCBLogo programs that use `ARC` will draw differently. That's accepted. `CIRCLE` covers the "around the turtle" case.
+
+### Shapes: `CIRCLE`, `ELLIPSE`, `SQUARE` and `RECTANGLE`
+
+From LibreLogo and FMSLogo. Shapes are drawn **centred on the turtle** and turn with its heading, and the turtle doesn't move. All four are phase 1.
+
+- **`CIRCLE radius`**.
+- **`ELLIPSE across along`:** `across` is the radius from side to side relative to the turtle, and `along` is the radius in the direction it's heading. At heading 0 that's the x radius then the y radius.
+- **`SQUARE side`**, and **`(SQUARE side corner)`** for rounded corners with radius `corner`.
+- **`RECTANGLE across along`**, and **`(RECTANGLE across along corner)`** for rounded corners. `across` and `along` are the full width and height, like `SQUARE`'s side.
+
+Circles and ellipses take radii, and squares and rectangles take side lengths, because that's how people usually measure each. The optional corner radius uses UCBLogo's usual parentheses for extra inputs, as with `(SENTENCE a b c)`.
+
+- **Outline:** drawn with the current pen (colour, size and, in phase 2, mode) when the pen is down.
+- **Fill (phase 2):** `SETFILLCOLOR colour` sets a fill colour, and `SETFILLCOLOR "none` turns filling off. `"none` is the default. When a fill colour is set, shapes are filled, even when the pen is up. So pen up with a fill colour gives a filled shape with no outline.
+- **Events:** `Ellipse { center, radii, heading, pen, fill }`, which `CIRCLE` uses too, with equal radii, and `Rect { center, size, corner, heading, pen, fill }` for `SQUARE` and `RECTANGLE`. At animated speeds the animator can draw the outline sweeping round, then the fill.
+
+Filling turtle-drawn polygons is already covered by UCBLogo's `FILLED colour [instructions]` and `FILL` (phase 2).
 
 ## Question
 
@@ -85,6 +149,8 @@ Does gpui or gpui-kit provide a canvas component that the Logo turtle can draw o
 | `SETPENSIZE`          | `PathBuilder::stroke(width)`      |
 | `SETPENCOLOR`         | colour passed to `paint_path`     |
 | `ARC`                 | `arc_to`                          |
+| `CIRCLE`, `ELLIPSE`   | `arc_to` (or a polygon), `fill()` |
+| `SQUARE`, `RECTANGLE` | `line_to` + `arc_to` corners      |
 | `FILLED`              | `PathBuilder::fill()`             |
 
 ## What gpui-kit adds
@@ -122,9 +188,10 @@ Plan on a pixel buffer for the finished drawing from the start, with vector path
 
 Have the interpreter output a stream of turtle events in its own coordinate system. This must include everything the user should see happen, not only lines that leave ink:
 
-- `Move { from, to, pen }`, which also covers pen-up moves, because those animate too. `pen` carries up/down, the mode (paint, erase or reverse), colour as resolved RGB, and size.
+- `Move { from, to, pen }`, which also covers pen-up moves, because those animate too. `pen` carries up/down, the mode (paint, erase or reverse), colour as resolved RGBA, and size.
 - `Turn { from, by }`, where `by` is the signed angle turned. Logo measures headings clockwise from north, and `RT 270` should visibly turn 270° clockwise, not take the short way round. So `from`/`to` alone isn't enough.
-- `Arc { center, radius, start_heading, angle }`. `ARC` draws around the turtle without moving it.
+- `Arc { center, radius, start_heading, angle, pen }`. Our `ARC` moves the turtle along the arc (see "Dialect and extensions"), so the animator moves the turtle sprite with it.
+- `Ellipse { center, radii, heading, pen, fill }` for `CIRCLE` and `ELLIPSE`, and `Rect { center, size, corner, heading, pen, fill }` for `SQUARE` and `RECTANGLE`. The turtle doesn't move.
 - `Label { at, text }`, drawn with gpui's `shape_line` + `ShapedLine::paint`.
 - `Fill`, `Filled { color, points }`, `Clean`, `SetBackground`, `ShowTurtle` / `HideTurtle`.
 - `Print(text)`, so console output stays in step with the drawing (see "Turtle speed" below).
@@ -235,7 +302,7 @@ These checks were made against `refs/logo/Berkeley-Logo-Reference-Manual.html`.
 ### What the manual adds to the plan
 
 - **The graphics window has a fixed size in turtle coordinates.** The default turtle mode is **`WRAP`**, where the turtle reappears on the opposite edge. **`FENCE`** stops the turtle at the edge with an error, and **`WINDOW`** lets it move off-screen. The interpreter needs to know where the edges are, and UCBLogo sizes the window so that [-100 -100] to [100 100] fit at a 1:1 aspect ratio. Decision: the interpreter uses a fixed, configurable area in turtle coordinates. The GUI scales it to fit the canvas, so resizing the window never changes how a program behaves, and the GUI never needs to send the window size back to the interpreter.
-- **Defaults:** black background, white pen. Colours can be numbers or RGB lists, where each RGB value is a percentage from 0 to 99, not 0 to 255. Colours 0 to 15 have fixed starting values, and `SETPALETTE` reassigns numbers from 8 up. Events carry the resolved RGB, so the GUI doesn't need to know about the palette.
+- **Defaults:** black background, white pen. Colours can be numbers or RGB lists, where each RGB value is a percentage from 0 to 99, not 0 to 255. Colours 0 to 15 have fixed starting values, and `SETPALETTE` reassigns numbers from 8 up. Events carry the resolved RGB, so the GUI doesn't need to know about the palette. (We use 0 to 255 instead, and add opacity, CSS names and hex: see "Dialect and extensions".)
 - **`SETPENSIZE`** can take `[width height]`. Some implementations ignore the height and always use a square pen.
 - **Turtle sprite:** an isosceles triangle. The turtle's position is the midpoint of the short side, and the triangle is drawn one step behind that position so it doesn't hide a line drawn at right angles to it.
 - **`HOME` is a move** like any other, so it draws a line when the pen is down. `CLEARSCREEN` is `CLEAN` plus `HOME`.

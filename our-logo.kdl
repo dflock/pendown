@@ -1,4 +1,4 @@
-// Generated from refs/logo/Berkeley-Logo-Reference-Manual.html
+// Generated from refs/logo/Berkeley-Logo-Reference-Manual.html, then edited by hand.
 // Phases (the `phase` node on each command):
 //   1  Turtle drawing: turtle and pen commands, procedures and recursion, variables,
 //      REPEAT / IF / STOP / OUTPUT, arithmetic, printing, and the few list commands
@@ -10,6 +10,9 @@
 //   4  Advanced and niche: objects, macros, property lists, file I/O, SHELL, bitwise
 //      operations, introspection / metaprogramming and obscure library procedures.
 //   #null  Obsolete: not planned (see obsolete_reason).
+// Our changes to UCBLogo (see "Dialect and extensions" in plan-1.md):
+//   extension #true  A command that isn't in the manual; `source` says where the idea came from.
+//   differs "..."    How our version behaves differently from the manual's `desc`.
 logo {
   data-structure-primitives {
     constructors {
@@ -1696,9 +1699,61 @@ logo {
       arc {
         eg "ARC angle radius"
         desc "draws an arc of a circle, with the turtle at the center, with the specified radius, starting at the turtle’s heading and extending clockwise through the specified angle. The turtle does not move."
+        differs """
+        The turtle walks along the arc instead of drawing around itself. It moves along an arc of a circle with the given radius, turning through the given angle as it goes: a positive angle curves right (clockwise, like RT) and a negative angle curves left. It finishes at the end of the arc with its heading changed by the angle, so ARC 360 50 draws a full circle and returns to where it started, and REPEAT 4 [ARC 90 50] does the same. It draws only when the pen is down, and wraps or stops at the edges like FD. Use CIRCLE to draw a circle around the turtle.
+        """
+        see "circle"
         supported #true
         obsolete #false
         phase 1
+      }
+    }
+    shapes {
+      circle {
+        eg "CIRCLE radius"
+        desc "draws a circle with the given radius, centred on the turtle. The turtle does not move. The outline is drawn with the current pen if the pen is down, and the circle is filled if a fill colour is set (see SETFILLCOLOR), even when the pen is up."
+        see "ellipse" "setfillcolor"
+        supported #true
+        obsolete #false
+        phase 1
+        extension #true
+        source "LibreLogo, FMSLogo"
+      }
+      ellipse {
+        eg "ELLIPSE across along"
+        desc "draws an ellipse centred on the turtle, turned to match the turtle's heading. The first input is the radius from side to side relative to the turtle, and the second is the radius in the direction the turtle is heading, so at heading 0 they're the X and Y radii. The turtle does not move. The outline is drawn with the current pen if the pen is down, and the ellipse is filled if a fill colour is set (see SETFILLCOLOR), even when the pen is up."
+        see "circle" "setfillcolor"
+        supported #true
+        obsolete #false
+        phase 1
+        extension #true
+        source "LibreLogo, FMSLogo"
+      }
+      square {
+        eg """
+        SQUARE side
+        (SQUARE side corner)
+        """
+        desc "draws a square with sides of the given length, centred on the turtle and turned to match the turtle's heading. With the optional third input, the corners are rounded with that radius. The turtle does not move. The outline is drawn with the current pen if the pen is down, and the square is filled if a fill colour is set (see SETFILLCOLOR), even when the pen is up."
+        see "rectangle" "setfillcolor"
+        supported #true
+        obsolete #false
+        phase 1
+        extension #true
+        source "LibreLogo"
+      }
+      rectangle {
+        eg """
+        RECTANGLE across along
+        (RECTANGLE across along corner)
+        """
+        desc "draws a rectangle centred on the turtle and turned to match the turtle's heading. The first input is its full width from side to side relative to the turtle, and the second is its full length in the direction the turtle is heading, so at heading 0 they're the width and height. With the optional third input, the corners are rounded with that radius. The turtle does not move. The outline is drawn with the current pen if the pen is down, and the rectangle is filled if a fill colour is set (see SETFILLCOLOR), even when the pen is up."
+        see "square" "setfillcolor"
+        supported #true
+        obsolete #false
+        phase 1
+        extension #true
+        source "LibreLogo"
       }
     }
     turtle-motion-queries {
@@ -1819,6 +1874,7 @@ logo {
       filled {
         eg "FILLED color instructions"
         desc "runs the instructions, remembering all points visited by turtle motion commands, starting and ending with the turtle’s initial position. Then draws (ignoring penmode) the resulting polygon, in the current pen color, filling the polygon with the given color, which can be a color number or an RGB list. The instruction list cannot include another FILLED invocation. (wxWidgets only)"
+        differs "The colour can be any of our colour forms: see SETPENCOLOR."
         supported #true
         obsolete #false
         phase 2
@@ -2008,6 +2064,17 @@ logo {
 
         but other colors can be assigned to numbers by the PALETTE command. Alternatively, sets the pen color to the given RGB values (a list of three nonnegative numbers less than 100 specifying the percent saturation of red, green, and blue in the desired color).
         """
+        differs """
+        A colour can be given in any of these forms, here and everywhere else a colour is accepted (SETBACKGROUND, SETFILLCOLOR, SETPALETTE, FILLED):
+
+        - a palette number, as above;
+        - an RGB list [r g b], with each value from 0 to 255, not a percentage;
+        - an RGBA list [r g b a], where a is the opacity from 0 (invisible) to 255 (solid);
+        - one of the 148 CSS colour names, in any case, such as "red or "cornflowerblue;
+        - a hex word: "#ff8800, the short form "#f80, or with opacity "#ff880080 or "#f808.
+
+        A number is always a palette number, a list is always RGB or RGBA, a word starting with # is hex, and any other word is a colour name.
+        """
         supported #true
         obsolete #false
         phase 1
@@ -2015,6 +2082,7 @@ logo {
       setpalette {
         eg "SETPALETTE colornumber rgblist"
         desc "sets the actual color corresponding to a given number, if allowed by the hardware and operating system. Colornumber must be an integer greater than or equal to 8. (Logo tries to keep the first 8 colors constant.) The second input is a list of three nonnegative numbers less than 100 specifying the percent saturation of red, green, and blue in the desired color."
+        differs "The second input can be any of our colour forms except a palette number: see SETPENCOLOR. RGB values are from 0 to 255, not percentages."
         supported #true
         obsolete #false
         phase 2
@@ -2048,10 +2116,26 @@ logo {
         SETBG colornumber.or.rgblist
         """
         desc "set the screen background color by slot number or RGB values. See SETPENCOLOR for details."
+        differs "The colour can be any of our colour forms: see SETPENCOLOR. The background is always solid, so any opacity is ignored."
         see "setpencolor"
         supported #true
         obsolete #false
         phase 1
+      }
+      setfillcolor {
+        eg """
+        SETFILLCOLOR color
+        SETFC color
+        """
+        desc """
+        sets the colour that shapes (CIRCLE, ELLIPSE, SQUARE, RECTANGLE) are filled with. The colour can be any of the forms SETPENCOLOR accepts. SETFILLCOLOR "none turns filling off, and "none is the default, so shapes are drawn as outlines only. When a fill colour is set, shapes are filled even when the pen is up, so pen up with a fill colour draws a filled shape with no outline.
+        """
+        see "fillcolor" "setpencolor" "circle"
+        supported #true
+        obsolete #false
+        phase 2
+        extension #true
+        source "LibreLogo (FILLCOLOR), FMSLogo (SETFLOODCOLOR)"
       }
     }
     pen-queries {
@@ -2087,6 +2171,7 @@ logo {
 
         but other colors can be assigned to numbers by the PALETTE command.
         """
+        differs "Outputs the colour in whichever form it was set: a palette number, an RGB or RGBA list, a colour name or a hex word (see SETPENCOLOR)."
         supported #true
         obsolete #false
         phase 1
@@ -2094,6 +2179,7 @@ logo {
       palette {
         eg "PALETTE colornumber"
         desc "outputs a list of three nonnegative numbers less than 100 specifying the percent saturation of red, green, and blue in the color associated with the given number."
+        differs "Outputs an RGB list with values from 0 to 255, or an RGBA list if the colour isn't fully opaque."
         supported #true
         obsolete #false
         phase 2
@@ -2125,9 +2211,23 @@ logo {
         BG
         """
         desc "outputs the graphics background color, either as a slot number or as an RGB list, whichever way it was set. (See PENCOLOR.)"
+        differs "Outputs the colour in whichever form it was set: a palette number, an RGB or RGBA list, a colour name or a hex word (see SETPENCOLOR)."
         supported #true
         obsolete #false
         phase 1
+      }
+      fillcolor {
+        eg """
+        FILLCOLOR
+        FC
+        """
+        desc "outputs the fill colour used by shapes, in whichever form it was set (see SETPENCOLOR), or the word NONE if filling is off."
+        see "setfillcolor"
+        supported #true
+        obsolete #false
+        phase 2
+        extension #true
+        source "LibreLogo, FMSLogo (FLOODCOLOR)"
       }
     }
     saving-and-loading-pictures {

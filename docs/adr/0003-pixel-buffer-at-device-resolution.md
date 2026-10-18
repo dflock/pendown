@@ -5,7 +5,7 @@ Date: 2026-10-18
 
 ## Context
 
-The finished drawing lives in a pixel buffer, because `FILL`, `PENREVERSE` and `PENERASE` need pixels (see `plan-1.md`). The interpreter uses a fixed turtle area, and the GUI scales it to fit the canvas. But the canvas can be resized, and it can be on a HiDPI display. A pixel buffer at a fixed resolution would look blurry when scaled up and waste memory when scaled down.
+The finished drawing lives in a pixel buffer, because `FILL`, `PENREVERSE` and `PENERASE` need pixels (ADR 0010). The interpreter uses a fixed turtle area, and the GUI scales it to fit the canvas. But the canvas can be resized, and it can be on a HiDPI display. A pixel buffer at a fixed resolution would look blurry when scaled up and waste memory when scaled down.
 
 ## Decision
 

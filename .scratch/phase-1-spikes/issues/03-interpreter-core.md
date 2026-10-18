@@ -9,7 +9,7 @@ Do the parsing and evaluation decisions (ADRs 0001, 0002, 0004, 0005, 0006 and 0
 
 ## Build
 
-A `logo` library crate, with no GUI code, that implements about ten commands: `FD`, `RT`, `REPEAT`, `TO`/`END`, `IF`, `STOP`, `OUTPUT`, `MAKE`, `PRINT`, plus infix arithmetic. It sends drawing events to a channel, as in `plan-1.md`. This spike may become the start of the real `logo` crate, so write it with that in mind.
+A `pendown-logo` library crate (ADR 0019), with no GUI code, that implements about ten commands: `FD`, `RT`, `REPEAT`, `TO`/`END`, `IF`, `STOP`, `OUTPUT`, `MAKE`, `PRINT`, plus infix arithmetic. It sends drawing events to a channel, as in `plan-1.md`. This spike may become the start of the real `pendown-logo` crate, so write it with that in mind.
 
 ## Answer these, with tests
 

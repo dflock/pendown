@@ -1,6 +1,8 @@
-# Plan 1: Logo playground
+# Plan 1: Pendown
 
 ## Scope and phases
+
+**Pendown** is a Logo playground: crates `pendown` (the GUI app), `pendown-cli` and `pendown-logo` (the interpreter library). See ADR 0019.
 
 The goal is a really good GUI for writing **new** Logo programs, not running the existing body of old Logo programs. So we implement a subset of UCBLogo, in phases.
 
@@ -57,7 +59,7 @@ Two of the headline features. They come after phase 2 so they cover the complete
 - **Errors for obsolete commands:** use `obsolete_reason` in the error when someone runs an obsolete command, for example "EDIT isn't supported: use the editor", not just "I don't know how to EDIT". This is cheap and could be done earlier.
 - **Examples:** add one or more `example` nodes to each supported command. Each holds a short runnable program, with an optional title. This is different from `eg`, which only shows how to call the command. In the help panel, each example has **Run** and **Copy to editor** buttons.
 - **Examples are tests:** a test runs every example through the interpreter and the CLI renderer and compares the result with a saved PNG. That keeps the documentation and the interpreter in agreement. Examples that use `RANDOM` need a fixed seed, so their output is repeatable.
-- **Tutorial:** a sequence of lessons, each with text and code. The code loads into the editor and runs from there. The lessons follow the phase 1 commands: moving and turning, `REPEAT`, procedures, inputs and variables, recursion, then colours and shapes.
+- **Tutorial:** a sequence of lessons, each with text and code, featuring Kame the turtle (ADR 0019). The code loads into the editor and runs from there. The lessons follow the phase 1 commands: moving and turning, `REPEAT`, procedures, inputs and variables, recursion, then colours and shapes.
 - **GUI:** a side panel next to the editor, with tabs for Help and Tutorial.
 
 Open questions:
@@ -200,7 +202,7 @@ That's very close to the structure we want: a gpui-kit layout for the editor and
 The canvas keeps nothing from one frame to the next, so the paint callback redraws every segment each time. That's fine for typical Logo drawings. For very large ones, such as deep recursive fractals with 100k+ segments, use one of these:
 
 - Combine runs of segments with the same pen into a single path.
-- Rasterize the drawing into a pixel buffer, either in the logo crate or with `tiny-skia`, and show it with `paint_image`.
+- Rasterize the drawing into a pixel buffer, either in the `pendown-logo` crate or with `tiny-skia`, and show it with `paint_image`.
 
 A pixel buffer would also make `FILL` (flood fill) and saving to PNG straightforward.
 
@@ -212,7 +214,7 @@ The manual makes the pixel buffer close to essential rather than optional (see "
 
 Plan on a pixel buffer for the finished drawing from the start, with vector paths only for the move in progress and the turtle sprite.
 
-### 2. Keep the logo crate free of GUI code
+### 2. Keep the `pendown-logo` crate free of GUI code
 
 Have the interpreter output a stream of turtle events in its own coordinate system. This must include everything the user should see happen, not only lines that leave ink:
 
@@ -241,7 +243,7 @@ Let the user choose how fast the turtle draws, from "instant" down to slow enoug
 
 ### Core idea: run the interpreter and the animation separately
 
-The interpreter never knows about speed or time. It runs as fast as it can and sends the events above to the GUI. The GUI has a component we'll call the **animator**, which plays those events onto the canvas at the chosen speed. Speed is therefore purely a GUI concern, and the logo crate and CLI stay simple.
+The interpreter never knows about speed or time. It runs as fast as it can and sends the events above to the GUI. The GUI has a component we'll call the **animator**, which plays those events onto the canvas at the chosen speed. Speed is therefore purely a GUI concern, and the `pendown-logo` crate and CLI stay simple.
 
 Running the whole program first and then replaying the recording isn't enough:
 

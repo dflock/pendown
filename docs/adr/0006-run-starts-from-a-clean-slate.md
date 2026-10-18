@@ -29,6 +29,6 @@ So the same code always draws the same picture, apart from `RANDOM`.
 
 ## Consequences
 
-- No obsolete workspace commands are needed (`ERASE`, `PO`, `SAVE`, `LOAD`…), as `our-logo.kdl` already says.
+- No obsolete workspace commands are needed (`ERASE`, `PO`, `SAVE`, `LOAD`…), as `pendown-logo.kdl` already says.
 - Making the editor read-only while running may feel restrictive, for example when a `FOREVER` program is running. Revisit after spike 04 if so.
 - Procedures defined at the console only last until the next Run, which the GUI should make clear.

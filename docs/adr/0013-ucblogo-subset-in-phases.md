@@ -1,4 +1,4 @@
-# 13. Implement a subset of UCBLogo in phases, recorded in our-logo.kdl
+# 13. Implement a subset of UCBLogo in phases, recorded in pendown-logo.kdl
 
 Status: Accepted
 Date: 2026-10-17 (recorded later, from commits e56b566, 8d5cc1f and a05ee3a)
@@ -11,11 +11,11 @@ Classic Logo assumes a full screen with no GUI or editor, so many of its command
 
 - **Implement a subset of UCBLogo,** in phases, starting with turtle and drawing commands and adding the more advanced parts later. The phases are described in `plan-1.md`: 1 turtle drawing, 2 the complete core language and richer drawing, 3 help, examples and tutorial, 4 interactive programs, 5 advanced and niche.
 - **Commands made unnecessary by the GUI, or tied to old hardware or the UCBLogo installation, are obsolete** and will never be supported: printing out definitions, workspace listings, `ERASE`, `EDIT`, `SAVE`/`LOAD`, `HELP`, `TRACE`/`STEP`, `PAUSE`, screen layout, console fonts, memory management, file paths, aspect-ratio correction, plus `TEST`/`IFTRUE`/`IFFALSE` and `GOTO`, which are superseded in the language.
-- **`our-logo.kdl` is the source of truth** for what we support. Every command from the Berkeley Logo manual is in it, organised by chapter and section, with:
+- **`pendown-logo.kdl` is the source of truth** for what we support. Every command from the Berkeley Logo manual is in it, organised by chapter and section, with:
   - `obsolete` and `obsolete_reason`;
   - `phase`: a number, or `#null` for obsolete commands;
   - the manual's usage (`eg`), description (`desc`) and cross-references (`see`).
-- **`scripts/manual_to_kdl.py`** generates `berkeley-logo.kdl` from `refs/logo/Berkeley-Logo-Reference-Manual.html`. `our-logo.kdl` started as a copy of that, and is now edited by hand. Never regenerate it, or the hand edits are lost.
+- **`scripts/manual_to_kdl.py`** generates `berkeley-logo.kdl` from `refs/logo/Berkeley-Logo-Reference-Manual.html`. `pendown-logo.kdl` started as a copy of that, and is now edited by hand. Never regenerate it, or the hand edits are lost.
 
 ## Consequences
 

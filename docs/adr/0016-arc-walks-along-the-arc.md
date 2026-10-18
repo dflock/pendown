@@ -18,4 +18,4 @@ In UCBLogo, `ARC angle radius` draws an arc *around* the turtle, with the turtle
 ## Consequences
 
 - UCBLogo programs that use `ARC` draw differently. `CIRCLE` (ADR 0017) covers drawing around the turtle.
-- `our-logo.kdl` keeps the manual's description of `ARC` and adds a `differs` note.
+- `pendown-logo.kdl` keeps the manual's description of `ARC` and adds a `differs` note.

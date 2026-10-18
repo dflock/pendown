@@ -13,7 +13,7 @@ Logo's traditional error messages are just text printed at the prompt, such as "
 - **Parse errors** come from the editor's static parse and show as diagnostics while the user types.
 - **Runtime errors** stop the program, show a diagnostic on the instruction that failed, and print the message in the console.
 - **Errors inside procedures** also record the chain of calls, such as "in SQUARE, called from TRIANGLE, called from line 3", and each step can be clicked to jump to it.
-- **Messages** are in plain English and say what to do where possible. Errors for obsolete commands use their `obsolete_reason` from `our-logo.kdl`.
+- **Messages** are in plain English and say what to do where possible. Errors for obsolete commands use their `obsolete_reason` from `pendown-logo.kdl`.
 
 ## Consequences
 

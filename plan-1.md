@@ -9,10 +9,10 @@ The goal is a really good GUI for writing **new** Logo programs, not running the
 The headline features are:
 
 - You can set the speed of the turtle, and the source code is highlighted instruction by instruction as it executes, making a direct visual link between what the turtle is doing and the code.
-- Extensive help, with reference/help panel generated from the our-logo.kdl
+- Extensive help, with reference/help panel generated from the pendown-logo.kdl
 - Built-in tutorial & example code for each command
 
-`our-logo.kdl` is the source of truth for which commands we support. It has every command from the Berkeley Logo manual, and each one has:
+`pendown-logo.kdl` is the source of truth for which commands we support. It has every command from the Berkeley Logo manual, and each one has:
 
 - **`obsolete` / `obsolete_reason`:** 103 commands are obsolete and will never be supported. Most of them are replaced by the GUI: printing out definitions, workspace listings, `EDIT`, `HELP`, `TRACE`/`STEP`, `PAUSE`, screen layout and console fonts. The rest are about old hardware or the UCBLogo installation (memory, file paths, aspect-ratio correction), or are superseded within the language (`TEST`/`IFTRUE`, `GOTO`).
 - **`phase`:** 1, 2, 4 or 5 for the remaining 263 (257 from the manual plus 6 of our own), or `#null` for obsolete commands.
@@ -28,7 +28,7 @@ The smallest Logo that is fun to draw with:
 - **Language:** `TO`/`END` with inputs and recursion, `MAKE`/`LOCAL`/`LOCALMAKE`/`THING`, `REPEAT`/`REPCOUNT`/`FOREVER`, `IF`/`IFELSE`, `STOP`/`OUTPUT`, `WAIT`, `PRINT`/`TYPE`/`SHOW`.
 - **Arithmetic and logic:** arithmetic, `SIN`/`COS`/`ARCTAN`, `RANDOM`, comparisons, `AND`/`OR`/`NOT`.
 - **Lists:** only what drawing needs, mainly for `POS`/`SETPOS`: `LIST`, `SENTENCE`, `FIRST`, `LAST`, `BUTFIRST`, `BUTLAST`, `ITEM`, `COUNT`, `EMPTYP`.
-- **Syntax that isn't a command in the manual:** `END`, the infix operators `+ - * / = < > <= >= <>`, `:var` and `"word`, `[...]` lists, `(...)` for variable numbers of inputs, `;` comments. It's described in the manual's Introduction (chapter 1), which `our-logo.kdl` leaves out.
+- **Syntax that isn't a command in the manual:** `END`, the infix operators `+ - * / = < > <= >= <>`, `:var` and `"word`, `[...]` lists, `(...)` for variable numbers of inputs, `;` comments. It's described in the manual's Introduction (chapter 1), which `pendown-logo.kdl` leaves out.
 
 In the GUI and runtime, phase 1 includes:
 
@@ -51,7 +51,7 @@ In the GUI and runtime, phase 1 includes:
 
 Two of the headline features. They come after phase 2 so they cover the complete core language, and so the commands they document have settled down.
 
-- **Help panel:** a reference panel generated from `our-logo.kdl`.
+- **Help panel:** a reference panel generated from `pendown-logo.kdl`.
   - The GUI embeds the file at build time (`include_str!`) and parses it with the `kdl` crate (version 6, as used by the validator).
   - Browse by chapter and section, search by name and alias, and show help for the command under the editor's cursor.
   - It lists the commands the interpreter implements. Obsolete commands can be shown on request, with their `obsolete_reason`.
@@ -65,7 +65,7 @@ Two of the headline features. They come after phase 2 so they cover the complete
 Open questions:
 
 - **Markup:** what format the `help` text and tutorial text use, for example a small subset of markdown with code spans and links between commands.
-- **Tutorial format:** a `tutorial.kdl` alongside `our-logo.kdl`, or a folder of markdown files?
+- **Tutorial format:** a `tutorial.kdl` alongside `pendown-logo.kdl`, or a folder of markdown files?
 - **Where examples run:** on the main canvas (replacing the user's drawing), or on a small canvas in the help panel?
 - **Pictures:** show a pre-rendered picture of each example's output in the help panel? The snapshot tests already produce them.
 
@@ -90,7 +90,7 @@ These need the parts of the speed design that synchronise with the GUI: sync poi
 
 We implement **UCBLogo**: it's the closest thing Logo has to a standard, it's the best documented, and most later Logos (FMSLogo, jsLogo) follow it. Where the dialects differ, it's mostly in commands we've marked obsolete or put in phase 5.
 
-"Our Logo" is UCBLogo's core plus a few deliberate changes and extensions, listed here. They're recorded in `our-logo.kdl` too, so the help panel covers them:
+"Our Logo" is UCBLogo's core plus a few deliberate changes and extensions, listed here. They're recorded in `pendown-logo.kdl` too, so the help panel covers them:
 
 - **New commands** have `extension #true` and a `source` naming where the idea came from. They're in a `shapes` section and in the pen sections of `graphics`.
 - **Changed commands** keep the manual's `desc` and add a `differs` node describing how ours behaves.
@@ -317,7 +317,7 @@ The CLI reads the same event stream with no timing and renders it to a file. `WA
 - **Speed scale and units:** Python-style levels from 0 to 10, or a slider in pixels per second?
 - ~~What does the highlight show?~~ The running instruction, not the whole line.
 - **What does Step step over:** Step currently runs one source line, so `REPEAT 4 [FD 50 RT 90]` is one step, with the highlight moving through its instructions as it plays. Would a second "Step instruction" button, which stops inside the brackets, be useful as well?
-- ~~Does `STEP` itself work?~~ No: `STEP`, `TRACE` and their relatives are marked obsolete in `our-logo.kdl`. Stepping and tracing are debugger controls in the GUI.
+- ~~Does `STEP` itself work?~~ No: `STEP`, `TRACE` and their relatives are marked obsolete in `pendown-logo.kdl`. Stepping and tracing are debugger controls in the GUI.
 - **Channel size:** how big should it be? Small keeps the turtle closely in step. Larger makes Instant mode more efficient.
 
 ## Checked against the Berkeley Logo manual
@@ -340,4 +340,4 @@ These checks were made against `refs/logo/Berkeley-Logo-Reference-Manual.html`.
 - **`FILLED color [instructions]`** runs the instructions, remembers every point the turtle visits, then fills the resulting polygon. It's marked as wxWidgets-only. To animate it, play the moves first, then send the fill as one `Filled` event at the end.
 - **Mouse queries** `MOUSEPOS`, `CLICKPOS` and `BUTTONP` are polled and return turtle coordinates. The GUI keeps the latest mouse state somewhere the interpreter can read it, such as `Arc<Mutex<_>>`, converted to turtle coordinates. Each query is a sync point, so a loop like `FOREVER [SETPOS MOUSEPOS]` runs at most once per frame, which is the right speed for following the mouse.
 - **Keyboard input** with `READCHAR`, `READLIST` and `KEYP` reads from what the manual calls the "read stream". In the GUI that's the console, so the console needs a mode where the running program is waiting for input.
-- **Obsolete, not supported** (see `our-logo.kdl`): `REFRESH` / `NOREFRESH` (we always keep the picture), `SAVEPICT` / `LOADPICT` / `EPSPICT` (replaced by GUI export), and `TEXTSCREEN` / `SPLITSCREEN` / `FULLSCREEN` (the GUI layout is fixed). Note for export: `EPSPICT` ignored `FILL`, `PENERASE` and `PENREVERSE`, and an SVG export from the event stream would have the same limits. PNG export from the pixel buffer would not.
+- **Obsolete, not supported** (see `pendown-logo.kdl`): `REFRESH` / `NOREFRESH` (we always keep the picture), `SAVEPICT` / `LOADPICT` / `EPSPICT` (replaced by GUI export), and `TEXTSCREEN` / `SPLITSCREEN` / `FULLSCREEN` (the GUI layout is fixed). Note for export: `EPSPICT` ignored `FILL`, `PENERASE` and `PENREVERSE`, and an SVG export from the event stream would have the same limits. PNG export from the pixel buffer would not.

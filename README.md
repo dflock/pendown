@@ -32,7 +32,13 @@ CIRCLE 20
 
 ## Getting started
 
-Pendown is written in Rust. With a [Rust toolchain](https://rustup.rs) installed:
+Pendown is written in Rust, so you'll need a [Rust toolchain](https://rustup.rs). On Linux, also install the windowing libraries. On Debian or Ubuntu:
+
+```sh
+sudo apt install libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-xcb-dev
+```
+
+Then build and run it:
 
 ```sh
 git clone <repo-url> pendown

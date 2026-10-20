@@ -297,6 +297,8 @@ The Pause button is not the same as Logo's `PAUSE` command. Logo's `PAUSE` stops
 
 Highlighting and stepping depend on source spans, and every node in the parsed program needs one from the start. With them, the editor highlights the instruction the turtle is carrying out, using the `Instruction` events. At slow speeds that's the direct link between the code and the drawing.
 
+In the editor (spike 01), the highlight is a gpui-kit `RangeDecoration` fill over the instruction's span, and the editor scrolls to keep it in view by setting its scroll offset when the highlight nears an edge. Syntax colours are separate: our own `InputHighlighter`, driven by the Logo lexer, so they follow the theme. Re-lexing the whole buffer on every keystroke is fast enough.
+
 For procedures, the span must point into the text where the procedure was defined. A program might call a procedure that was defined in the editor, typed at the console, or loaded from a file, so a span needs to record which source it came from as well as the position.
 
 ### How this fits with rendering

@@ -1,0 +1,15 @@
+[package]
+name = "spike-01-gpui-editor-and-canvas"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Throwaway spike: see .scratch/phase-1-spikes/issues/01-gpui-editor-and-canvas.md
+[workspace]
+
+[dependencies]
+# `tree-sitter` gives real theme highlight and diagnostic colours; without it they are a transparent stub.
+gpui-kit = { version = "=0.7.3", features = ["tree-sitter"] }
+
+[profile.dev.package."*"]
+opt-level = 2

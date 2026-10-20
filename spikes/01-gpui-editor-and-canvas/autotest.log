@@ -1,0 +1,44 @@
+--- sample program, nothing changing:
+  Frame intervals: n=119 mean=16.87ms p50=16.67ms p95=16.74ms max=27.72ms
+  Highlight update: no samples
+  Highlighter re-lex: n=1 mean=0.01ms p50=0.01ms p95=0.01ms max=0.01ms
+  Diagnostics + instruction spans: n=1 mean=0.05ms p50=0.05ms p95=0.05ms max=0.05ms
+Screenshot screenshot-1-sample.png: Ok(true)
+Loaded 500-line program: 875 instructions
+--- idle: request a frame, nothing changes:
+  Frame intervals: n=179 mean=16.67ms p50=16.67ms p95=16.74ms max=17.27ms
+  Highlight update: no samples
+  Highlighter re-lex: n=1 mean=0.06ms p50=0.06ms p95=0.06ms max=0.06ms
+  Diagnostics + instruction spans: no samples
+--- canvas only: turtle moves each frame:
+  Frame intervals: n=180 mean=16.67ms p50=16.66ms p95=16.72ms max=16.76ms
+  Highlight update: no samples
+  Highlighter re-lex: no samples
+  Diagnostics + instruction spans: no samples
+--- canvas + highlight, no scrolling:
+  Frame intervals: n=240 mean=16.67ms p50=16.67ms p95=16.73ms max=16.95ms
+  Highlight update: n=241 mean=0.01ms p50=0.01ms p95=0.01ms max=0.02ms
+  Highlighter re-lex: no samples
+  Diagnostics + instruction spans: no samples
+--- canvas + highlight, following it:
+  Frame intervals: n=360 mean=16.67ms p50=16.67ms p95=16.73ms max=17.67ms
+  Highlight update: n=361 mean=0.05ms p50=0.04ms p95=0.08ms max=0.15ms
+  Highlighter re-lex: no samples
+  Diagnostics + instruction spans: no samples
+Screenshot screenshot-2-canvas.png: Ok(true)
+--- typing a character per frame, no recolour:
+  Frame intervals: n=240 mean=16.67ms p50=16.67ms p95=16.73ms max=16.87ms
+  Highlight update: no samples
+  Highlighter re-lex: n=241 mean=0.22ms p50=0.19ms p95=0.49ms max=0.98ms
+  Diagnostics + instruction spans: no samples
+--- typing a character per frame, recolouring:
+  Frame intervals: n=240 mean=16.67ms p50=16.67ms p95=16.75ms max=17.05ms
+  Highlight update: no samples
+  Highlighter re-lex: n=241 mean=0.27ms p50=0.24ms p95=0.54ms max=1.08ms
+  Diagnostics + instruction spans: n=241 mean=0.37ms p50=0.34ms p95=0.73ms max=1.19ms
+Screenshot screenshot-3-typing.png: Ok(true)
+--- finished:
+  Frame intervals: n=59 mean=16.67ms p50=16.67ms p95=16.75ms max=16.78ms
+  Highlight update: no samples
+  Highlighter re-lex: no samples
+  Diagnostics + instruction spans: n=1 mean=0.13ms p50=0.13ms p95=0.13ms max=0.13ms

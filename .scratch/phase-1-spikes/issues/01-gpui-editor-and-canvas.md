@@ -36,7 +36,7 @@ The questions are answered in a comment below, with any numbers measured, and an
 
 ### 2026-10-18: spike results
 
-Code: `spikes/01-gpui-editor-and-canvas/` on branch `spike/01-gpui-editor-and-canvas`. Run it with `cargo run --release`. `SPIKE_AUTOTEST=1` runs a timed, scripted session that prints measurements and saves screenshots; the results of the final run are in `autotest.log` and `screenshot-*.png` next to the code.
+Code: `spikes/01-gpui-editor-and-canvas/` on `main`. Run it with `cargo run --release`. `SPIKE_AUTOTEST=1` runs a timed, scripted session that prints measurements and saves screenshots; the results of the final run are in `autotest.log` and `screenshot-*.png` next to the code.
 
 The app has a gpui-kit layout: toolbar, then the editor and a raw `gpui::canvas` in resizable panels, then a console pane. A tiny Logo lexer drives syntax colours, diagnostics and approximate instruction spans. The canvas draws a 400-segment spiral and a turtle that moves every frame.
 

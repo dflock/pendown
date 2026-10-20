@@ -1,44 +1,47 @@
 --- sample program, nothing changing:
-  Frame intervals: n=119 mean=16.87ms p50=16.67ms p95=16.74ms max=27.72ms
+  Frame intervals: n=119 mean=16.88ms p50=16.67ms p95=16.74ms max=29.25ms
   Highlight update: no samples
   Highlighter re-lex: n=1 mean=0.01ms p50=0.01ms p95=0.01ms max=0.01ms
-  Diagnostics + instruction spans: n=1 mean=0.05ms p50=0.05ms p95=0.05ms max=0.05ms
+  Diagnostics + instruction spans: n=1 mean=0.03ms p50=0.03ms p95=0.03ms max=0.03ms
 Screenshot screenshot-1-sample.png: Ok(true)
 Loaded 500-line program: 875 instructions
 --- idle: request a frame, nothing changes:
-  Frame intervals: n=179 mean=16.67ms p50=16.67ms p95=16.74ms max=17.27ms
+  Frame intervals: n=179 mean=16.67ms p50=16.67ms p95=16.72ms max=16.97ms
   Highlight update: no samples
-  Highlighter re-lex: n=1 mean=0.06ms p50=0.06ms p95=0.06ms max=0.06ms
+  Highlighter re-lex: n=1 mean=0.23ms p50=0.23ms p95=0.23ms max=0.23ms
   Diagnostics + instruction spans: no samples
 --- canvas only: turtle moves each frame:
-  Frame intervals: n=180 mean=16.67ms p50=16.66ms p95=16.72ms max=16.76ms
+  Frame intervals: n=180 mean=16.67ms p50=16.67ms p95=16.76ms max=16.87ms
   Highlight update: no samples
   Highlighter re-lex: no samples
   Diagnostics + instruction spans: no samples
 --- canvas + highlight, no scrolling:
-  Frame intervals: n=240 mean=16.67ms p50=16.67ms p95=16.73ms max=16.95ms
+  Frame intervals: n=240 mean=16.67ms p50=16.66ms p95=16.76ms max=16.81ms
   Highlight update: n=241 mean=0.01ms p50=0.01ms p95=0.01ms max=0.02ms
   Highlighter re-lex: no samples
   Diagnostics + instruction spans: no samples
+follow: line 206, visible rows 189..222, line height 20px, offset y -3780px, scroll false
+follow: line 274, visible rows 270..303, line height 20px, offset y -5400px, scroll false
+follow: line 343, visible rows 324..357, line height 20px, offset y -6480px, scroll false
 --- canvas + highlight, following it:
-  Frame intervals: n=360 mean=16.67ms p50=16.67ms p95=16.73ms max=17.67ms
-  Highlight update: n=361 mean=0.05ms p50=0.04ms p95=0.08ms max=0.15ms
+  Frame intervals: n=360 mean=16.67ms p50=16.67ms p95=16.78ms max=20.45ms
+  Highlight update: n=361 mean=0.06ms p50=0.05ms p95=0.11ms max=0.16ms
   Highlighter re-lex: no samples
   Diagnostics + instruction spans: no samples
 Screenshot screenshot-2-canvas.png: Ok(true)
 --- typing a character per frame, no recolour:
-  Frame intervals: n=240 mean=16.67ms p50=16.67ms p95=16.73ms max=16.87ms
+  Frame intervals: n=240 mean=16.67ms p50=16.67ms p95=16.77ms max=18.22ms
   Highlight update: no samples
-  Highlighter re-lex: n=241 mean=0.22ms p50=0.19ms p95=0.49ms max=0.98ms
+  Highlighter re-lex: n=241 mean=0.22ms p50=0.18ms p95=0.51ms max=0.78ms
   Diagnostics + instruction spans: no samples
 --- typing a character per frame, recolouring:
-  Frame intervals: n=240 mean=16.67ms p50=16.67ms p95=16.75ms max=17.05ms
+  Frame intervals: n=240 mean=16.67ms p50=16.66ms p95=16.79ms max=16.85ms
   Highlight update: no samples
-  Highlighter re-lex: n=241 mean=0.27ms p50=0.24ms p95=0.54ms max=1.08ms
-  Diagnostics + instruction spans: n=241 mean=0.37ms p50=0.34ms p95=0.73ms max=1.19ms
+  Highlighter re-lex: n=241 mean=0.20ms p50=0.18ms p95=0.42ms max=0.61ms
+  Diagnostics + instruction spans: n=241 mean=0.31ms p50=0.30ms p95=0.52ms max=1.69ms
 Screenshot screenshot-3-typing.png: Ok(true)
 --- finished:
-  Frame intervals: n=59 mean=16.67ms p50=16.67ms p95=16.75ms max=16.78ms
+  Frame intervals: n=60 mean=16.67ms p50=16.66ms p95=16.74ms max=16.76ms
   Highlight update: no samples
   Highlighter re-lex: no samples
-  Diagnostics + instruction spans: n=1 mean=0.13ms p50=0.13ms p95=0.13ms max=0.13ms
+  Diagnostics + instruction spans: n=1 mean=0.17ms p50=0.17ms p95=0.17ms max=0.17ms

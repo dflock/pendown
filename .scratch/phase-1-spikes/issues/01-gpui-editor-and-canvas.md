@@ -117,3 +117,16 @@ Not found, so we'd build them ourselves:
 ### 2026-10-20: closed
 
 Hover popover checked by hand and works. Wayland is out of scope for now. The suggested changes are made in ADR 0008, `README.md` and `plan-1.md`.
+
+### 2026-10-20: rechecked on gpui-kit 0.8.0
+
+The spike now uses `gpui-kit = "=0.8.0"`. It still pins `gpui-pre =0.3.9`, so GPUI itself is unchanged, and `refs/zed` stays at `93d7456`. The spike built with no code changes and no warnings. The autotest results matched 0.7.3: every phase was 16.67 ms p50; the highlighter's re-lex took 0.18 ms p50, and diagnostics plus spans took 0.30 ms p50. The diagnostic underline still shows. `autotest.log` and the screenshots are from this run.
+
+Points from the 0.8.0 release notes that matter to us:
+
+- **`syntect` feature:** this is a lighter highlighter, but it uses the same stub theme as having no highlighter feature at all, so diagnostics stay transparent. Keep `tree-sitter`.
+- **`EditorState::display_map()`:** `buffer_line_to_display_row(line)` converts a buffer line to a display row. Use it in the scroll-follow recipe (point 5 above), and soft wrap and folding stop being a problem.
+- **Completion:** `Lsp::with_completion_highlighter`, `highlight_prefix` and on-demand completion commands. These are useful for completing command names from `pendown-logo.kdl` in phase 3.
+- **`ResizablePanel::fixed`:** keeps a panel's size when the window resizes. This suits the console pane.
+- **UI tests:** with the `test-support` feature, gpui-kit's offscreen rendering tests now run on Linux, and `cx.capture_screenshot(window)` gives the pixels (see `crates/kit/tests/rendering.rs`). This could replace the spike's `xwd` screenshots for GUI tests and for spike 04.
+- **Behaviour changes:** scroll bounce is now on by default, but only on macOS. A scroll over an editor that has reached its end no longer passes to the page around it. `set_line_number` no longer redraws when nothing changes. None of these affect us.

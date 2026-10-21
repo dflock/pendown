@@ -190,3 +190,104 @@ pub(super) fn not(it: &mut Interpreter, a: &Args) -> Out {
     let b = truth(it, a, 0)?;
     Ok(Some(it.bool(!b)))
 }
+
+pub(super) fn exp(_: &mut Interpreter, a: &Args) -> Out {
+    a.result(a.num(0)?.exp())
+}
+
+/// A logarithm of a number above zero.
+fn log(a: &Args, f: fn(f64) -> f64) -> Out {
+    let x = a.num(0)?;
+    if x <= 0.0 {
+        return Err(a.doesnt_like(0));
+    }
+    a.result(f(x))
+}
+
+pub(super) fn ln(_: &mut Interpreter, a: &Args) -> Out {
+    log(a, f64::ln)
+}
+
+pub(super) fn log10(_: &mut Interpreter, a: &Args) -> Out {
+    log(a, f64::log10)
+}
+
+pub(super) fn radsin(_: &mut Interpreter, a: &Args) -> Out {
+    a.result(a.num(0)?.sin())
+}
+
+pub(super) fn radcos(_: &mut Interpreter, a: &Args) -> Out {
+    a.result(a.num(0)?.cos())
+}
+
+/// Like `ARCTAN`, in radians.
+pub(super) fn radarctan(_: &mut Interpreter, a: &Args) -> Out {
+    a.result(if a.vals.len() == 2 { a.num(1)?.atan2(a.num(0)?) } else { a.num(0)?.atan() })
+}
+
+/// The most members `ISEQ`, `RSEQ` and `ARRAY` will make, so a typing
+/// mistake like `ISEQ 1 1e12` is an error rather than running out of memory.
+pub(super) const MAX_MEMBERS: i64 = 10_000_000;
+
+pub(super) fn too_many(a: &Args) -> Flow {
+    a.error(format!("{} would make more than {MAX_MEMBERS} members", a.call.name.to_uppercase()))
+}
+
+fn numbers(items: impl Iterator<Item = f64>) -> Out {
+    Ok(Some(Value::List(std::rc::Rc::new(crate::value::List::new(items.map(Value::Num).collect())))))
+}
+
+/// `ISEQ from to`: the whole numbers from `from` to `to`, counting down if
+/// `to` is smaller.
+pub(super) fn iseq(_: &mut Interpreter, a: &Args) -> Out {
+    let (from, to) = (a.int(0)?, a.int(1)?);
+    if (to - from).abs() >= MAX_MEMBERS {
+        return Err(too_many(a));
+    }
+    if from <= to { numbers((from..=to).map(|n| n as f64)) } else { numbers((to..=from).rev().map(|n| n as f64)) }
+}
+
+/// `RSEQ from to count`: `count` numbers evenly spaced from `from` to `to`.
+pub(super) fn rseq(_: &mut Interpreter, a: &Args) -> Out {
+    let (from, to, count) = (a.num(0)?, a.num(1)?, a.int(2)?);
+    if count < 1 {
+        return Err(a.doesnt_like(2));
+    }
+    if count > MAX_MEMBERS {
+        return Err(too_many(a));
+    }
+    if count == 1 {
+        return numbers(std::iter::once(from));
+    }
+    let step = (to - from) / (count - 1) as f64;
+    numbers((0..count).map(|i| if i == count - 1 { to } else { from + i as f64 * step }))
+}
+
+/// `RERANDOM` starts `RANDOM`'s sequence again from the start, and
+/// `(RERANDOM seed)` picks one of many repeatable sequences.
+pub(super) fn rerandom(it: &mut Interpreter, a: &Args) -> Out {
+    let seed = if a.vals.is_empty() { 0 } else { a.int(0)? };
+    it.random = crate::random::Random::new(seed as u64);
+    Ok(None)
+}
+
+/// `FORM num width precision`: `num` with exactly `precision` digits after
+/// the point, padded with spaces on the left to at least `width`
+/// characters. UCBLogo's printf formats, `(FORM num -1 format)`, aren't
+/// supported.
+pub(super) fn form(_: &mut Interpreter, a: &Args) -> Out {
+    let x = a.num(0)?;
+    let width = a.int(1)?;
+    if width < 0 {
+        return Err(a.error("FORM's printf formats aren't supported: give a width of 0 or more".into()));
+    }
+    let precision = a.int(2)?;
+    if !(0..=100).contains(&precision) {
+        return Err(a.doesnt_like(2));
+    }
+    if width > 1000 {
+        return Err(a.doesnt_like(1));
+    }
+    let text = format!("{x:>width$.precision$}", width = width as usize, precision = precision as usize);
+    Ok(Some(Value::Word(text.into())))
+}

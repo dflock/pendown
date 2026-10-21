@@ -302,6 +302,9 @@ pub(super) fn array(_: &mut Interpreter, a: &Args) -> Out {
     if size < 1 {
         return Err(a.doesnt_like(0));
     }
+    if size > super::arithmetic::MAX_MEMBERS {
+        return Err(super::arithmetic::too_many(a));
+    }
     Ok(Some(new_array(size, a.origin(1)?)))
 }
 
@@ -310,6 +313,9 @@ pub(super) fn mdarray(_: &mut Interpreter, a: &Args) -> Out {
     let sizes = a.ints(0)?;
     if sizes.iter().any(|&s| s < 1) {
         return Err(a.doesnt_like(0));
+    }
+    if sizes.iter().try_fold(1i64, |total, &s| total.checked_mul(s)).is_none_or(|total| total > super::arithmetic::MAX_MEMBERS) {
+        return Err(super::arithmetic::too_many(a));
     }
     let origin = a.origin(1)?;
     fn build(sizes: &[i64], origin: i64) -> Value {

@@ -142,3 +142,48 @@ fn random() {
     let runs: Vec<_> = (0..3).map(|_| printed(&mut it, &events, program)).collect();
     assert!(runs[0] != runs[1] || runs[1] != runs[2]);
 }
+
+#[test]
+fn phase_2_arithmetic() {
+    let cases = [
+        ("EXP 0", "1"),
+        ("LN EXP 2", "2"),
+        ("LOG10 1000", "3"),
+        ("RADSIN 0", "0"),
+        ("RADCOS 0", "1"),
+        ("RADARCTAN 1", "0.785398163397448"),
+        ("(RADARCTAN 0 1)", "1.5707963267949"),
+        ("ISEQ 3 7", "[3 4 5 6 7]"),
+        ("ISEQ 7 3", "[7 6 5 4 3]"),
+        ("RSEQ 3 5 9", "[3 3.25 3.5 3.75 4 4.25 4.5 4.75 5]"),
+        ("RSEQ 3 5 5", "[3 3.5 4 4.5 5]"),
+        ("RSEQ 1 2 1", "[1]"),
+        ("FORM 3.14159 8 2", "    3.14"),
+        ("FORM 2 0 0", "2"),
+        ("FORM -1.5 1 3", "-1.500"),
+    ];
+    for (expr, expected) in cases {
+        assert_eq!(output(&format!("SHOW {expr}")), format!("{expected}\n"), "{expr}");
+    }
+}
+
+#[test]
+fn rerandom_repeats() {
+    let a = output("RERANDOM REPEAT 10 [TYPE RANDOM 100 TYPE \" ]");
+    let b = output("RERANDOM REPEAT 10 [TYPE RANDOM 100 TYPE \" ]");
+    assert_eq!(a, b);
+    let c = output("(RERANDOM 7) REPEAT 10 [TYPE RANDOM 100 TYPE \" ]");
+    assert_ne!(a, c);
+}
+
+#[test]
+fn phase_2_arithmetic_errors() {
+    assert_eq!(error("SHOW LN 0"), "LN doesn't like 0 as input");
+    assert_eq!(error("SHOW LOG10 -1"), "LOG10 doesn't like -1 as input");
+    assert_eq!(error("SHOW EXP 1000"), "That number is too big");
+    assert_eq!(error("SHOW ISEQ 1 1.5"), "ISEQ doesn't like 1.5 as input");
+    assert_eq!(error("SHOW ISEQ 1 1e12"), "ISEQ would make more than 10000000 members");
+    assert_eq!(error("SHOW RSEQ 1 2 0"), "RSEQ doesn't like 0 as input");
+    assert_eq!(error("SHOW FORM 1 -1 \"%x"), "FORM's printf formats aren't supported: give a width of 0 or more");
+    assert_eq!(error("SHOW ARRAY 1e9"), "ARRAY would make more than 10000000 members");
+}

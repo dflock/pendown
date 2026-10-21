@@ -115,6 +115,8 @@ pub static PRIMS: &[Prim] = &[
     Prim { names: &["local"], arity: some(1, 1, None), imp: Imp::F(local) },
     Prim { names: &["localmake"], arity: TWO, imp: Imp::F(localmake) },
     Prim { names: &["thing"], arity: ONE, imp: Imp::F(thing) },
+    Prim { names: &["name"], arity: TWO, imp: Imp::F(name) },
+    Prim { names: &["global"], arity: some(1, 1, None), imp: Imp::F(global) },
     Prim { names: &["print", "pr"], arity: some(0, 1, None), imp: Imp::F(print) },
     Prim { names: &["type"], arity: some(0, 1, None), imp: Imp::F(type_) },
     Prim { names: &["show"], arity: some(0, 1, None), imp: Imp::F(show) },
@@ -129,6 +131,40 @@ pub static PRIMS: &[Prim] = &[
     Prim { names: &["item"], arity: TWO, imp: Imp::F(item) },
     Prim { names: &["count"], arity: ONE, imp: Imp::F(count) },
     Prim { names: &["emptyp", "empty?"], arity: ONE, imp: Imp::F(emptyp) },
+    Prim { names: &["fput"], arity: TWO, imp: Imp::F(fput) },
+    Prim { names: &["lput"], arity: TWO, imp: Imp::F(lput) },
+    Prim { names: &["combine"], arity: TWO, imp: Imp::F(combine) },
+    Prim { names: &["reverse"], arity: ONE, imp: Imp::F(reverse) },
+    Prim { names: &["firsts"], arity: ONE, imp: Imp::F(firsts) },
+    Prim { names: &["butfirsts", "bfs"], arity: ONE, imp: Imp::F(butfirsts) },
+    Prim { names: &["pick"], arity: ONE, imp: Imp::F(pick) },
+    Prim { names: &["remove"], arity: TWO, imp: Imp::F(remove) },
+    Prim { names: &["remdup"], arity: ONE, imp: Imp::F(remdup) },
+    Prim { names: &["quoted"], arity: ONE, imp: Imp::F(quoted) },
+    Prim { names: &["push"], arity: TWO, imp: Imp::F(push) },
+    Prim { names: &["pop"], arity: ONE, imp: Imp::F(pop) },
+    Prim { names: &["queue"], arity: TWO, imp: Imp::F(queue) },
+    Prim { names: &["dequeue"], arity: ONE, imp: Imp::F(pop) },
+    Prim { names: &["wordp", "word?"], arity: ONE, imp: Imp::F(wordp) },
+    Prim { names: &["listp", "list?"], arity: ONE, imp: Imp::F(listp) },
+    Prim { names: &["arrayp", "array?"], arity: ONE, imp: Imp::F(arrayp) },
+    Prim { names: &["numberp", "number?"], arity: ONE, imp: Imp::F(numberp) },
+    Prim { names: &["beforep", "before?"], arity: TWO, imp: Imp::F(beforep) },
+    Prim { names: &["memberp", "member?"], arity: TWO, imp: Imp::F(memberp) },
+    Prim { names: &["substringp", "substring?"], arity: TWO, imp: Imp::F(substringp) },
+    Prim { names: &["member"], arity: TWO, imp: Imp::F(member) },
+    Prim { names: &["ascii"], arity: ONE, imp: Imp::F(ascii) },
+    Prim { names: &["char"], arity: ONE, imp: Imp::F(char) },
+    Prim { names: &["lowercase"], arity: ONE, imp: Imp::F(lowercase) },
+    Prim { names: &["uppercase"], arity: ONE, imp: Imp::F(uppercase) },
+    // Arrays (ADR 0021).
+    Prim { names: &["array"], arity: some(1, 1, Some(2)), imp: Imp::F(array) },
+    Prim { names: &["mdarray"], arity: some(1, 1, Some(2)), imp: Imp::F(mdarray) },
+    Prim { names: &["listtoarray"], arity: some(1, 1, Some(2)), imp: Imp::F(listtoarray) },
+    Prim { names: &["arraytolist"], arity: ONE, imp: Imp::F(arraytolist) },
+    Prim { names: &["setitem"], arity: Arity::fixed(3), imp: Imp::F(setitem) },
+    Prim { names: &["mditem"], arity: TWO, imp: Imp::F(mditem) },
+    Prim { names: &["mdsetitem"], arity: Arity::fixed(3), imp: Imp::F(mdsetitem) },
     Prim { names: &["sum"], arity: some(0, 2, None), imp: Imp::F(sum) },
     Prim { names: &["difference"], arity: TWO, imp: Imp::F(difference) },
     Prim { names: &["product"], arity: some(0, 2, None), imp: Imp::F(product) },
@@ -231,7 +267,7 @@ impl Args<'_> {
         match &self.vals[i] {
             Value::Word(w) => Ok(w.clone()),
             Value::Num(n) => Ok(crate::number::format_number(*n).into()),
-            Value::List(_) => Err(self.doesnt_like(i)),
+            Value::List(_) | Value::Array(_) => Err(self.doesnt_like(i)),
         }
     }
 
@@ -284,6 +320,25 @@ fn make(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
     Ok(None)
 }
 
+/// `NAME value varname`: `MAKE` with its inputs the other way round.
+fn name(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
+    let name = a.word(1)?;
+    let sym = it.define(&name);
+    it.vars[sym as usize] = Some(a.vals[0].clone());
+    Ok(None)
+}
+
+/// `GLOBAL`: in UCBLogo, this lets the setter notation (`SETXYZ`) work for
+/// a variable with no value yet. Pendown has no setter notation, and `MAKE`
+/// creates globals anyway, so it only checks its inputs and records the
+/// names' spelling.
+fn global(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
+    for name in names(a)? {
+        it.define(&name);
+    }
+    Ok(None)
+}
+
 /// The names `LOCAL` gets: words, or lists of words.
 fn names(a: &Args) -> Result<Vec<Rc<str>>, Flow> {
     let mut names = Vec::new();
@@ -333,22 +388,25 @@ fn thing(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
     }
 }
 
-fn joined(a: &Args, form: fn(&Value) -> String) -> String {
+fn joined(a: &Args, form: impl Fn(&Value) -> String) -> String {
     a.vals.iter().map(form).collect::<Vec<_>>().join(" ")
 }
 
 fn print(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    it.emit(Event::Print(joined(a, Value::print_form) + "\n"))?;
+    let style = it.print_style();
+    it.emit(Event::Print(joined(a, |v| v.print_styled(style)) + "\n"))?;
     Ok(None)
 }
 
 fn type_(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    it.emit(Event::Print(a.vals.iter().map(Value::print_form).collect()))?;
+    let style = it.print_style();
+    it.emit(Event::Print(a.vals.iter().map(|v| v.print_styled(style)).collect()))?;
     Ok(None)
 }
 
 fn show(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    it.emit(Event::Print(joined(a, Value::show) + "\n"))?;
+    let style = it.print_style();
+    it.emit(Event::Print(joined(a, |v| v.show_styled(style)) + "\n"))?;
     Ok(None)
 }
 

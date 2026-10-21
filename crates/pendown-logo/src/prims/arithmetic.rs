@@ -8,7 +8,7 @@ use super::Args;
 use crate::{
     interp::{Flow, Interpreter},
     number::{self, sin_cos_degrees},
-    value::{Value, equal},
+    value::Value,
 };
 
 type Out = Result<Option<Value>, Flow>;
@@ -47,11 +47,11 @@ pub(super) fn minus(_: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow
 }
 
 pub(super) fn equalp(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    Ok(Some(it.bool(equal(&a.vals[0], &a.vals[1]))))
+    Ok(Some(it.bool(it.equal(&a.vals[0], &a.vals[1]))))
 }
 
 pub(super) fn notequalp(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    Ok(Some(it.bool(!equal(&a.vals[0], &a.vals[1]))))
+    Ok(Some(it.bool(!it.equal(&a.vals[0], &a.vals[1]))))
 }
 
 fn compare(it: &mut Interpreter, a: &Args, test: fn(Ordering) -> bool) -> Result<Option<Value>, Flow> {

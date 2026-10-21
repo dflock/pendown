@@ -1,6 +1,6 @@
 //! `pendown-logo.kdl` is the source of truth for which commands exist (see
 //! `implementation-plan.md`), so it must parse, and the interpreter must
-//! implement exactly the commands it marks as phase 1.
+//! implement exactly the commands it marks as phases 1 and 2.
 
 use std::collections::BTreeSet;
 
@@ -50,12 +50,28 @@ fn pendown_logo_kdl_parses() {
     assert!(!document().nodes().is_empty());
 }
 
+fn phase(node: &KdlNode) -> Option<i128> {
+    value(node, "phase").and_then(|v| v.as_integer())
+}
+
+/// Special variables, such as `CASEIGNOREDP`, are documented like commands,
+/// with `(variable)` in their `eg`.
+fn is_variable(node: &KdlNode) -> bool {
+    value(node, "eg").and_then(|v| v.as_string()).is_some_and(|eg| eg.contains("(variable)"))
+}
+
 #[test]
-fn the_interpreter_implements_exactly_the_phase_1_commands() {
+fn the_interpreter_implements_exactly_the_phase_1_and_2_commands() {
     let mut all = Vec::new();
     commands(document().nodes(), &mut all);
-    let phase_1: Vec<_> = all.iter().filter(|n| value(n, "phase").and_then(|v| v.as_integer()) == Some(1)).collect();
-    assert_eq!(phase_1.len(), 90, "the plan's count");
+    assert_eq!(all.iter().filter(|n| phase(n) == Some(1)).count(), 90, "the plan's count for phase 1");
+    assert_eq!(all.iter().filter(|n| phase(n) == Some(2)).count(), 76, "the plan's count for phase 2");
+    let supported: Vec<_> = all.iter().filter(|n| matches!(phase(n), Some(1 | 2))).collect();
+    let (variables, commands): (Vec<_>, Vec<_>) = supported.into_iter().partition(|n| is_variable(n));
+
+    let specials: BTreeSet<String> = pendown_logo::special_variables().iter().map(|n| n.to_lowercase()).collect();
+    let documented: BTreeSet<String> = variables.iter().flat_map(|n| names(n)).collect();
+    assert_eq!(specials, documented, "the special variables");
 
     let implemented: BTreeSet<String> =
         pendown_logo::command_names().flat_map(|names| names.iter().map(|n| n.to_string())).collect();
@@ -63,7 +79,7 @@ fn the_interpreter_implements_exactly_the_phase_1_commands() {
     let syntax = ["to", "end"];
     let mut missing = Vec::new();
     let mut documented = BTreeSet::new();
-    for node in &phase_1 {
+    for node in &commands {
         for name in names(node) {
             documented.insert(name.clone());
             if !implemented.contains(&name) && !syntax.contains(&name.as_str()) {
@@ -71,10 +87,12 @@ fn the_interpreter_implements_exactly_the_phase_1_commands() {
             }
         }
     }
-    assert!(missing.is_empty(), "phase 1 commands the interpreter doesn't have: {missing:?}");
-    // `#` is REPCOUNT's short form, which the manual gives in REPCOUNT's description.
-    let extra: Vec<_> = implemented.iter().filter(|n| !documented.contains(*n) && *n != "#").collect();
-    assert!(extra.is_empty(), "commands the interpreter has that aren't phase 1 in the kdl: {extra:?}");
+    assert!(missing.is_empty(), "phase 1 and 2 commands the interpreter doesn't have: {missing:?}");
+    // `#` is REPCOUNT's short form, which the manual gives in REPCOUNT's
+    // description. `?` and `?REST` are template slots, described with MAP.
+    let described = ["#", "?", "?rest"];
+    let extra: Vec<_> = implemented.iter().filter(|n| !documented.contains(*n) && !described.contains(&n.as_str())).collect();
+    assert!(extra.is_empty(), "commands the interpreter has that aren't phase 1 or 2 in the kdl: {extra:?}");
 }
 
 /// The example programs in `examples/phase-1/` use every phase-1 command at

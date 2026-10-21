@@ -39,3 +39,8 @@ pub use value::Value;
 pub fn command_names() -> impl Iterator<Item = &'static [&'static str]> {
     prims::PRIMS.iter().map(|p| p.names)
 }
+
+/// The special variables, which change how Pendown behaves.
+pub fn special_variables() -> &'static [&'static str] {
+    interp::SPECIAL_VARIABLES
+}

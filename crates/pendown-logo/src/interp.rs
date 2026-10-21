@@ -22,7 +22,7 @@ use crate::{
     parse::{self, Arity, Block, Call, Cx, Expr, Instr, Target},
     prims::{self, Args, Imp, PRIMS},
     span::{SourceId, Span},
-    value::{List, Value},
+    value::{List, Style, Value},
 };
 
 /// How the evaluator leaves an instruction other than by finishing it.
@@ -156,8 +156,30 @@ pub struct Control {
     pub speed: AtomicU8,
 }
 
+/// The special variables (issue 03): ordinary variables that change how
+/// Pendown behaves, interned once.
+struct Specials {
+    caseignoredp: Sym,
+    erract: Sym,
+    fullprintp: Sym,
+    printdepthlimit: Sym,
+    printwidthlimit: Sym,
+    logoversion: Sym,
+}
+
+pub const SPECIAL_VARIABLES: &[&str] = &["CASEIGNOREDP", "ERRACT", "FULLPRINTP", "PRINTDEPTHLIMIT", "PRINTWIDTHLIMIT", "LOGOVERSION"];
+
+/// `LOGOVERSION`: Pendown's version, such as 0.1, as a number.
+fn logo_version() -> f64 {
+    let mut parts = env!("CARGO_PKG_VERSION").split('.');
+    let major = parts.next().unwrap_or("0");
+    let minor = parts.next().unwrap_or("0");
+    format!("{major}.{minor}").parse().unwrap_or(0.0)
+}
+
 pub struct Interpreter {
     names: Names,
+    specials: Specials,
     pub(crate) vars: Vec<Option<Value>>,
     procs: Vec<Option<Rc<Proc>>>,
     frames: Vec<Frame>,
@@ -204,8 +226,18 @@ fn didnt_output(name: &str, to: &str, span: Span) -> Flow {
 
 impl Interpreter {
     pub fn new(sink: Box<dyn EventSink>, control: Arc<Control>) -> Interpreter {
-        Interpreter {
-            names: Names::default(),
+        let mut names = Names::default();
+        let specials = Specials {
+            caseignoredp: names.define("CASEIGNOREDP"),
+            erract: names.define("ERRACT"),
+            fullprintp: names.define("FULLPRINTP"),
+            printdepthlimit: names.define("PRINTDEPTHLIMIT"),
+            printwidthlimit: names.define("PRINTWIDTHLIMIT"),
+            logoversion: names.define("LOGOVERSION"),
+        };
+        let mut it = Interpreter {
+            names,
+            specials,
             vars: Vec::new(),
             procs: Vec::new(),
             frames: Vec::new(),
@@ -224,7 +256,58 @@ impl Interpreter {
             false_word: Value::word("false"),
             limits: Limits::default(),
             stats: Stats::default(),
+        };
+        it.grow();
+        it.set_specials();
+        it
+    }
+
+    /// The special variables' starting values. The others have none.
+    fn set_specials(&mut self) {
+        self.vars[self.specials.caseignoredp as usize] = Some(self.true_word.clone());
+        self.vars[self.specials.logoversion as usize] = Some(Value::Num(logo_version()));
+    }
+
+    fn special(&self, sym: Sym) -> Option<&Value> {
+        self.vars[sym as usize].as_ref()
+    }
+
+    /// `CASEIGNOREDP`: whether words compare without case. Anything but
+    /// `FALSE` counts as true, since it starts true.
+    pub(crate) fn ignore_case(&self) -> bool {
+        self.special(self.specials.caseignoredp).and_then(Value::as_bool) != Some(false)
+    }
+
+    /// `EQUALP`, with `CASEIGNOREDP`.
+    pub(crate) fn equal(&self, a: &Value, b: &Value) -> bool {
+        crate::value::equal(a, b, self.ignore_case())
+    }
+
+    /// How `PRINT` and friends print, from `FULLPRINTP`, `PRINTDEPTHLIMIT`
+    /// and `PRINTWIDTHLIMIT`. A limit that isn't a whole number of zero or
+    /// more is ignored.
+    pub(crate) fn print_style(&self) -> Style {
+        let limit = |sym| {
+            let n = self.special(sym)?.as_num()?;
+            (n >= 0.0 && n.fract() == 0.0).then_some(n as usize)
+        };
+        Style {
+            depth: limit(self.specials.printdepthlimit),
+            width: limit(self.specials.printwidthlimit),
+            full: self.special(self.specials.fullprintp).and_then(Value::as_bool) == Some(true),
         }
+    }
+
+    /// `ERRACT`'s list, if it has one that isn't empty.
+    pub(crate) fn erract(&self) -> Option<Rc<List>> {
+        match self.special(self.specials.erract)? {
+            Value::List(list) if !list.items.is_empty() => Some(list.clone()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn erract_sym(&self) -> Sym {
+        self.specials.erract
     }
 
     /// Sends events somewhere else, and takes Stop and lockstep from a new
@@ -243,6 +326,8 @@ impl Interpreter {
         self.vars.clear();
         self.procs.clear();
         self.names.forget_definitions();
+        self.grow();
+        self.set_specials();
         self.repcounts.clear();
         self.turtle = Turtle::default();
         self.background = (PALETTE[0], Value::Num(0.0));

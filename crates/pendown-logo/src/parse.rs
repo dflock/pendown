@@ -368,6 +368,7 @@ fn runparse(items: &[Value], spans: Option<&[Span]>, fallback: Option<Span>) -> 
         match item {
             Value::List(list) => out.push(Token { tok: Tok::List(list.clone()), span: whole }),
             Value::Num(n) => out.push(Token { tok: Tok::Lit(Value::Num(*n)), span: whole }),
+            Value::Array(_) => out.push(Token { tok: Tok::Lit(item.clone()), span: whole }),
             Value::Word(w) => split_word(w, span, whole, &mut out),
         }
     }

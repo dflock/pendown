@@ -240,7 +240,7 @@ pub fn parse(value: &Value) -> Result<Rgba, ColourError> {
                 Err(_) => Err(ColourError::UnknownName { name: word.to_string(), suggestions: suggest(&lower) }),
             }
         }
-        Value::Num(_) => Err(ColourError::NotAColour),
+        Value::Num(_) | Value::Array(_) => Err(ColourError::NotAColour),
     }
 }
 

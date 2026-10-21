@@ -261,6 +261,10 @@ interpreter thread ──(bounded channel of events)──▶ animator (UI threa
 
 - **Interpreter on its own thread.** Use `std::thread` rather than gpui's background executor. The interpreter blocks when the channel is full, and a blocking task would tie up one of the executor's shared worker threads. Having our own thread also lets us give it a large stack (`std::thread::Builder::stack_size`) for deeply recursive Logo procedures.
 - **A bounded channel keeps the two in step.** The channel holds only a limited number of events, so when it's full the interpreter blocks until the animator catches up. At slow speeds the interpreter therefore stays only a few events ahead of what's on screen, and pausing the animator automatically pauses the program.
+- **Events go in batches.** One channel send per event manages only 2–11 M events a second, more than the rest of the interpreter costs (spike 03). Batching makes runs 2.5–5 times faster: 9–12 M instructions a second for drawing loops, about ten times what the pixel buffer can draw.
+  - The interpreter sends a `Vec<Event>` of up to 256 events when it's full, when it has been open for 4 ms, and at the end of the run. The channel holds 4 batches.
+  - At slow speeds, the interpreter can be up to about 1,000 events ahead of the screen.
+  - Every sync point sends the open batch first, including each line while stepping, so the animator can reach the `Sync` it's waiting for.
 - **Turtle queries never wait for the GUI.** `POS`, `HEADING`, `PENDOWNP` and similar are answered from the interpreter's own turtle state. Only the drawing lags behind.
 - **Sync points.** Before anything that depends on what the user sees, the interpreter sends a `Sync` event with a one-shot reply channel and waits until the animator reaches it. That applies to reading input, reading the mouse or keyboard, and the end of the program.
 - **Driving frames.** While events are queued or a move is part-way through, the animator calls `window.request_animation_frame()` (`window.rs:2730`) each frame, and stops calling it when idle. Each frame it uses `try_recv` to take as many events as the current speed and elapsed time allow, so no async plumbing is needed. gpui's docs say *decorative* animations should respect `App::reduce_motion`. This animation isn't decorative, because the user chose the speed, so it shouldn't be skipped.
@@ -320,7 +324,7 @@ The CLI reads the same event stream with no timing and renders it to a file. `WA
 - ~~What does the highlight show?~~ The running instruction, not the whole line.
 - **What does Step step over:** Step currently runs one source line, so `REPEAT 4 [FD 50 RT 90]` is one step, with the highlight moving through its instructions as it plays. Would a second "Step instruction" button, which stops inside the brackets, be useful as well?
 - ~~Does `STEP` itself work?~~ No: `STEP`, `TRACE` and their relatives are marked obsolete in `pendown-logo.kdl`. Stepping and tracing are debugger controls in the GUI.
-- **Channel size:** how big should it be? Small keeps the turtle closely in step. Larger makes Instant mode more efficient.
+- ~~**Channel size:**~~ Batches of up to 256 events, at most 4 ms old, with room for 4 batches (spike 03; see "Architecture").
 
 ## Checked against the Berkeley Logo manual
 

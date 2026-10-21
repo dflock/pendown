@@ -1,0 +1,38 @@
+# spike 03 bench, release build
+
+## Stack used per call that isn't a tail call
+
+- command, then more: 2001 calls deep used 2469 KiB, 1264 bytes a call
+- inside an expression: 2001 calls deep used 6909 KiB, 3537 bytes a call
+- fib-style, two calls: 2001 calls deep used 6909 KiB, 3537 bytes a call
+- inside REPEAT and IFELSE lists: 2001 calls deep used 9313 KiB, 4768 bytes a call
+
+Worst case 4768 bytes a call, so a 256 MiB stack fits about 56244 calls.
+Endless recursion through lists, no depth limit: stopped by the stack guard at 56246 calls: "DOWN called itself too many times: 56246 calls deep. Does it have a way to STOP?"
+
+## Speed
+
+| Program | Events | Instructions | Time | Instructions/s |
+|---|---|---|---|---|
+| REPEAT [FD 1 RT 1] | no channel, no Instruction events | 4.0 M | 182 ms | 22.0 M/s |
+| REPEAT [FD 1 RT 1] | no channel, with Instruction events | 4.0 M | 284 ms | 14.1 M/s |
+| REPEAT [FD 1 RT 1] | channel, one event a send, with Instruction events | 4.0 M | 877 ms | 4.6 M/s, 9.1 M events/s |
+| REPEAT [FD 1 RT 1] | channel, batches of 256, with Instruction events | 4.0 M | 335 ms | 11.9 M/s, 23.9 M events/s |
+| tail-recursive loop | no channel, no Instruction events | 4.0 M | 474 ms | 8.4 M/s |
+| tail-recursive loop | no channel, with Instruction events | 4.0 M | 337 ms | 11.9 M/s |
+| tail-recursive loop | channel, one event a send, with Instruction events | 4.0 M | 2003 ms | 2.0 M/s, 3.0 M events/s |
+| tail-recursive loop | channel, batches of 256, with Instruction events | 4.0 M | 477 ms | 8.4 M/s, 12.6 M events/s |
+| FIB 25 | no channel, no Instruction events | 0.5 M | 73 ms | 6.7 M/s |
+| FIB 25 | no channel, with Instruction events | 0.5 M | 77 ms | 6.3 M/s |
+| FIB 25 | channel, one event a send, with Instruction events | 0.5 M | 306 ms | 1.6 M/s, 1.6 M events/s |
+| FIB 25 | channel, batches of 256, with Instruction events | 0.5 M | 84 ms | 5.8 M/s, 5.8 M events/s |
+
+## Memory: SPIRAL for 20 s, through a channel, with Instruction events
+
+-  0 s: RSS 4.8 MiB
+-  5 s: RSS 4.8 MiB
+- 10 s: RSS 4.8 MiB
+- 15 s: RSS 4.8 MiB
+- 20 s: RSS 4.8 MiB
+
+Err(Halted) after 50 M instructions and 83 M events; deepest 1 call

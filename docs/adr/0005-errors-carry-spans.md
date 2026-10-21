@@ -18,4 +18,6 @@ Logo's traditional error messages are just text printed at the prompt, such as "
 ## Consequences
 
 - The error type lives in the logo crate, with no GUI code. The GUI turns it into a gpui-kit `Diagnostic`.
+- A tail call replaces its caller, so it leaves no entry in the chain, as in UCBLogo.
+- An error from a deep recursion has a chain of thousands of identical entries. The GUI should collapse repeats, such as "called from DOWN, 10,000 times".
 - `CATCH "ERROR` and `ERROR` (phase 2) must expose the same information to Logo programs, as UCBLogo's error list.

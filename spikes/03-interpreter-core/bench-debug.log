@@ -1,0 +1,29 @@
+# spike 03 bench, debug build
+
+## Stack used per call that isn't a tail call
+
+- command, then more: 2001 calls deep used 2751 KiB, 1408 bytes a call
+- inside an expression: 2001 calls deep used 7440 KiB, 3809 bytes a call
+- fib-style, two calls: 2001 calls deep used 7440 KiB, 3809 bytes a call
+- inside REPEAT and IFELSE lists: 2001 calls deep used 10563 KiB, 5408 bytes a call
+
+Worst case 5408 bytes a call, so a 256 MiB stack fits about 49588 calls.
+Endless recursion through lists, no depth limit: stopped by the stack guard at 49590 calls: "DOWN called itself too many times: 49590 calls deep. Does it have a way to STOP?"
+
+## Speed
+
+| Program | Events | Instructions | Time | Instructions/s |
+|---|---|---|---|---|
+| REPEAT [FD 1 RT 1] | no channel, no Instruction events | 4.0 M | 199 ms | 20.1 M/s |
+| REPEAT [FD 1 RT 1] | no channel, with Instruction events | 4.0 M | 217 ms | 18.4 M/s |
+| REPEAT [FD 1 RT 1] | channel, one event a send, with Instruction events | 4.0 M | 592 ms | 6.8 M/s, 13.5 M events/s |
+| REPEAT [FD 1 RT 1] | channel, batches of 256, with Instruction events | 4.0 M | 356 ms | 11.2 M/s, 22.5 M events/s |
+| tail-recursive loop | no channel, no Instruction events | 4.0 M | 381 ms | 10.5 M/s |
+| tail-recursive loop | no channel, with Instruction events | 4.0 M | 403 ms | 9.9 M/s |
+| tail-recursive loop | channel, one event a send, with Instruction events | 4.0 M | 1942 ms | 2.1 M/s, 3.1 M events/s |
+| tail-recursive loop | channel, batches of 256, with Instruction events | 4.0 M | 527 ms | 7.6 M/s, 11.4 M events/s |
+| FIB 25 | no channel, no Instruction events | 0.5 M | 95 ms | 5.1 M/s |
+| FIB 25 | no channel, with Instruction events | 0.5 M | 100 ms | 4.9 M/s |
+| FIB 25 | channel, one event a send, with Instruction events | 0.5 M | 307 ms | 1.6 M/s, 1.6 M events/s |
+| FIB 25 | channel, batches of 256, with Instruction events | 0.5 M | 108 ms | 4.5 M/s, 4.5 M events/s |
+

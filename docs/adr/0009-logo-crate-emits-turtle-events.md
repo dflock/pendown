@@ -19,4 +19,5 @@ The project has a logo crate, a CLI and a GUI playground. The interpreter must b
 ## Consequences
 
 - Examples can be tested by rendering their event streams with the CLI (ADR 0018).
+- The GUI receives events in batches, because one channel send per event costs more than running the program (spike 03). See "Architecture" in `implementation-plan.md`.
 - Resizing the window never changes how a program behaves.

@@ -3,11 +3,13 @@
 //! them.
 
 mod pen;
+mod shapes;
 mod turtle;
 
 use std::{cmp::Ordering, collections::HashMap, rc::Rc, sync::OnceLock};
 
 use pen::*;
+use shapes::*;
 use turtle::*;
 
 use crate::{
@@ -70,6 +72,12 @@ pub static PRIMS: &[Prim] = &[
     Prim { names: &["ycor"], arity: NONE, imp: Imp::F(ycor) },
     Prim { names: &["heading"], arity: NONE, imp: Imp::F(heading) },
     Prim { names: &["towards"], arity: ONE, imp: Imp::F(towards) },
+    Prim { names: &["arc"], arity: TWO, imp: Imp::F(arc) },
+    // Shapes (our extension, ADR 0017).
+    Prim { names: &["circle"], arity: ONE, imp: Imp::F(circle) },
+    Prim { names: &["ellipse"], arity: TWO, imp: Imp::F(ellipse) },
+    Prim { names: &["square"], arity: some(1, 1, Some(2)), imp: Imp::F(square) },
+    Prim { names: &["rectangle"], arity: some(2, 2, Some(3)), imp: Imp::F(rectangle) },
     // Turtle and window control.
     Prim { names: &["showturtle", "st"], arity: NONE, imp: Imp::F(showturtle) },
     Prim { names: &["hideturtle", "ht"], arity: NONE, imp: Imp::F(hideturtle) },

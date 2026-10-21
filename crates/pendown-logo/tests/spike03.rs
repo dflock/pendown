@@ -274,7 +274,7 @@ fn mutual_recursion_past_the_limit() {
 
 #[test]
 fn call_above_its_definition() {
-    let r = run("SQUARE 10\nTO SQUARE :n\n  REPEAT 4 [FD :n RT 90]\nEND");
+    let r = run("BOX 10\nTO BOX :n\n  REPEAT 4 [FD :n RT 90]\nEND");
     assert_eq!((r.result.clone(), r.moves()), (Ok(()), 4));
 }
 
@@ -294,22 +294,22 @@ fn arity_from_a_later_definition_groups_inputs() {
 
 #[test]
 fn parse_errors_are_collected_and_nothing_runs() {
-    let r = run("PRINT \"before\nFD\nFOO 3\nTO SQUARE :n\nREPEAT 4 [FD :n RT 90]");
+    let r = run("PRINT \"before\nFD\nFOO 3\nTO BOX :n\nREPEAT 4 [FD :n RT 90]");
     let Err(RunError::Parse(errors)) = r.result else { panic!("{:?}", r.result) };
     let messages: Vec<_> = errors.iter().map(|e| e.message.as_str()).collect();
-    assert_eq!(messages, ["SQUARE has no END", "Not enough inputs to FD", "I don't know how to FOO"]);
+    assert_eq!(messages, ["BOX has no END", "Not enough inputs to FD", "I don't know how to FOO"]);
     assert!(r.events.is_empty());
 }
 
 #[test]
 fn run_starts_from_a_clean_slate_and_the_console_keeps_it() {
     let (mut it, events) = interpreter();
-    it.run_program("TO SQUARE :n REPEAT 4 [FD :n RT 90] END\nMAKE \"size 20").unwrap();
-    it.run_console("SQUARE :size").unwrap();
+    it.run_program("TO BOX :n REPEAT 4 [FD :n RT 90] END\nMAKE \"size 20").unwrap();
+    it.run_console("BOX :size").unwrap();
     assert_eq!(events.0.borrow().iter().filter(|e| matches!(e, Event::Move { .. })).count(), 4);
     it.run_program("PRINT 1").unwrap();
-    let Err(RunError::Parse(errors)) = it.run_console("SQUARE 10") else { panic!() };
-    assert_eq!(errors[0].message, "I don't know how to SQUARE");
+    let Err(RunError::Parse(errors)) = it.run_console("BOX 10") else { panic!() };
+    assert_eq!(errors[0].message, "I don't know how to BOX");
 }
 
 #[test]
@@ -383,17 +383,17 @@ fn traced(src: &str) -> Run {
 
 #[test]
 fn spans_inside_repeat_and_procedures() {
-    let src = "TO SQUARE :n\n  REPEAT 2 [FD :n RT 90]\nEND\nSQUARE 10 PRINT \"hi";
+    let src = "TO BOX :n\n  REPEAT 2 [FD :n RT 90]\nEND\nBOX 10 PRINT \"hi";
     let r = traced(src);
     assert_eq!(r.result, Ok(()));
     let expected = [
-        ("SQUARE 10", true),
+        ("BOX 10", true),
         ("REPEAT 2 [FD :n RT 90]", true),
         ("FD :n", false),
         ("RT 90", false),
         ("FD :n", false),
         ("RT 90", false),
-        // Back on line 4 after SQUARE's body, so Step pauses here too.
+        // Back on line 4 after BOX's body, so Step pauses here too.
         ("PRINT \"hi", true),
     ];
     let expected: Vec<_> = expected.iter().map(|(t, s)| (t.to_string(), *s)).collect();
@@ -453,10 +453,10 @@ fn errors_in_lists_point_into_the_list() {
 #[test]
 fn definition_spans() {
     let (mut it, _) = interpreter();
-    let src = "PRINT 1\nTO SQUARE :n\nREPEAT 4 [FD :n RT 90]\nEND";
+    let src = "PRINT 1\nTO BOX :n\nREPEAT 4 [FD :n RT 90]\nEND";
     it.run_program(src).unwrap();
-    let span: Span = it.definition("square").unwrap();
-    assert_eq!(&src[span.range()], "TO SQUARE :n");
+    let span: Span = it.definition("box").unwrap();
+    assert_eq!(&src[span.range()], "TO BOX :n");
 }
 
 // 6. Numbers.
@@ -518,7 +518,7 @@ fn stepping_by_a_tenth_reaches_one() {
 
 #[test]
 fn one_line_and_multi_line_definitions_mix() {
-    let src = "TO DOUBLE :n OUTPUT :n * 2 END\nTO SQUARE :n\n  REPEAT 4 [FD DOUBLE :n RT 90]\nEND\nSQUARE 5 PRINT DOUBLE 4";
+    let src = "TO DOUBLE :n OUTPUT :n * 2 END\nTO BOX :n\n  REPEAT 4 [FD DOUBLE :n RT 90]\nEND\nBOX 5 PRINT DOUBLE 4";
     let r = run(src);
     assert_eq!((r.result.clone(), r.moves(), r.printed().as_str()), (Ok(()), 4, "8\n"));
 }
@@ -588,9 +588,9 @@ fn stop_is_not_an_error_at_top_level() {
 
 #[test]
 fn the_first_definition_decides_the_spelling() {
-    // Called as `square` before it's defined as `Square`.
-    let r = run("square 1\nTO Square :n\n FD \"far\n PRINT 1\nEND");
-    assert_eq!(r.error().calls[0].procedure, "Square");
+    // Called as `box` before it's defined as `Box`.
+    let r = run("box 1\nTO Box :n\n FD \"far\n PRINT 1\nEND");
+    assert_eq!(r.error().calls[0].procedure, "Box");
 
     let (mut it, _) = interpreter();
     it.run_program("PRINT 1\nMAKE \"Size 3\nPRINT :SIZE").unwrap();

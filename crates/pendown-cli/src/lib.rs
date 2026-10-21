@@ -10,12 +10,12 @@ use std::{
 };
 
 use pendown_logo::{Error, Event, EventSink, Halted, Interpreter, Limits, RunError};
-use pendown_render::{Drawing, Segment};
+use pendown_render::{Drawing, Mark, Segment};
 
 /// The interpreter's stack (ADR 0007).
 const STACK: usize = 256 * 1024 * 1024;
 
-/// Segments are drawn in batches of this many, so a long program's pending
+/// Marks are drawn in batches of this many, so a long program's pending
 /// list stays small.
 const DRAW_BATCH: usize = 4096;
 
@@ -35,12 +35,23 @@ pub struct Output {
     pub result: Result<(), RunError>,
 }
 
-/// Turns events into segments in the drawing. The CLI has no animation, so
-/// turns and `Instruction` events don't matter.
+/// Turns events into lines, arcs and shapes in the drawing. The CLI has no
+/// animation, so turns and `Instruction` events don't matter.
 struct DrawingSink {
     drawing: Rc<RefCell<Drawing>>,
     printed: Rc<RefCell<String>>,
-    pending: Vec<Segment>,
+    pending: Vec<Mark>,
+}
+
+impl DrawingSink {
+    fn add(&mut self, mark: Mark) {
+        if mark.pen().down {
+            self.pending.push(mark);
+            if self.pending.len() >= DRAW_BATCH {
+                self.draw();
+            }
+        }
+    }
 }
 
 impl DrawingSink {
@@ -55,11 +66,13 @@ impl DrawingSink {
 impl EventSink for DrawingSink {
     fn send(&mut self, event: Event) -> Result<(), Halted> {
         match event {
-            Event::Move { from, to, pen } if pen.down => {
-                self.pending.push(Segment { from, to, pen });
-                if self.pending.len() >= DRAW_BATCH {
-                    self.draw();
-                }
+            Event::Move { from, to, pen } => self.add(Segment { from, to, pen }.into()),
+            Event::Arc { center, radius, start_heading, angle, pen } => {
+                self.add(Mark::Arc { center, radius, start_heading, angle, pen })
+            }
+            Event::Ellipse { center, radii, heading, pen, .. } => self.add(Mark::Ellipse { center, radii, heading, pen }),
+            Event::Rect { center, size, corner, heading, pen, .. } => {
+                self.add(Mark::Rect { center, size, corner, heading, pen })
             }
             Event::Print(text) => self.printed.borrow_mut().push_str(&text),
             Event::Clean => {

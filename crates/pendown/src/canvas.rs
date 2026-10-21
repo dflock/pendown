@@ -4,8 +4,8 @@
 use std::{sync::Arc, time::Duration};
 
 use gpui_kit::*;
-use pendown_logo::Point;
-use pendown_render::{Drawing, Segment, pen_width};
+use pendown_logo::{Pen, Point};
+use pendown_render::{Drawing, pen_width};
 
 pub struct Canvas {
     pub drawing: Drawing,
@@ -15,9 +15,10 @@ pub struct Canvas {
 }
 
 /// What changes each frame, painted on top of the buffer.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Overlay {
-    pub partial: Option<Segment>,
+    /// What's drawn so far of the move, arc or shape in progress.
+    pub partial: Option<(Vec<Point>, Pen)>,
     /// The turtle's position and heading, if it's shown.
     pub turtle: Option<(Point, f64)>,
 }
@@ -70,12 +71,16 @@ impl Canvas {
             let (x, y) = self.drawing.to_device(p);
             point(bounds.origin.x + logical(x), bounds.origin.y + logical(y))
         };
-        if let Some(segment) = overlay.partial {
-            let width = pen_width(segment.pen, self.drawing.scale()) as f32 / per_device;
+        if let Some((points, pen)) = overlay.partial
+            && points.len() >= 2
+        {
+            let width = pen_width(pen, self.drawing.scale()) as f32 / per_device;
             let mut path = PathBuilder::stroke(px(width));
-            path.move_to(to_window(segment.from));
-            path.line_to(to_window(segment.to));
-            let [r, g, b, a] = segment.pen.color;
+            path.move_to(to_window(points[0]));
+            for p in &points[1..] {
+                path.line_to(to_window(*p));
+            }
+            let [r, g, b, a] = pen.color;
             let color = Rgba { r: r as f32 / 255.0, g: g as f32 / 255.0, b: b as f32 / 255.0, a: a as f32 / 255.0 };
             if let Ok(path) = path.build() {
                 window.paint_path(path, color);

@@ -36,7 +36,7 @@ use crate::{
 pub const WELCOME: &str = r#"; Press Run, and watch the turtle draw.
 ; Try the speed slider, Pause and Step.
 
-TO SQUARE :size
+TO BOX :size
   REPEAT 4 [
     FD :size
     RT 90
@@ -45,7 +45,7 @@ END
 
 TO FLOWER :size
   REPEAT 12 [
-    SQUARE :size
+    BOX :size
     RT 30
   ]
 END
@@ -265,8 +265,8 @@ impl App {
             }
             self.last_frame = Some(now);
             let per_segment = self.canvas.borrow().drawing.per_segment.max(Duration::from_nanos(200));
-            let max_segments = (INSTANT_DRAWING.as_nanos() / per_segment.as_nanos()).clamp(500, 100_000) as usize;
-            let frame = animator.frame(dt, max_segments);
+            let max_marks = (INSTANT_DRAWING.as_nanos() / per_segment.as_nanos()).clamp(500, 100_000) as usize;
+            let frame = animator.frame(dt, max_marks);
             self.events += frame.events;
             let mut canvas = self.canvas.borrow_mut();
             if frame.cleaned {
@@ -275,7 +275,7 @@ impl App {
             if let Some(color) = frame.background {
                 canvas.drawing.set_background(color);
             }
-            canvas.drawing.push(&frame.segments);
+            canvas.drawing.push(&frame.marks);
             drop(canvas);
             for text in frame.printed {
                 self.console.extend(text.lines().map(|line| SharedString::from(line.to_string())));
@@ -335,7 +335,11 @@ impl Render for App {
         let paused = self.animator.as_ref().is_some_and(|a| a.mode() == Mode::Paused && !a.finished());
         let canvas = self.canvas.clone();
         let overlay = match &self.animator {
-            Some(a) => Overlay { partial: a.partial(), turtle: a.shown.then_some((a.pos, a.heading)) },
+            Some(a) => {
+                // A fifth of a pixel, as the buffer is drawn.
+                let tolerance = 0.2 / self.canvas.borrow().drawing.scale().max(1e-6);
+                Overlay { partial: a.partial(tolerance), turtle: a.shown.then_some((a.pos, a.heading)) }
+            }
             None => Overlay { partial: None, turtle: Some((pendown_logo::Point { x: 0.0, y: 0.0 }, 0.0)) },
         };
 
@@ -411,7 +415,7 @@ impl Render for App {
                         .child(resizable_panel().child(
                             gpui_kit::canvas(
                                 move |bounds, _, _| bounds,
-                                move |_, bounds, window, _| canvas.borrow_mut().paint(bounds, window, overlay),
+                                move |_, bounds, window, _| canvas.borrow_mut().paint(bounds, window, overlay.clone()),
                             )
                             .size_full(),
                         )),

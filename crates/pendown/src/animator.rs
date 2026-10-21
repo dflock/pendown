@@ -14,7 +14,8 @@ use std::{
 };
 
 use pendown_logo::{Control, Event, Pen, Point, Span, SyncPoint};
-use pendown_render::Segment;
+use pendown_logo::arc_point;
+use pendown_render::{Mark, Segment};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Speed {
@@ -55,6 +56,9 @@ pub enum Mode {
 
 enum Current {
     Move { from: Point, to: Point, pen: Pen, done: f64 },
+    /// An arc, which moves the turtle, or a shape, which doesn't: `done` of
+    /// its `length` in steps so far.
+    Mark { mark: Mark, length: f64, done: f64 },
     Turn { from: f64, by: f64, done: f64 },
     /// Keeps the highlight on an instruction that drew nothing.
     Dwell { left: f64 },
@@ -63,13 +67,14 @@ enum Current {
 /// What a frame produced.
 #[derive(Default)]
 pub struct Frame {
-    /// Moves finished this frame, to draw into the pixel buffer.
-    pub segments: Vec<Segment>,
+    /// Lines, arcs and shapes finished this frame, to draw into the pixel
+    /// buffer.
+    pub marks: Vec<Mark>,
     /// A `CLEAN` happened this frame: clear the drawing before adding
-    /// `segments`, which only holds the moves since the last one.
+    /// `marks`, which only holds what came after it.
     pub cleaned: bool,
     /// The background changed this frame, to this. It goes under
-    /// everything, so it doesn't matter where among `segments` it came.
+    /// everything, so it doesn't matter where among `marks` it came.
     pub background: Option<[u8; 4]>,
     pub printed: Vec<String>,
     pub highlight_changed: bool,
@@ -159,10 +164,15 @@ impl Animator {
         self.current.is_some()
     }
 
-    /// The move in progress, from its start to where the turtle is now.
-    pub fn partial(&self) -> Option<Segment> {
+    /// What's drawn so far of the move, arc or shape in progress, as a
+    /// polyline within `tolerance` turtle steps of the curve, with its pen.
+    pub fn partial(&self, tolerance: f64) -> Option<(Vec<Point>, Pen)> {
         match &self.current {
-            Some(Current::Move { from, pen, .. }) if pen.down => Some(Segment { from: *from, to: self.pos, pen: *pen }),
+            Some(Current::Move { from, pen, .. }) if pen.down => Some((vec![*from, self.pos], *pen)),
+            Some(Current::Mark { mark, length, done }) if mark.pen().down => {
+                let fraction = if *length > 0.0 { done / length } else { 1.0 };
+                Some((mark.partial(fraction, tolerance), mark.pen()))
+            }
             _ => None,
         }
     }
@@ -234,7 +244,7 @@ impl Animator {
 
     /// Plays one frame's worth of events. `dt` is the time since the last
     /// frame.
-    pub fn frame(&mut self, dt: Duration, max_segments: usize) -> Frame {
+    pub fn frame(&mut self, dt: Duration, max_marks: usize) -> Frame {
         let started = Instant::now();
         let mut out = Frame::default();
         let instant = self.speed == Speed::Instant;
@@ -254,7 +264,7 @@ impl Animator {
             {
                 break;
             }
-            if instant && (Instant::now() >= slice_end || out.segments.len() >= max_segments) {
+            if instant && (Instant::now() >= slice_end || out.marks.len() >= max_marks) {
                 break;
             }
             // Instant mode waits for events until its slice is used up: the
@@ -302,11 +312,22 @@ impl Animator {
                     self.idle_instruction = false;
                     self.current = Some(Current::Turn { from, by, done: 0.0 });
                 }
+                Event::Arc { center, radius, start_heading, angle, pen } => {
+                    self.idle_instruction = false;
+                    let mark = Mark::Arc { center, radius, start_heading, angle, pen };
+                    self.current = Some(Current::Mark { mark, length: mark.length(), done: 0.0 });
+                }
+                Event::Ellipse { center, radii, heading, pen, .. } => {
+                    self.start_shape(Mark::Ellipse { center, radii, heading, pen });
+                }
+                Event::Rect { center, size, corner, heading, pen, .. } => {
+                    self.start_shape(Mark::Rect { center, size, corner, heading, pen });
+                }
                 Event::Print(text) => out.printed.push(text),
                 Event::ShowTurtle => self.shown = true,
                 Event::HideTurtle => self.shown = false,
                 Event::Clean => {
-                    out.segments.clear();
+                    out.marks.clear();
                     out.cleaned = true;
                 }
                 Event::SetBackground { color } => out.background = Some(color),
@@ -328,6 +349,15 @@ impl Animator {
             self.after_line_start = false;
         }
         out
+    }
+
+    /// A shape sweeps round as the pen draws it. With the pen up, there's
+    /// nothing to see, so it takes no time.
+    fn start_shape(&mut self, mark: Mark) {
+        if mark.pen().down {
+            self.idle_instruction = false;
+            self.current = Some(Current::Mark { mark, length: mark.length(), done: 0.0 });
+        }
     }
 
     fn is_playing(&self) -> bool {
@@ -368,13 +398,27 @@ impl Animator {
                 if done >= length {
                     self.pos = to;
                     if pen.down {
-                        out.segments.push(Segment { from, to, pen });
+                        out.marks.push(Segment { from, to, pen }.into());
                     }
                     return true;
                 }
                 let t = done / length;
                 self.pos = Point { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
                 self.current = Some(Current::Move { from, to, pen, done });
+                false
+            }
+            Current::Mark { mark, length, done } => {
+                let done = done + progress(length - done, rate);
+                let t = if length > 0.0 { (done / length).min(1.0) } else { 1.0 };
+                // An arc carries the turtle with it; a shape leaves it put.
+                if let Mark::Arc { center, radius, start_heading, angle, .. } = mark {
+                    (self.pos, self.heading) = arc_point(center, radius, start_heading, angle, t);
+                }
+                if done >= length {
+                    out.marks.push(mark);
+                    return true;
+                }
+                self.current = Some(Current::Mark { mark, length, done });
                 false
             }
             Current::Turn { from, by, done } => {

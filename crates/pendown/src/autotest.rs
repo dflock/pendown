@@ -19,7 +19,7 @@ use pendown::{
 
 use crate::app::App;
 
-const SQUARE: &str = "REPEAT 4 [FD 300 RT 90]";
+const BOX: &str = "REPEAT 4 [FD 300 RT 90]";
 
 const STEPPER: &str = r#"MAKE "n 0
 REPEAT 6 [
@@ -47,7 +47,7 @@ SETPC 10
 TREE 230 16
 "#;
 
-const ERRORS: &str = "TO SQUARE :n\n  FD :n RT 90\n  FD \"far\n  PRINT 1\nEND\nSQUARE 100";
+const ERRORS: &str = "TO BOX :n\n  FD :n RT 90\n  FD \"far\n  PRINT 1\nEND\nBOX 100";
 
 /// One step of the session.
 #[derive(Clone)]
@@ -96,7 +96,7 @@ fn script() -> Vec<Step> {
         CheckFinishedWithin(Duration::from_secs(30)),
         Say("Highlighting follows the turtle"),
         Trace,
-        Run(SQUARE, Speed::Animated(100.0)),
+        Run(BOX, Speed::Animated(100.0)),
         Wait(ms(1500)),
         CheckHighlight("FD 300"),
         CheckMoving,
@@ -158,7 +158,7 @@ fn script() -> Vec<Step> {
         Run(ERRORS, Speed::Instant),
         WaitFinished,
         CheckConsole("Line 3: FD doesn't like far as input"),
-        CheckConsole("    in SQUARE (line 6)"),
+        CheckConsole("    in BOX (line 6)"),
         Run("FD 10\nRT", Speed::Instant),
         WaitFinished,
         CheckConsole("Line 2: Not enough inputs to RT"),
@@ -298,7 +298,7 @@ impl App {
                     self.check(text == expected, format!("the highlight is on {text:?}"));
                 }
                 Step::CheckMoving => {
-                    let moving = self.animator.as_ref().is_some_and(|a| a.partial().is_some());
+                    let moving = self.animator.as_ref().is_some_and(|a| a.partial(1.0).is_some());
                     self.check(moving, "the turtle is part-way through the move".into());
                 }
                 Step::CheckNothingAhead => {

@@ -124,3 +124,17 @@ SETBG "midnightblue
 "##;
     check("colours", program, 300, 300);
 }
+
+#[test]
+fn arcs_and_shapes() {
+    let program = r#"
+SETPENSIZE 4
+SETPC "orange CIRCLE 300
+SETPC "skyblue ELLIPSE 100 250
+SETPC "lime RT 30 SQUARE 300 LT 30
+SETPC "violet (RECTANGLE 500 200 60)
+PU SETXY -200 -350 PD SETPC "white
+REPEAT 4 [ARC 90 50 ARC -90 50]
+"#;
+    check("arcs-and-shapes", program, 300, 300);
+}

@@ -72,13 +72,13 @@ fn parse_errors_are_reported_and_nothing_is_saved() {
 #[test]
 fn runtime_errors_save_the_picture_so_far() {
     let d = dir("runtime-error");
-    let program = "TO SQUARE :n\n  FD :n RT 90\n  FD \"far\nEND\nFD 50\nSQUARE 100";
+    let program = "TO BOX :n\n  FD :n RT 90\n  FD \"far\nEND\nFD 50\nBOX 100";
     std::fs::write(d.join("p.logo"), program).unwrap();
     let r = cli(&d, &["p.logo"]);
     assert_eq!(r.status, 1);
     assert_eq!(
         r.stderr,
-        "p.logo:3:6: FD doesn't like far as input\n  in SQUARE (line 6)\nSaved the drawing as far as it got to p.png\n"
+        "p.logo:3:6: FD doesn't like far as input\n  in BOX (line 6)\nSaved the drawing as far as it got to p.png\n"
     );
     assert!(d.join("p.png").exists());
 }

@@ -138,6 +138,32 @@ impl Area {
     }
 }
 
+/// Where the turtle is, and its heading, a fraction `t` of the way along an
+/// arc (ADR 0016). A clockwise arc (positive `angle`) has its centre on the
+/// turtle's right, so the turtle is on the centre's left: at heading `h`,
+/// that's the direction `h - 90`.
+pub fn arc_point(center: Point, radius: f64, start_heading: f64, angle: f64, t: f64) -> (Point, f64) {
+    let heading = start_heading + angle * t;
+    let side = if angle >= 0.0 { -90.0 } else { 90.0 };
+    let (sin, cos) = crate::number::sin_cos_degrees(heading + side);
+    (Point { x: center.x + radius * sin, y: center.y + radius * cos }, heading.rem_euclid(360.0))
+}
+
+/// The centre of the arc the turtle walks from `from` at `heading`: on its
+/// right for a clockwise arc, on its left otherwise.
+pub fn arc_center(from: Point, heading: f64, radius: f64, angle: f64) -> Point {
+    let side = if angle >= 0.0 { 90.0 } else { -90.0 };
+    let (sin, cos) = crate::number::sin_cos_degrees(heading + side);
+    Point { x: from.x + radius * sin, y: from.y + radius * cos }
+}
+
+/// Points along an arc, one per degree at most, including both ends. Used
+/// to split an arc into straight pieces where it crosses an edge.
+pub fn arc_chords(center: Point, radius: f64, start_heading: f64, angle: f64) -> Vec<Point> {
+    let n = angle.abs().ceil().max(1.0) as usize;
+    (0..=n).map(|i| arc_point(center, radius, start_heading, angle, i as f64 / n as f64).0).collect()
+}
+
 fn lerp(a: Point, b: Point, t: f64) -> Point {
     Point { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
 }
@@ -232,6 +258,24 @@ mod tests {
         assert_eq!(AREA.wrap_point(p(700.0, -1200.0)), p(-300.0, -200.0));
         assert_eq!(AREA.wrap_point(p(1500.0, 0.0)), p(500.0, 0.0));
         assert_eq!(AREA.wrap_point(p(10.0, 20.0)), p(10.0, 20.0));
+    }
+
+    #[test]
+    fn arcs() {
+        // A quarter turn right, radius 100, from the origin heading north:
+        // the centre is at (100, 0), and the turtle ends at (100, 100)
+        // heading east.
+        let center = arc_center(p(0.0, 0.0), 0.0, 100.0, 90.0);
+        assert_eq!(center, p(100.0, 0.0));
+        let (start, h0) = arc_point(center, 100.0, 0.0, 90.0, 0.0);
+        let (end, h1) = arc_point(center, 100.0, 0.0, 90.0, 1.0);
+        assert_eq!((start, h0), (p(0.0, 0.0), 0.0));
+        assert_eq!((end, h1), (p(100.0, 100.0), 90.0));
+        // A quarter turn left ends at (-100, 100) heading west.
+        let center = arc_center(p(0.0, 0.0), 0.0, 100.0, -90.0);
+        assert_eq!(center, p(-100.0, 0.0));
+        assert_eq!(arc_point(center, 100.0, 0.0, -90.0, 1.0), (p(-100.0, 100.0), 270.0));
+        assert_eq!(arc_chords(center, 100.0, 0.0, -90.0).len(), 91);
     }
 
     #[test]

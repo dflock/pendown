@@ -31,6 +31,16 @@ pub enum Event {
     Move { from: Point, to: Point, pen: Pen },
     /// `by` is the signed angle turned, clockwise, in degrees.
     Turn { from: f64, by: f64 },
+    /// The turtle walks along an arc (ADR 0016), starting at `start_heading`
+    /// and turning through `angle` degrees, clockwise if positive, around
+    /// `center`. See `arc_point` for where it is part-way along.
+    Arc { center: Point, radius: f64, start_heading: f64, angle: f64, pen: Pen },
+    /// `CIRCLE` and `ELLIPSE` (ADR 0017): `radii` are across and along the
+    /// heading. The turtle doesn't move.
+    Ellipse { center: Point, radii: (f64, f64), heading: f64, pen: Pen, fill: Option<[u8; 4]> },
+    /// `SQUARE` and `RECTANGLE`: `size` is the full width across and length
+    /// along the heading, and `corner` the radius of the rounded corners.
+    Rect { center: Point, size: (f64, f64), corner: f64, heading: f64, pen: Pen, fill: Option<[u8; 4]> },
     ShowTurtle,
     HideTurtle,
     /// Clear the drawing. The turtle doesn't move.

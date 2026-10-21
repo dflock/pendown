@@ -17,6 +17,9 @@ New commands, all drawn **centred on the turtle**, turned with its heading. The 
 - **Outline:** drawn with the current pen when the pen is down.
 - **Fill (phase 2):** `SETFILLCOLOR colour` (short form `SETFC`) sets a fill colour, using any colour form (ADR 0015). `SETFILLCOLOR "none` turns filling off, and `"none` is the default. When a fill colour is set, shapes are filled even with the pen up, so pen up gives a filled shape with no outline. `FILLCOLOR` (`FC`) reports it, or `NONE`.
 - **Events:** `Ellipse { center, radii, heading, pen, fill }` for `CIRCLE` and `ELLIPSE`, and `Rect { center, size, corner, heading, pen, fill }` for `SQUARE` and `RECTANGLE`.
+- **At the edges,** shapes are drawn as if in `WINDOW` mode: they're never wrapped or fenced, and anything outside the canvas is cut off (phase 1 issue 08). They don't move the turtle, and drawing a shape in pieces round the edges would look broken.
+- **Animated,** the outline sweeps round clockwise from the point straight ahead of the turtle, at the turtle's speed along the outline. A shape with the pen up and no fill can't be seen, so it takes no time.
+- **Rounded corners** can't be rounder than half the shorter side; a larger corner radius is reduced to that. Negative sizes are errors.
 
 ## Consequences
 

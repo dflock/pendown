@@ -13,7 +13,9 @@ In UCBLogo, `ARC angle radius` draws an arc *around* the turtle, with the turtle
 - It finishes at the end of the arc with its heading changed by `angle`. So `ARC 360 50` draws a full circle and returns the turtle to where it started, and so does `REPEAT 4 [ARC 90 50]`.
 - It draws only when the pen is down, like `FD`, and wraps or stops at the edges like any other move.
 - For a positive angle it's the same as `REPEAT angle [FD (2 * PI * radius / 360) RT 1]`, but drawn as a smooth curve.
-- The `Arc` event carries the pen, and the animator moves the turtle sprite along the arc.
+- The `Arc` event carries the pen, and the animator moves the turtle sprite along the arc, at the same speed in steps as a move.
+- **At the edges** (phase 1 issue 06): an arc that stays inside the turtle area, or any arc in `WINDOW` mode, is one `Arc` event. An arc that would cross an edge in `WRAP` or `FENCE` mode goes as one-degree chords instead, each a `Move` and a `Turn`. So it wraps or stops at the fence exactly like `FD`, as UCBLogo's `ARC` does.
+- `ARC angle 0` just turns, `ARC 0 radius` does nothing, and a negative radius is an error.
 
 ## Consequences
 

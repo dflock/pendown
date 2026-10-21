@@ -40,7 +40,7 @@ fn walk(it: &mut Interpreter, a: &Args, distance: f64) -> Out {
 
 /// Turns the turtle by `by` degrees, clockwise if positive. The event
 /// carries the signed angle, so `RT 270` visibly turns 270° (ADR 0009).
-fn turn(it: &mut Interpreter, by: f64) -> Out {
+pub(super) fn turn(it: &mut Interpreter, by: f64) -> Out {
     let from = it.turtle.heading;
     it.turtle.heading = (from + by).rem_euclid(360.0);
     it.emit(Event::Turn { from, by })?;

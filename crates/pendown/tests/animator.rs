@@ -74,9 +74,10 @@ fn highlight_is_on_the_move_while_the_turtle_moves() {
     let mut moving_frames = 0;
     while !animator.finished() {
         frame(&mut animator, FRAME);
-        if let Some(partial) = animator.partial() {
+        if let Some((points, _)) = animator.partial(1.0) {
             assert_eq!(highlighted(src, &animator), "FD 100");
-            assert!(partial.to.y > 0.0 && partial.to.y < 100.0);
+            let y = points.last().unwrap().y;
+            assert!(y > 0.0 && y < 100.0);
             moving_frames += 1;
         }
     }
@@ -279,7 +280,7 @@ TREE 200 14";
     let started = Instant::now();
     let mut segments = 0;
     while !animator.finished() {
-        segments += frame(&mut animator, FRAME).segments.len();
+        segments += frame(&mut animator, FRAME).marks.len();
     }
     assert_eq!(run.result(), Some(Ok(())));
     assert_eq!(segments, 2 * (2usize.pow(14) - 1));
@@ -297,9 +298,55 @@ fn clean_and_hiding_the_turtle() {
             cleaned = true;
             segments.clear();
         }
-        segments.extend(out.segments);
+        segments.extend(out.marks);
     }
     assert!(cleaned);
     assert_eq!(segments.len(), 1, "only the move after CLEAN is left");
     assert!(!animator.shown);
+}
+
+#[test]
+fn arcs_carry_the_turtle_along_them() {
+    // A quarter circle of radius 100 is 157 steps: about 1.6 s at 100 a second.
+    let (mut animator, _run) = start("ARC 90 100", Speed::Animated(100.0));
+    let mut frames = 0;
+    let mut halfway = None;
+    while !animator.finished() && frames < 1000 {
+        frame(&mut animator, FRAME);
+        frames += 1;
+        if frames == 48 {
+            halfway = Some((animator.pos, animator.heading, animator.partial(0.1).map(|(p, _)| p.len())));
+        }
+    }
+    assert!((frames as f64 - 157.0 / 100.0 / FRAME.as_secs_f64()).abs() <= 3.0, "{frames} frames");
+    let (pos, heading, partial) = halfway.unwrap();
+    // Half way round, the turtle is 45 degrees along, on the circle.
+    assert!((heading - 45.0).abs() < 2.0, "heading {heading}");
+    assert!((((pos.x - 100.0).powi(2) + pos.y.powi(2)).sqrt() - 100.0).abs() < 1e-6);
+    assert!(partial.unwrap() > 2, "the arc so far is drawn as a curve");
+    assert_eq!((animator.pos.x.round(), animator.pos.y.round(), animator.heading.round()), (100.0, 100.0, 90.0));
+}
+
+#[test]
+fn shapes_sweep_round_and_pen_up_shapes_take_no_time() {
+    let (mut animator, _run) = start("CIRCLE 50", Speed::Animated(100.0));
+    let mut frames = 0;
+    while !animator.finished() && frames < 1000 {
+        frame(&mut animator, FRAME);
+        frames += 1;
+        if frames == 10 {
+            let (points, _) = animator.partial(0.1).expect("sweeping");
+            assert_eq!(points[0].y.round(), 50.0, "starting straight ahead");
+            assert_eq!((animator.pos.x, animator.pos.y), (0.0, 0.0), "the turtle stays put");
+        }
+    }
+    // 314 steps round at 100 a second.
+    assert!((frames as f64 - 3.14 / FRAME.as_secs_f64()).abs() <= 3.0, "{frames} frames");
+    let (mut animator, _run) = start("PU CIRCLE 50 SQUARE 80", Speed::Animated(100.0));
+    let mut frames = 0;
+    while !animator.finished() && frames < 1000 {
+        frame(&mut animator, FRAME);
+        frames += 1;
+    }
+    assert!(frames < 20, "{frames} frames for shapes nobody can see");
 }

@@ -6,3 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
+gpui-kit.workspace = true
+image.workspace = true
+pendown-logo.workspace = true
+pendown-render.workspace = true

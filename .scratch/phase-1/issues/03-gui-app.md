@@ -1,6 +1,6 @@
 # The GUI app from spike 04
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 01
 
@@ -42,3 +42,27 @@ Use whatever commands `pendown-logo` has. Issues 05 to 11 add the rest, and each
   - the Tree at Instant with frames at 16.7 ms.
 
 ## Comments
+
+### 2026-10-21: done
+
+`crates/pendown`:
+- **The library** (`src/lib.rs`), with no window:
+  - `animator` and `run` from spike 04, now drawing `pendown-render`'s `Segment`s;
+  - `speed`, the levels from 1 to 11;
+  - `errors`, call chains with runs of the same call collapsed: "called from DOWN (line 2), 9,999 times".
+  
+  17 tests: spike 04's 12 animator tests, and 5 unit tests.
+- **The window:**
+  - `app.rs`: the toolbar (Run, Pause/Resume, Step, Step instruction, Stop, the speed slider and its "Speed 5 · 80 steps/s" label, and a status line), the editor, the canvas and the console.
+  - The editor is read-only while running, the highlight is followed by scrolling, and errors show as diagnostics and in the console with their chains.
+  - `canvas.rs`: `pendown-render`'s dirty tiles, the move in progress, the turtle, and the shading outside the turtle area (ADR 0003).
+  - `highlighter.rs`: spike 01's lexer, until issue 15.
+- **The scripted session:** `PENDOWN_AUTOTEST=1 cargo run --release -p pendown` (`autotest.rs`) runs 17 checks, and exits non-zero if any fail. All pass:
+  - the highlight's order, and it being on the move while the turtle moves;
+  - a speed change mid-move (50, then 200 steps/s);
+  - no lines run ahead after each Step;
+  - Stop from four states, within 0.001–0.07 ms;
+  - the tree at Instant: 0.68 s, at 16.7 ms a frame;
+  - errors in the console.
+  
+  The log and screenshots go to `target/autotest/`.

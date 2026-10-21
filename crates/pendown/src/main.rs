@@ -1,5 +1,22 @@
-//! The Pendown app. Phase 1's issue 03 builds it from spike 04.
+//! Pendown: a Logo playground where you can watch the turtle think.
+
+mod app;
+mod autotest;
+mod canvas;
+mod highlighter;
+
+use gpui_kit::*;
 
 fn main() {
-    eprintln!("The Pendown window isn't built yet: see .scratch/phase-1/issues/03-gui-app.md");
+    gpui_kit::application().run(|cx| {
+        gpui_kit::init(cx);
+        let options = WindowOptions {
+            titlebar: Some(TitlebarOptions { title: Some("Pendown".into()), ..Default::default() }),
+            window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1400.), px(900.)), cx))),
+            ..Default::default()
+        };
+        gpui_kit::open_window(options, cx, |window, cx| cx.new(|cx| app::App::new(window, cx)))
+            .expect("can open the window");
+        cx.activate(true);
+    });
 }

@@ -4,6 +4,7 @@
 
 pub mod animator;
 pub mod console;
+pub mod document;
 pub mod errors;
 pub mod run;
 pub mod speed;

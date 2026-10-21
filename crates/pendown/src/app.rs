@@ -24,6 +24,7 @@ use gpui_kit::{prelude::FluentBuilder as _, *};
 use pendown::{
     animator::{Animator, Mode, Speed},
     console::{ConsoleInput, Submit, defines},
+    document::Document,
     errors,
     run::{Channel, DEFAULT_CHANNEL, Job, Run, Session},
     speed::{INSTANT_LEVEL, describe, level_speed, speed_level},
@@ -33,6 +34,7 @@ use pendown_logo::{RunError, SourceId};
 use crate::{
     autotest::Autotest,
     canvas::{Canvas, Overlay},
+    files::{After, ExportPicture, NewFile, OpenFile, RunProgram, SaveFile, SaveFileAs},
     highlighter::LogoHighlighter,
 };
 
@@ -102,6 +104,11 @@ pub struct App {
     pub(crate) stop_at: Option<Instant>,
     /// The interpreter, which lives between runs for the console.
     session: Session,
+    /// The program's file, if it has one, and whether it has changed.
+    pub(crate) document: Document,
+    pub(crate) title: String,
+    /// The user has said the window can close.
+    pub(crate) closing: bool,
     /// Console output, one line each.
     pub(crate) console: Vec<SharedString>,
     console_dirty: bool,
@@ -150,6 +157,10 @@ impl App {
                 }
             }),
         ];
+        let app = cx.entity().downgrade();
+        window.on_window_should_close(cx, move |window, cx| {
+            app.update(cx, |this, cx| this.should_close(window, cx)).unwrap_or(true)
+        });
         App {
             editor,
             highlight,
@@ -162,6 +173,9 @@ impl App {
             finished_at: None,
             stop_at: None,
             session: Session::new(),
+            document: Document::new(WELCOME),
+            title: String::new(),
+            closing: false,
             console: Vec::new(),
             console_dirty: false,
             console_output,
@@ -465,6 +479,7 @@ impl Render for App {
         self.tick(window, cx);
         self.drive_autotest(window, cx);
         self.flush_console(window, cx);
+        self.update_title(window, cx);
         if self.animator.as_ref().is_some_and(|a| a.wants_frames()) || self.autotest.is_some() {
             window.request_animation_frame();
         }
@@ -487,6 +502,23 @@ impl Render for App {
             .p_2()
             .border_b_1()
             .border_color(theme.border)
+            .child(Button::new("new").small().ghost().label("New").on_click(cx.listener(|this, _, window, cx| {
+                this.then(After::NewFile, window, cx)
+            })))
+            .child(Button::new("open").small().ghost().label("Open").on_click(cx.listener(|this, _, window, cx| {
+                this.then(After::OpenFile, window, cx)
+            })))
+            .child(Button::new("save").small().ghost().label("Save").on_click(cx.listener(|this, _, window, cx| {
+                this.save(After::Nothing, window, cx)
+            })))
+            .child(
+                Button::new("export")
+                    .small()
+                    .ghost()
+                    .label("Export PNG")
+                    .on_click(cx.listener(|this, _, window, cx| this.export(window, cx))),
+            )
+            .child(div().w(px(12.)))
             .child(
                 Button::new("run")
                     .small()
@@ -535,6 +567,12 @@ impl Render for App {
 
         v_flex()
             .size_full()
+            .on_action(cx.listener(|this, _: &NewFile, window, cx| this.then(After::NewFile, window, cx)))
+            .on_action(cx.listener(|this, _: &OpenFile, window, cx| this.then(After::OpenFile, window, cx)))
+            .on_action(cx.listener(|this, _: &SaveFile, window, cx| this.save(After::Nothing, window, cx)))
+            .on_action(cx.listener(|this, _: &SaveFileAs, window, cx| this.save_as(After::Nothing, window, cx)))
+            .on_action(cx.listener(|this, _: &ExportPicture, window, cx| this.export(window, cx)))
+            .on_action(cx.listener(|this, _: &RunProgram, _, cx| this.start(DEFAULT_CHANNEL, cx)))
             .bg(theme.background)
             .text_color(theme.foreground)
             .child(toolbar)

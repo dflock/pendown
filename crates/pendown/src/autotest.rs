@@ -87,6 +87,18 @@ enum Step {
     Console(&'static str),
     /// How many lines, arcs and shapes are drawn.
     CheckDrawn(usize),
+    /// Save the program as this file in the autotest folder, as Save As
+    /// would once the dialog has a name.
+    SaveTo(&'static str),
+    OpenFrom(&'static str),
+    ExportTo(&'static str),
+    /// Replace the editor's text, as typing would.
+    Type(&'static str),
+    CheckTitle(&'static str),
+    /// The editor holds exactly this.
+    CheckEditor(&'static str),
+    /// The exported picture is a PNG the size of the canvas.
+    CheckExported(&'static str),
     Quit,
 }
 
@@ -120,6 +132,20 @@ fn script() -> Vec<Step> {
         Console("TRI 10"),
         WaitFinished,
         CheckConsole("In the console: I don't know how to TRI"),
+        Say("Files"),
+        CheckTitle("Untitled — Pendown"),
+        Type("REPEAT 3 [FD 200 RT 120]"),
+        CheckTitle("● Untitled — Pendown"),
+        SaveTo("triangle"),
+        CheckTitle("triangle.logo — Pendown"),
+        Run("REPEAT 5 [FD 200 RT 144]", Speed::Instant),
+        WaitFinished,
+        CheckTitle("● triangle.logo — Pendown"),
+        ExportTo("star.png"),
+        CheckExported("star.png"),
+        OpenFrom("triangle.logo"),
+        CheckEditor("REPEAT 3 [FD 200 RT 120]"),
+        CheckTitle("triangle.logo — Pendown"),
         Say("Highlighting follows the turtle"),
         Trace,
         Run(BOX, Speed::Animated(100.0)),
@@ -349,6 +375,42 @@ impl App {
                 Step::Console(line) => {
                     self.type_into_console(line, window, cx);
                 }
+                Step::SaveTo(name) => {
+                    let path = self.autotest.as_ref().unwrap().dir.join(name);
+                    self.save_to(&path, cx);
+                }
+                Step::OpenFrom(name) => {
+                    let path = self.autotest.as_ref().unwrap().dir.join(name);
+                    self.open_path(&path, window, cx);
+                }
+                Step::ExportTo(name) => {
+                    let path = self.autotest.as_ref().unwrap().dir.join(name);
+                    self.export_to(&path, cx);
+                }
+                Step::Type(text) => {
+                    self.editor.update(cx, |state, cx| state.set_value(text.to_string(), window, cx));
+                }
+                Step::CheckTitle(expected) => {
+                    self.update_title(window, cx);
+                    let title = self.title.clone();
+                    self.check(title == expected, format!("the title is {title:?}"));
+                }
+                Step::CheckEditor(expected) => {
+                    let text = self.editor.read(cx).value().to_string();
+                    self.check(text == expected, format!("the editor holds {text:?}"));
+                }
+                Step::CheckExported(name) => {
+                    let path = self.autotest.as_ref().unwrap().dir.join(name);
+                    let size = {
+                        let canvas = self.canvas.borrow();
+                        (canvas.drawing.width(), canvas.drawing.height())
+                    };
+                    let image = image::open(&path).map(|i| i.to_rgba8());
+                    let found = image.as_ref().map(|i| i.dimensions());
+                    let drawn = image.as_ref().map_or(0, |i| i.pixels().filter(|p| p.0 != [0, 0, 0, 255]).count());
+                    let ok = found.as_ref().is_ok_and(|s| *s == size) && drawn > 0;
+                    self.check(ok, format!("exported a {found:?} PNG with {drawn} drawn pixels, the canvas is {size:?}"));
+                }
                 Step::CheckDrawn(expected) => {
                     let drawn = self.canvas.borrow().drawing.segments();
                     self.check(drawn == expected, format!("{drawn} lines and shapes drawn"));
@@ -399,9 +461,10 @@ impl App {
         let auto = self.autotest.as_mut().unwrap();
         auto.screenshots += 1;
         let path = auto.dir.join(format!("{}-{name}.png", auto.screenshots));
+        let title = self.title.replace('\'', "");
         let status = std::process::Command::new("sh")
             .arg("-c")
-            .arg(format!("xwd -silent -name Pendown | convert xwd:- '{}'", path.display()))
+            .arg(format!("xwd -silent -name '{title}' | convert xwd:- '{}'", path.display()))
             .status();
         let ok = status.is_ok_and(|s| s.success());
         self.say(format!("  screenshot {}{}", path.display(), if ok { "" } else { " (failed: needs xwd and ImageMagick)" }));

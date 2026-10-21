@@ -17,7 +17,7 @@ use crate::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     Comment,
-    /// `[`, `]`, `(` and `)`.
+    /// `[`, `]`, `{`, `}`, `(` and `)`.
     Bracket,
     Number,
     /// A quoted word, such as `"red`.
@@ -50,9 +50,21 @@ fn pieces(text: &str) -> Vec<Piece> {
     while i < b.len() {
         match b[i] {
             b' ' | b'\t' | b'\r' | b'\n' => i += 1,
-            b'[' | b']' => {
+            b'[' | b']' | b'{' => {
                 out.push(Piece::Bracket(i..i + 1));
                 i += 1;
+            }
+            // An array's origin is part of its closing brace: `}@0`.
+            b'}' => {
+                let start = i;
+                i += 1;
+                if b.get(i) == Some(&b'@') {
+                    i += 1;
+                    while i < b.len() && (b[i].is_ascii_digit() || b[i] == b'-') {
+                        i += 1;
+                    }
+                }
+                out.push(Piece::Bracket(start..i));
             }
             b';' => {
                 let start = i;
@@ -63,7 +75,7 @@ fn pieces(text: &str) -> Vec<Piece> {
             }
             _ => {
                 let start = i;
-                while i < b.len() && !matches!(b[i], b' ' | b'\t' | b'\r' | b'\n' | b'[' | b']' | b';') {
+                while i < b.len() && !matches!(b[i], b' ' | b'\t' | b'\r' | b'\n' | b'[' | b']' | b'{' | b'}' | b';') {
                     i += 1;
                 }
                 out.push(Piece::Word(start..i));
@@ -116,7 +128,7 @@ pub fn highlight(text: &str) -> Vec<(Range<usize>, Kind)> {
                 Tok::LParen | Tok::RParen => Kind::Bracket,
                 Tok::List(_) => continue,
                 Tok::Word(w) if w.eq_ignore_ascii_case("to") || w.eq_ignore_ascii_case("end") => Kind::Keyword,
-                Tok::Word(w) if prims::lookup(&w).is_some() => Kind::Command,
+                Tok::Word(w) if prims::lookup(&w).is_some() || parse::slot_number(&w).is_some() => Kind::Command,
                 Tok::Word(w) if procedures.contains(&w.to_lowercase()) => Kind::Procedure,
                 Tok::Word(_) => Kind::Unknown,
             };
@@ -127,9 +139,10 @@ pub fn highlight(text: &str) -> Vec<(Range<usize>, Kind)> {
 }
 
 /// Parses `text` as the editor's program would be on Run, without running
-/// it, and returns every error: those of the parse itself, and those in
-/// instruction lists given to `REPEAT`, `FOREVER`, `IF` and `IFELSE`, which
-/// otherwise only show up when they run (ADR 0001).
+/// it, and returns every error: those of the parse itself, and those in the
+/// instruction lists and templates given to commands such as `REPEAT`,
+/// `IF`, `FOR` and `MAP`, which otherwise only show up when they run (ADR
+/// 0001).
 pub fn check(text: &str) -> Vec<Error> {
     let mut names = Names::default();
     let no_procedures = |_| None;
@@ -152,13 +165,18 @@ fn check_expr(expr: &Expr, cx: &mut Cx, errors: &mut Vec<Error>) {
     match expr {
         Expr::Neg(e, _) => check_expr(e, cx, errors),
         Expr::Call(call) => {
-            // The inputs that are instruction lists, for the commands that
-            // run them.
+            // The inputs that are instruction lists or templates, for the
+            // commands that run them. `FOREACH`'s template comes last.
+            let last = call.args.len().saturating_sub(1);
             let lists: &[usize] = match call.target {
-                Target::Prim(id) => match PRIMS[id].imp {
-                    Imp::Repeat => &[1],
-                    Imp::Forever => &[0],
-                    Imp::If | Imp::IfElse => &[1, 2],
+                Target::Prim(id) => match (PRIMS[id].imp, PRIMS[id].names[0]) {
+                    (Imp::Repeat, _) => &[1],
+                    (Imp::Forever, _) => &[0],
+                    (Imp::If | Imp::IfElse, _) => &[1, 2],
+                    (_, "run" | "runresult" | "apply" | "invoke" | "map" | "map.se" | "filter" | "find" | "reduce") => &[0],
+                    (_, "for" | "catch") => &[1],
+                    (_, "while" | "until" | "do.while" | "do.until") => &[0, 1],
+                    (_, "foreach") => std::slice::from_ref(&last),
                     _ => &[],
                 },
                 _ => &[],
@@ -213,6 +231,16 @@ mod tests {
                 ("5", Number),
             ]
         );
+        assert_eq!(kinds("SHOW {a [b]}@0 ?2"), [
+            ("SHOW", Command),
+            ("{", Bracket),
+            ("a", Unknown),
+            ("[", Bracket),
+            ("b", Unknown),
+            ("]", Bracket),
+            ("}@0", Bracket),
+            ("?2", Command),
+        ]);
         assert_eq!(kinds("(SUM :a-1 2)"), [
             ("(", Bracket),
             ("SUM", Command),
@@ -241,6 +269,13 @@ mod tests {
         // Lists that aren't instructions aren't checked.
         assert_eq!(messages("MAKE \"x [FD] SETPOS [1 2]"), []);
         assert_eq!(messages("PRINT [1 2"), [("This [ has no matching ]".into(), "[".into())]);
+        // Phase 2's lists and templates.
+        assert_eq!(messages("FOR [i 1 3] [FD]"), [("Not enough inputs to FD".into(), "FD".into())]);
+        assert_eq!(messages("WHILE [FOO] [FD 1]"), [("I don't know how to FOO".into(), "FOO".into())]);
+        assert_eq!(messages("SHOW MAP [SQRT] [1 2]"), [("Not enough inputs to SQRT".into(), "SQRT".into())]);
+        assert_eq!(messages("FOREACH [1 2] [PRINT BAR ?]"), [("I don't know how to BAR".into(), "BAR".into())]);
+        assert_eq!(messages("SHOW MAP [[x] :x * 2] [1] SHOW MAP \"FIRST [ab] CATCH \"error [FD 1]"), []);
+        assert_eq!(messages("SHOW {1 2}@0 PRINT ?1"), []);
         assert!(check("").is_empty());
     }
 }

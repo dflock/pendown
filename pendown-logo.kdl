@@ -2454,6 +2454,7 @@ logo {
         """
         desc "command. Accepts as inputs one or more words, or a list of words. A variable is created for each of these words, with that word as its name. The variables are local to the currently running procedure. Logo variables follow dynamic scope rules; a variable that is local to a procedure is available to any subprocedure invoked by that procedure. The variables created by LOCAL have no initial value; they must be assigned a value (e.g., with MAKE) before the procedure attempts to read their value."
         see "make"
+        differs "At the top level, outside any procedure, LOCAL is an error."
         supported #true
         obsolete #false
         phase 1
@@ -3256,6 +3257,7 @@ logo {
 
         The abbreviation # can be used for REPCOUNT unless the REPEAT is inside the template input to a higher order procedure such as FOREACH, in which case # has a different meaning.
         """
+        differs "Outside REPEAT and FOREVER, REPCOUNT is an error rather than outputting -1, so a mistake shows up straight away."
         supported #true
         obsolete #false
         phase 1

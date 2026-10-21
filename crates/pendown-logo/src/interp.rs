@@ -318,6 +318,22 @@ impl Interpreter {
         sym
     }
 
+    /// Makes a variable local to the running procedure, with no value yet
+    /// (`LOCAL`). With shallow binding, that means saving its current value
+    /// in the procedure's frame, to put back when it ends. A tail-called
+    /// procedure shares its caller's frame, so its locals go there too.
+    /// Returns false outside any procedure.
+    pub(crate) fn make_local(&mut self, sym: Sym) -> bool {
+        let Some(frame) = self.frames.last_mut() else { return false };
+        let slot = &mut self.vars[sym as usize];
+        if frame.saved.iter().any(|(s, _)| *s == sym) {
+            *slot = None;
+        } else {
+            frame.saved.push((sym, slot.take()));
+        }
+        true
+    }
+
     /// Like `intern`, for a name `MAKE` is creating (ADR 0004).
     pub(crate) fn define(&mut self, name: &str) -> Sym {
         let sym = self.names.define(name);
@@ -425,7 +441,12 @@ impl Interpreter {
             }
             Imp::IfElse => self.exec_ifelse(call, tail),
             Imp::Repeat => {
-                let count = Args { call, vals: &[self.eval(&call.args[0], &call.name)?] }.int(0)?;
+                let count_arg = [self.eval(&call.args[0], &call.name)?];
+                let args = Args { call, vals: &count_arg };
+                let count = args.int(0)?;
+                if count < 0 {
+                    return Err(args.doesnt_like(0));
+                }
                 let list = self.eval_list(call, 1)?;
                 let block = self.list_block(&list, call.span)?;
                 for i in 1..=count {

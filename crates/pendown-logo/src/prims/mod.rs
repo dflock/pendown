@@ -99,13 +99,15 @@ pub static PRIMS: &[Prim] = &[
     Prim { names: &["setbackground", "setbg"], arity: ONE, imp: Imp::F(setbackground) },
     Prim { names: &["background", "bg"], arity: NONE, imp: Imp::F(background) },
     Prim { names: &["repeat"], arity: TWO, imp: Imp::Repeat },
-    Prim { names: &["repcount"], arity: Arity::fixed(0), imp: Imp::F(repcount) },
+    Prim { names: &["repcount", "#"], arity: NONE, imp: Imp::F(repcount) },
     Prim { names: &["forever"], arity: ONE, imp: Imp::Forever },
     Prim { names: &["if"], arity: some(2, 2, Some(3)), imp: Imp::If },
     Prim { names: &["ifelse"], arity: Arity::fixed(3), imp: Imp::IfElse },
     Prim { names: &["stop"], arity: Arity::fixed(0), imp: Imp::Stop },
     Prim { names: &["output", "op"], arity: ONE, imp: Imp::Output },
     Prim { names: &["make"], arity: TWO, imp: Imp::F(make) },
+    Prim { names: &["local"], arity: some(1, 1, None), imp: Imp::F(local) },
+    Prim { names: &["localmake"], arity: TWO, imp: Imp::F(localmake) },
     Prim { names: &["thing"], arity: ONE, imp: Imp::F(thing) },
     Prim { names: &["print", "pr"], arity: some(0, 1, None), imp: Imp::F(print) },
     Prim { names: &["type"], arity: some(0, 1, None), imp: Imp::F(type_) },
@@ -216,6 +218,46 @@ fn repcount(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
 fn make(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
     let name = a.word(0)?;
     let sym = it.define(&name);
+    it.vars[sym as usize] = Some(a.vals[1].clone());
+    Ok(None)
+}
+
+/// The names `LOCAL` gets: words, or lists of words.
+fn names(a: &Args) -> Result<Vec<Rc<str>>, Flow> {
+    let mut names = Vec::new();
+    for (i, v) in a.vals.iter().enumerate() {
+        match v {
+            Value::List(list) => {
+                for item in &list.items {
+                    match item {
+                        Value::Word(w) => names.push(w.clone()),
+                        _ => return Err(a.doesnt_like(i)),
+                    }
+                }
+            }
+            _ => names.push(a.word(i)?),
+        }
+    }
+    Ok(names)
+}
+
+fn local(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
+    for name in names(a)? {
+        let sym = it.define(&name);
+        if !it.make_local(sym) {
+            return Err(a.error(format!("{} can only be used inside a procedure", a.call.name.to_uppercase())));
+        }
+    }
+    Ok(None)
+}
+
+/// `LOCAL` then `MAKE`.
+fn localmake(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
+    let name = a.word(0)?;
+    let sym = it.define(&name);
+    if !it.make_local(sym) {
+        return Err(a.error("LOCALMAKE can only be used inside a procedure".into()));
+    }
     it.vars[sym as usize] = Some(a.vals[1].clone());
     Ok(None)
 }

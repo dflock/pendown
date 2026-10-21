@@ -284,3 +284,21 @@ TREE 200 14";
     assert_eq!(segments, 2 * (2usize.pow(14) - 1));
     eprintln!("{segments} segments in {:?}, not drawing them", started.elapsed());
 }
+
+#[test]
+fn clean_and_hiding_the_turtle() {
+    let (mut animator, _run) = start("FD 50 CLEAN FD 20 HT", Speed::Instant);
+    let mut cleaned = false;
+    let mut segments = Vec::new();
+    while !animator.finished() {
+        let out = frame(&mut animator, FRAME);
+        if out.cleaned {
+            cleaned = true;
+            segments.clear();
+        }
+        segments.extend(out.segments);
+    }
+    assert!(cleaned);
+    assert_eq!(segments.len(), 1, "only the move after CLEAN is left");
+    assert!(!animator.shown);
+}

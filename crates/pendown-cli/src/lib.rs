@@ -62,6 +62,10 @@ impl EventSink for DrawingSink {
                 }
             }
             Event::Print(text) => self.printed.borrow_mut().push_str(&text),
+            Event::Clean => {
+                self.pending.clear();
+                self.drawing.borrow_mut().clean();
+            }
             // A Sync only comes in lockstep, which the CLI never sets.
             Event::Sync(sync) => sync.reply(),
             _ => {}

@@ -115,6 +115,7 @@ pub struct Turtle {
     /// Degrees clockwise from north.
     pub heading: f64,
     pub pen: Pen,
+    pub shown: bool,
 }
 
 impl Default for Turtle {
@@ -123,6 +124,7 @@ impl Default for Turtle {
             pos: Point { x: 0.0, y: 0.0 },
             heading: 0.0,
             pen: Pen { down: true, color: [255, 255, 255, 255], size: 1.0 },
+            shown: true,
         }
     }
 }

@@ -61,6 +61,19 @@ pub fn parse_number(s: &str) -> Option<f64> {
     s.parse().ok().filter(|x: &f64| x.is_finite())
 }
 
+/// The sine and cosine of an angle in degrees, exact at multiples of 90°,
+/// so `RT 90 FD 100` lands on whole numbers rather than `6.1e-15` off them.
+pub fn sin_cos_degrees(degrees: f64) -> (f64, f64) {
+    let d = degrees.rem_euclid(360.0);
+    match d {
+        0.0 => (0.0, 1.0),
+        90.0 => (1.0, 0.0),
+        180.0 => (0.0, -1.0),
+        270.0 => (-1.0, 0.0),
+        _ => d.to_radians().sin_cos(),
+    }
+}
+
 /// Compares numbers rounded to 15 significant digits, so two numbers are
 /// equal exactly when they print the same: `0.1 + 0.2 = 0.3` is true.
 /// `<` and `>` use the same rounding, so they agree with `=`.

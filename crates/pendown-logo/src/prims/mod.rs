@@ -1,7 +1,14 @@
-//! The built-in procedures. A real version would take its names and arities
-//! from `pendown-logo.kdl`.
+//! The built-in procedures. The table here gives each one's names, inputs
+//! and code; the code is in a module per area, as `pendown-logo.kdl` groups
+//! them.
+
+mod pen;
+mod turtle;
 
 use std::{cmp::Ordering, collections::HashMap, rc::Rc, sync::OnceLock};
+
+use pen::*;
+use turtle::*;
 
 use crate::{
     error::Error,
@@ -42,15 +49,34 @@ const fn some(min: usize, default: usize, max: Option<usize>) -> Arity {
     Arity { min, default, max }
 }
 
+const NONE: Arity = Arity::fixed(0);
 const ONE: Arity = Arity::fixed(1);
 const TWO: Arity = Arity::fixed(2);
 
 pub static PRIMS: &[Prim] = &[
+    // Turtle motion and queries.
     Prim { names: &["forward", "fd"], arity: ONE, imp: Imp::F(forward) },
     Prim { names: &["back", "bk"], arity: ONE, imp: Imp::F(back) },
     Prim { names: &["right", "rt"], arity: ONE, imp: Imp::F(right) },
     Prim { names: &["left", "lt"], arity: ONE, imp: Imp::F(left) },
-    Prim { names: &["heading"], arity: Arity::fixed(0), imp: Imp::F(heading) },
+    Prim { names: &["setpos"], arity: ONE, imp: Imp::F(setpos) },
+    Prim { names: &["setxy"], arity: TWO, imp: Imp::F(setxy) },
+    Prim { names: &["setx"], arity: ONE, imp: Imp::F(setx) },
+    Prim { names: &["sety"], arity: ONE, imp: Imp::F(sety) },
+    Prim { names: &["setheading", "seth"], arity: ONE, imp: Imp::F(setheading) },
+    Prim { names: &["home"], arity: NONE, imp: Imp::F(home) },
+    Prim { names: &["pos"], arity: NONE, imp: Imp::F(pos) },
+    Prim { names: &["xcor"], arity: NONE, imp: Imp::F(xcor) },
+    Prim { names: &["ycor"], arity: NONE, imp: Imp::F(ycor) },
+    Prim { names: &["heading"], arity: NONE, imp: Imp::F(heading) },
+    Prim { names: &["towards"], arity: ONE, imp: Imp::F(towards) },
+    // Turtle and window control.
+    Prim { names: &["showturtle", "st"], arity: NONE, imp: Imp::F(showturtle) },
+    Prim { names: &["hideturtle", "ht"], arity: NONE, imp: Imp::F(hideturtle) },
+    Prim { names: &["shownp", "shown?"], arity: NONE, imp: Imp::F(shownp) },
+    Prim { names: &["clean"], arity: NONE, imp: Imp::F(clean) },
+    Prim { names: &["clearscreen", "cs"], arity: NONE, imp: Imp::F(clearscreen) },
+    // Pen and background.
     Prim { names: &["penup", "pu"], arity: Arity::fixed(0), imp: Imp::F(penup) },
     Prim { names: &["pendown", "pd"], arity: Arity::fixed(0), imp: Imp::F(pendown) },
     Prim { names: &["setpencolor", "setpc"], arity: ONE, imp: Imp::F(setpencolor) },
@@ -137,6 +163,17 @@ impl Args<'_> {
         if n.fract() == 0.0 && n.abs() < 2f64.powi(53) { Ok(n as i64) } else { Err(self.doesnt_like(i)) }
     }
 
+    /// A position: a list of two numbers.
+    pub fn point(&self, i: usize) -> Result<Point, Flow> {
+        if let Value::List(list) = &self.vals[i]
+            && let [x, y] = list.items.as_slice()
+            && let (Some(x), Some(y)) = (x.as_num(), y.as_num())
+        {
+            return Ok(Point { x, y });
+        }
+        Err(self.doesnt_like(i))
+    }
+
     pub fn word(&self, i: usize) -> Result<Rc<str>, Flow> {
         match &self.vals[i] {
             Value::Word(w) => Ok(w.clone()),
@@ -149,96 +186,6 @@ impl Args<'_> {
     fn result(&self, x: f64) -> Result<Option<Value>, Flow> {
         if x.is_finite() { Ok(Some(Value::Num(x))) } else { Err(self.error("That number is too big".into())) }
     }
-}
-
-fn walk(it: &mut Interpreter, distance: f64) -> Result<Option<Value>, Flow> {
-    let t = &mut it.turtle;
-    let from = t.pos;
-    let radians = t.heading.to_radians();
-    t.pos = Point { x: from.x + distance * radians.sin(), y: from.y + distance * radians.cos() };
-    let event = Event::Move { from, to: t.pos, pen: t.pen };
-    it.emit(event)?;
-    Ok(None)
-}
-
-fn turn(it: &mut Interpreter, by: f64) -> Result<Option<Value>, Flow> {
-    let from = it.turtle.heading;
-    it.turtle.heading = (from + by).rem_euclid(360.0);
-    it.emit(Event::Turn { from, by })?;
-    Ok(None)
-}
-
-fn forward(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    walk(it, a.num(0)?)
-}
-
-fn back(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    walk(it, -a.num(0)?)
-}
-
-fn right(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    turn(it, a.num(0)?)
-}
-
-fn left(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    turn(it, -a.num(0)?)
-}
-
-fn heading(it: &mut Interpreter, _: &Args) -> Result<Option<Value>, Flow> {
-    Ok(Some(Value::Num(it.turtle.heading)))
-}
-
-fn penup(it: &mut Interpreter, _: &Args) -> Result<Option<Value>, Flow> {
-    it.turtle.pen.down = false;
-    Ok(None)
-}
-
-fn pendown(it: &mut Interpreter, _: &Args) -> Result<Option<Value>, Flow> {
-    it.turtle.pen.down = true;
-    Ok(None)
-}
-
-/// UCBLogo's default palette (ADR 0015).
-const PALETTE: [[u8; 3]; 16] = [
-    [0, 0, 0],
-    [0, 0, 255],
-    [0, 255, 0],
-    [0, 255, 255],
-    [255, 0, 0],
-    [255, 0, 255],
-    [255, 255, 0],
-    [255, 255, 255],
-    [155, 96, 59],
-    [197, 136, 18],
-    [100, 162, 64],
-    [120, 187, 187],
-    [255, 149, 119],
-    [144, 113, 208],
-    [255, 163, 0],
-    [183, 183, 183],
-];
-
-/// A palette number or an `[r g b]` list from 0 to 255. The other colour
-/// forms come with phase 1's issue 07.
-fn setpencolor(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    let [r, g, b] = match &a.vals[0] {
-        Value::List(list) if list.items.len() == 3 => {
-            let mut rgb = [0u8; 3];
-            for (c, item) in rgb.iter_mut().zip(&list.items) {
-                match item.as_num() {
-                    Some(n) if (0.0..=255.0).contains(&n) => *c = n.round() as u8,
-                    _ => return Err(a.doesnt_like(0)),
-                }
-            }
-            rgb
-        }
-        v => match v.as_num() {
-            Some(n) if n.fract() == 0.0 && (0.0..16.0).contains(&n) => PALETTE[n as usize],
-            _ => return Err(a.doesnt_like(0)),
-        },
-    };
-    it.turtle.pen.color = [r, g, b, 255];
-    Ok(None)
 }
 
 fn repcount(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {

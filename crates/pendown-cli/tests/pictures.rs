@@ -84,3 +84,19 @@ TREE 250 9
 ";
     check("tree", program, 300, 300);
 }
+
+#[test]
+fn setxy_home_and_clean() {
+    // The first square is cleaned away; only the star and its spokes home
+    // remain.
+    let program = "
+REPEAT 4 [FD 200 RT 90]
+CLEAN
+PU SETXY -300 -100 PD
+REPEAT 5 [FD 300 RT 144]
+SETXY 300 300
+HOME
+SETPOS [-400 400]
+";
+    check("setxy-home-clean", program, 300, 300);
+}

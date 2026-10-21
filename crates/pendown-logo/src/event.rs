@@ -31,6 +31,10 @@ pub enum Event {
     Move { from: Point, to: Point, pen: Pen },
     /// `by` is the signed angle turned, clockwise, in degrees.
     Turn { from: f64, by: f64 },
+    ShowTurtle,
+    HideTurtle,
+    /// Clear the drawing. The turtle doesn't move.
+    Clean,
     /// Console output, including the newline if there is one.
     Print(String),
     /// The interpreter waits here until the front end replies (ADR 0011).

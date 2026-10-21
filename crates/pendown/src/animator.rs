@@ -65,6 +65,9 @@ enum Current {
 pub struct Frame {
     /// Moves finished this frame, to draw into the pixel buffer.
     pub segments: Vec<Segment>,
+    /// A `CLEAN` happened this frame: clear the drawing before adding
+    /// `segments`, which only holds the moves since the last one.
+    pub cleaned: bool,
     pub printed: Vec<String>,
     pub highlight_changed: bool,
     /// Events taken this frame.
@@ -85,6 +88,8 @@ pub struct Animator {
     pub instant_slice: Duration,
     pub pos: Point,
     pub heading: f64,
+    /// Whether the turtle sprite is shown.
+    pub shown: bool,
     pub highlight: Option<Span>,
     /// The last instruction hasn't moved or turned the turtle yet.
     idle_instruction: bool,
@@ -114,6 +119,7 @@ impl Animator {
             instant_slice: INSTANT_SLICE,
             pos: Point { x: 0.0, y: 0.0 },
             heading: 0.0,
+            shown: true,
             highlight: None,
             idle_instruction: false,
             after_line_start: false,
@@ -294,6 +300,12 @@ impl Animator {
                     self.current = Some(Current::Turn { from, by, done: 0.0 });
                 }
                 Event::Print(text) => out.printed.push(text),
+                Event::ShowTurtle => self.shown = true,
+                Event::HideTurtle => self.shown = false,
+                Event::Clean => {
+                    out.segments.clear();
+                    out.cleaned = true;
+                }
                 Event::Sync(sync) => {
                     // A Sync straight after the line start the step began
                     // on belongs to that line, so Step runs it. Any other

@@ -268,7 +268,12 @@ impl App {
             let max_segments = (INSTANT_DRAWING.as_nanos() / per_segment.as_nanos()).clamp(500, 100_000) as usize;
             let frame = animator.frame(dt, max_segments);
             self.events += frame.events;
-            self.canvas.borrow_mut().drawing.push(&frame.segments);
+            let mut canvas = self.canvas.borrow_mut();
+            if frame.cleaned {
+                canvas.drawing.clean();
+            }
+            canvas.drawing.push(&frame.segments);
+            drop(canvas);
             for text in frame.printed {
                 self.console.extend(text.lines().map(|line| SharedString::from(line.to_string())));
             }
@@ -327,7 +332,7 @@ impl Render for App {
         let paused = self.animator.as_ref().is_some_and(|a| a.mode() == Mode::Paused && !a.finished());
         let canvas = self.canvas.clone();
         let overlay = match &self.animator {
-            Some(a) => Overlay { partial: a.partial(), turtle: Some((a.pos, a.heading)) },
+            Some(a) => Overlay { partial: a.partial(), turtle: a.shown.then_some((a.pos, a.heading)) },
             None => Overlay { partial: None, turtle: Some((pendown_logo::Point { x: 0.0, y: 0.0 }, 0.0)) },
         };
 

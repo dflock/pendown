@@ -22,6 +22,7 @@ mod prims;
 mod random;
 mod reader;
 mod span;
+pub mod syntax;
 mod value;
 
 pub use colour::{NAMES as COLOUR_NAMES, PALETTE, Rgba};

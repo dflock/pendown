@@ -60,6 +60,15 @@ SETPC 6
 FLOWER 250
 "#;
 
+/// Where a byte offset is in `text`, as the editor counts lines and
+/// columns: columns in UTF-16 units, as in LSP.
+fn position(text: &str, offset: usize) -> Position {
+    let before = &text[..offset.min(text.len())];
+    let line = before.matches('\n').count() as u32;
+    let line_start = before.rfind('\n').map_or(0, |i| i + 1);
+    Position::new(line, before[line_start..].encode_utf16().count() as u32)
+}
+
 /// Instant mode draws at most about this much a frame, so the window stays
 /// responsive (ADR 0011).
 const INSTANT_DRAWING: Duration = Duration::from_millis(6);
@@ -109,6 +118,8 @@ pub struct App {
     pub(crate) title: String,
     /// The user has said the window can close.
     pub(crate) closing: bool,
+    /// The program has been checked for errors since the window opened.
+    checked: bool,
     /// Console output, one line each.
     pub(crate) console: Vec<SharedString>,
     console_dirty: bool,
@@ -120,6 +131,9 @@ pub struct App {
     console_definitions: Vec<String>,
     /// The console entry that's running, if it defines procedures.
     defining: Option<String>,
+    /// A Run has cleared `console_definitions` since the last was added, and
+    /// said so.
+    definitions_cleared: bool,
     last_frame: Option<Instant>,
     pub(crate) frame_intervals: Samples,
     pub(crate) events: usize,
@@ -151,6 +165,14 @@ impl App {
                     this.set_speed(level_speed(value.end().round() as u8), window, cx);
                 }
             }),
+            // Parse errors show while typing (ADRs 0001 and 0005).
+            cx.subscribe(&editor, |this, _, event: &InputEvent, cx| {
+                if let InputEvent::Change = event
+                    && !this.running()
+                {
+                    this.check_program(cx);
+                }
+            }),
             cx.subscribe_in(&console_input, window, |this, _, event: &InputEvent, window, cx| {
                 if let InputEvent::PressEnter { .. } = event {
                     this.submit_console(window, cx);
@@ -176,6 +198,7 @@ impl App {
             document: Document::new(WELCOME),
             title: String::new(),
             closing: false,
+            checked: false,
             console: Vec::new(),
             console_dirty: false,
             console_output,
@@ -183,6 +206,7 @@ impl App {
             console_entry: ConsoleInput::default(),
             console_definitions: Vec::new(),
             defining: None,
+            definitions_cleared: false,
             last_frame: None,
             frame_intervals: Samples::default(),
             events: 0,
@@ -220,7 +244,7 @@ impl App {
         self.canvas.borrow_mut().drawing.reset();
         self.console.clear();
         self.console_dirty = true;
-        if !self.console_definitions.is_empty() {
+        if !self.console_definitions.is_empty() && !std::mem::replace(&mut self.definitions_cleared, true) {
             self.print("Run cleared the procedures you defined in the console. \"Copy to editor\" keeps them.");
         }
         self.set_diagnostics(Vec::new(), cx);
@@ -310,6 +334,7 @@ impl App {
             text.push('\n');
         }
         self.editor.update(cx, |state, cx| state.set_value(text, window, cx));
+        self.check_program(cx);
         self.print("Copied the console's definitions to the editor.");
     }
 
@@ -341,10 +366,23 @@ impl App {
     }
 
     fn position(&self, offset: usize) -> Position {
-        let before = &self.run_text[..offset.min(self.run_text.len())];
-        let line = before.matches('\n').count() as u32;
-        let column = (before.len() - before.rfind('\n').map_or(0, |i| i + 1)) as u32;
-        Position::new(line, column)
+        position(&self.run_text, offset)
+    }
+
+    /// Shows the program's parse errors as it's typed, without running it.
+    pub(crate) fn check_program(&mut self, cx: &mut Context<Self>) {
+        // The last run's highlight no longer points at the right text.
+        self.highlight.set(vec![], cx);
+        let text = self.editor.read(cx).value().to_string();
+        let diagnostics = pendown_logo::syntax::check(&text)
+            .into_iter()
+            .filter_map(|e| {
+                let span = e.span?;
+                let range = position(&text, span.start as usize)..position(&text, span.end as usize);
+                Some(Diagnostic::new(range, e.message).with_severity(DiagnosticSeverity::Error))
+            })
+            .collect();
+        self.set_diagnostics(diagnostics, cx);
     }
 
     /// Shows errors as diagnostics on the code, and in the console with
@@ -442,7 +480,12 @@ impl App {
             match self.run.as_ref().and_then(|r| r.result()) {
                 Some(Err(RunError::Parse(errors))) => self.show_errors(errors, cx),
                 Some(Err(RunError::Runtime(e))) => self.show_errors(vec![e], cx),
-                Some(Ok(())) => self.console_definitions.extend(defining),
+                Some(Ok(())) => {
+                    if let Some(definition) = defining {
+                        self.console_definitions.push(definition);
+                        self.definitions_cleared = false;
+                    }
+                }
                 _ => {}
             }
         }
@@ -476,6 +519,9 @@ impl App {
 
 impl Render for App {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if !std::mem::replace(&mut self.checked, true) {
+            self.check_program(cx);
+        }
         self.tick(window, cx);
         self.drive_autotest(window, cx);
         self.flush_console(window, cx);

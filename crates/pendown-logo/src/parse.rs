@@ -159,7 +159,17 @@ impl Cx<'_> {
 /// before its definition (ADRs 0001 and 0006). Errors are collected one per
 /// line, so the editor can show them all.
 pub fn parse_program(text: &str, source: SourceId, cx: &mut Cx) -> Result<Program, Vec<Error>> {
-    let all = reader::read(text, source).map_err(|e| vec![e])?;
+    let (program, errors) = parse_program_partly(text, source, cx);
+    if errors.is_empty() { Ok(program) } else { Err(errors) }
+}
+
+/// Like `parse_program`, but also returns whatever parsed, alongside the
+/// errors, for the editor's checks.
+pub fn parse_program_partly(text: &str, source: SourceId, cx: &mut Cx) -> (Program, Vec<Error>) {
+    let all = match reader::read(text, source) {
+        Ok(all) => all,
+        Err(e) => return (Program { procs: Vec::new(), top: Vec::new() }, vec![e]),
+    };
     let items = &all.items;
     let spans = all.spans.as_ref().expect("source lists have spans");
     let mut errors = Vec::new();
@@ -281,7 +291,7 @@ pub fn parse_program(text: &str, source: SourceId, cx: &mut Cx) -> Result<Progra
             }
         }
     }
-    if errors.is_empty() { Ok(program) } else { Err(errors) }
+    (program, errors)
 }
 
 /// Parses a list as instructions, the first time it's run. A list written in
@@ -330,7 +340,7 @@ fn parse_lines(tokens: &[Token], cx: &mut Cx, block: &mut Block, errors: &mut Ve
 }
 
 #[derive(Debug)]
-enum Tok {
+pub(crate) enum Tok {
     Lit(Value),
     Word(Rc<str>),
     Quoted(Rc<str>),
@@ -344,9 +354,9 @@ enum Tok {
 }
 
 #[derive(Debug)]
-struct Token {
-    tok: Tok,
-    span: Span,
+pub(crate) struct Token {
+    pub(crate) tok: Tok,
+    pub(crate) span: Span,
 }
 
 /// Splits read words into tokens, like UCBLogo's `runparse`.
@@ -372,7 +382,7 @@ fn is_infix(c: u8) -> bool {
     matches!(c, b'+' | b'-' | b'*' | b'/' | b'=' | b'<' | b'>')
 }
 
-fn split_word(text: &str, span: Option<Span>, whole: Span, out: &mut Vec<Token>) {
+pub(crate) fn split_word(text: &str, span: Option<Span>, whole: Span, out: &mut Vec<Token>) {
     let sub = |a: usize, b: usize| match span {
         Some(s) => Span { start: s.start + a as u32, end: s.start + b as u32, ..s },
         None => whole,

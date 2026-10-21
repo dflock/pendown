@@ -99,6 +99,8 @@ enum Step {
     CheckEditor(&'static str),
     /// The exported picture is a PNG the size of the canvas.
     CheckExported(&'static str),
+    /// The editor shows exactly these diagnostics.
+    CheckDiagnostics(&'static [&'static str]),
     Quit,
 }
 
@@ -132,6 +134,17 @@ fn script() -> Vec<Step> {
         Console("TRI 10"),
         WaitFinished,
         CheckConsole("In the console: I don't know how to TRI"),
+        Say("Errors show while typing"),
+        CheckDiagnostics(&[]),
+        // The editor sends its change event once the edit is done.
+        Type("FD 10\nFOOBAR 3\nREPEAT 4 [FD]"),
+        Wait(ms(100)),
+        CheckDiagnostics(&["I don't know how to FOOBAR", "Not enough inputs to FD"]),
+        Screenshot("errors-while-typing"),
+        Type("REPEAT 4 [FD 10 RT 90]"),
+        Wait(ms(100)),
+        CheckDiagnostics(&[]),
+        Type(crate::app::WELCOME),
         Say("Files"),
         CheckTitle("Untitled — Pendown"),
         Type("REPEAT 3 [FD 200 RT 120]"),
@@ -388,12 +401,20 @@ impl App {
                     self.export_to(&path, cx);
                 }
                 Step::Type(text) => {
-                    self.editor.update(cx, |state, cx| state.set_value(text.to_string(), window, cx));
+                    // Like typing: an edit the user could undo, which sends
+                    // a change event. `set_value` sends none.
+                    self.editor.update(cx, |state, cx| state.replace_all(text.to_string(), window, cx));
                 }
                 Step::CheckTitle(expected) => {
                     self.update_title(window, cx);
                     let title = self.title.clone();
                     self.check(title == expected, format!("the title is {title:?}"));
+                }
+                Step::CheckDiagnostics(expected) => {
+                    let found: Vec<String> = self.editor.update(cx, |state, _| {
+                        state.diagnostics_mut().map_or(Vec::new(), |set| set.iter().map(|d| d.diagnostic.message.to_string()).collect())
+                    });
+                    self.check(found == expected, format!("the editor shows {found:?}"));
                 }
                 Step::CheckEditor(expected) => {
                     let text = self.editor.read(cx).value().to_string();

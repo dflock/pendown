@@ -88,6 +88,7 @@ impl App {
                 self.stop(cx);
                 self.document = Document::new("");
                 self.editor.update(cx, |state, cx| state.set_value("", window, cx));
+                self.check_program(cx);
             }
             After::OpenFile => {
                 let options = PathPromptOptions {
@@ -117,6 +118,8 @@ impl App {
                 self.stop(cx);
                 self.document = document;
                 self.editor.update(cx, |state, cx| state.set_value(text, window, cx));
+                // Setting the text sends no change event, so check it here.
+                self.check_program(cx);
                 remember_folder(path);
                 self.print(format!("Opened {}", path.display()));
             }

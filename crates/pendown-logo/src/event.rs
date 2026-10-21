@@ -50,6 +50,12 @@ pub enum Event {
     SetBackground { color: [u8; 4] },
     /// Console output, including the newline if there is one.
     Print(String),
+    /// `WAIT`: the animator waits this long at every speed, including
+    /// Instant (ADR 0011).
+    Wait(std::time::Duration),
+    /// `SETSPEED`: the animator changes to this level, from 1 to 11, when it
+    /// gets here.
+    SetSpeed(u8),
     /// The interpreter waits here until the front end replies (ADR 0011).
     /// In lockstep, one follows each `Instruction` that starts a line, so
     /// the program can't run a line before the animator gets to it.

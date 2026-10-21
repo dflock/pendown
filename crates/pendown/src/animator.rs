@@ -62,6 +62,8 @@ enum Current {
     Turn { from: f64, by: f64, done: f64 },
     /// Keeps the highlight on an instruction that drew nothing.
     Dwell { left: f64 },
+    /// `WAIT`: seconds left, counted in real time at every speed.
+    Wait { left: f64 },
 }
 
 /// What a frame produced.
@@ -73,6 +75,9 @@ pub struct Frame {
     /// A `CLEAN` happened this frame: clear the drawing before adding
     /// `marks`, which only holds what came after it.
     pub cleaned: bool,
+    /// A `SETSPEED` changed the speed this frame, to this, so the slider
+    /// should move.
+    pub speed: Option<Speed>,
     /// The background changed this frame, to this. It goes under
     /// everything, so it doesn't matter where among `marks` it came.
     pub background: Option<[u8; 4]>,
@@ -137,6 +142,7 @@ impl Animator {
             disconnected: false,
             stopped: false,
         };
+        animator.control.speed.store(crate::speed::speed_level(speed), Ordering::Relaxed);
         animator.update_lockstep();
         animator
     }
@@ -196,8 +202,10 @@ impl Animator {
         self.control.lockstep.store(!free, Ordering::Relaxed);
     }
 
+    /// Changes the speed, and tells the interpreter the level, for `SPEED`.
     pub fn set_speed(&mut self, speed: Speed) {
         self.speed = speed;
+        self.control.speed.store(crate::speed::speed_level(speed), Ordering::Relaxed);
         self.update_lockstep();
     }
 
@@ -331,6 +339,15 @@ impl Animator {
                     out.cleaned = true;
                 }
                 Event::SetBackground { color } => out.background = Some(color),
+                Event::Wait(duration) => {
+                    self.idle_instruction = false;
+                    self.current = Some(Current::Wait { left: duration.as_secs_f64() });
+                }
+                Event::SetSpeed(level) => {
+                    let speed = crate::speed::level_speed(level);
+                    self.set_speed(speed);
+                    out.speed = Some(speed);
+                }
                 Event::Sync(sync) => {
                     // A Sync straight after the line start the step began
                     // on belongs to that line, so Step runs it. Any other
@@ -428,6 +445,17 @@ impl Animator {
                     return true;
                 }
                 self.current = Some(Current::Turn { from, by, done });
+                false
+            }
+            // Real time, whatever the speed: a program that says WAIT
+            // means it, even at Instant.
+            Current::Wait { left } => {
+                if *budget >= left {
+                    *budget -= left;
+                    return true;
+                }
+                self.current = Some(Current::Wait { left: left - *budget });
+                *budget = 0.0;
                 false
             }
             Current::Dwell { left } => {

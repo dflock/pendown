@@ -5,7 +5,7 @@ use std::{
     rc::Rc,
     sync::{
         Arc,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering},
         mpsc,
     },
 };
@@ -150,6 +150,10 @@ pub struct Control {
     /// How many lines the interpreter has started, so the front end can see
     /// how far ahead of the highlight it is.
     pub lines_started: AtomicU64,
+    /// The speed level from 1 to 11 that the slider shows, for `SPEED`. The
+    /// GUI keeps it up to date; 0 means there's no slider, as in the CLI,
+    /// and `SPEED` outputs 11.
+    pub speed: AtomicU8,
 }
 
 pub struct Interpreter {
@@ -353,6 +357,10 @@ impl Interpreter {
         let sym = self.names.define(name);
         self.grow();
         sym
+    }
+
+    pub(crate) fn control(&self) -> &Control {
+        &self.control
     }
 
     pub(crate) fn bool(&self, b: bool) -> Value {

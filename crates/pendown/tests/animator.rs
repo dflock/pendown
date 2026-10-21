@@ -350,3 +350,52 @@ fn shapes_sweep_round_and_pen_up_shapes_take_no_time() {
     }
     assert!(frames < 20, "{frames} frames for shapes nobody can see");
 }
+
+#[test]
+fn wait_takes_its_time_even_at_instant() {
+    let (mut animator, _run) = start("FD 10 WAIT 30 FD 10", Speed::Instant);
+    let mut frames = 0;
+    let mut highlight_during_wait = String::new();
+    while !animator.finished() && frames < 1000 {
+        frame(&mut animator, FRAME);
+        frames += 1;
+        if frames == 15 {
+            highlight_during_wait = highlighted("FD 10 WAIT 30 FD 10", &animator).to_string();
+        }
+    }
+    // Half a second at 16 ms a frame.
+    assert!((29..=34).contains(&frames), "{frames} frames");
+    assert_eq!(highlight_during_wait, "WAIT 30");
+}
+
+#[test]
+fn pause_and_stop_during_a_wait() {
+    let (mut animator, run) = start("WAIT 60\nFD 10", Speed::Instant);
+    for _ in 0..10 {
+        frame(&mut animator, FRAME);
+    }
+    animator.pause();
+    for _ in 0..200 {
+        animator.frame(FRAME, usize::MAX);
+    }
+    assert!(!animator.finished(), "paused, the wait doesn't count down");
+    animator.stop();
+    assert!(animator.finished(), "Stop ends the playback");
+    // At Instant the interpreter didn't wait: it had already finished, and
+    // only the animator was waiting.
+    wait_for_exit(&run);
+    assert_eq!(run.result(), Some(Ok(())));
+}
+
+#[test]
+fn setspeed_changes_the_speed_where_it_runs() {
+    let (mut animator, _run) = start("FD 10\nSETSPEED 3\nFD 10", Speed::Instant);
+    let mut changed = None;
+    while !animator.finished() {
+        if let Some(speed) = frame(&mut animator, FRAME).speed {
+            changed = Some(speed);
+        }
+    }
+    assert_eq!(changed, Some(Speed::Animated(20.0)), "level 3 is 20 steps a second");
+    assert_eq!(animator.speed(), Speed::Animated(20.0));
+}

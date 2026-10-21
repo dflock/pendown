@@ -253,7 +253,7 @@ impl App {
 
     /// One animation frame: play events, hand finished moves to the canvas,
     /// and notice when the run has ended.
-    fn tick(&mut self, cx: &mut Context<Self>) {
+    fn tick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let now = Instant::now();
         let Some(animator) = &mut self.animator else { return };
         if !animator.wants_frames() {
@@ -279,6 +279,10 @@ impl App {
             drop(canvas);
             for text in frame.printed {
                 self.console.extend(text.lines().map(|line| SharedString::from(line.to_string())));
+            }
+            if let Some(speed) = frame.speed {
+                // The animator has changed already: this moves the slider.
+                self.set_speed(speed, window, cx);
             }
             if frame.highlight_changed {
                 self.on_highlight();
@@ -324,7 +328,7 @@ impl App {
 
 impl Render for App {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.tick(cx);
+        self.tick(window, cx);
         self.drive_autotest(window, cx);
         if self.animator.as_ref().is_some_and(|a| a.wants_frames()) || self.autotest.is_some() {
             window.request_animation_frame();

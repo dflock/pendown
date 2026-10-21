@@ -1954,7 +1954,7 @@ logo {
       }
       speed {
         eg "SPEED"
-        desc "outputs the turtle's speed, as a level from 1 to 11. See SETSPEED."
+        desc "outputs the turtle's speed, as a level from 1 to 11: whatever the speed slider shows, which both SETSPEED and moving the slider change. When a picture is drawn with pendown-cli, SPEED outputs 11. See SETSPEED."
         see "setspeed"
         supported #true
         obsolete #false
@@ -3404,6 +3404,7 @@ logo {
       wait {
         eg "WAIT time"
         desc "command. Delays further execution for time 60ths of a second. Also causes any buffered characters destined for the terminal to be printed immediately. WAIT 0 can be used to achieve this buffer flushing without actually waiting."
+        differs "The turtle waits at every speed, including Instant: the program is paused for that long, with WAIT highlighted. When a picture is drawn with pendown-cli, WAIT does nothing."
         supported #true
         obsolete #false
         phase 1

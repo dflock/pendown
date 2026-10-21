@@ -107,6 +107,9 @@ pub static PRIMS: &[Prim] = &[
     Prim { names: &["if"], arity: some(2, 2, Some(3)), imp: Imp::If },
     Prim { names: &["ifelse"], arity: Arity::fixed(3), imp: Imp::IfElse },
     Prim { names: &["stop"], arity: Arity::fixed(0), imp: Imp::Stop },
+    Prim { names: &["wait"], arity: ONE, imp: Imp::F(wait) },
+    Prim { names: &["setspeed"], arity: ONE, imp: Imp::F(setspeed) },
+    Prim { names: &["speed"], arity: NONE, imp: Imp::F(speed) },
     Prim { names: &["output", "op"], arity: ONE, imp: Imp::Output },
     Prim { names: &["make"], arity: TWO, imp: Imp::F(make) },
     Prim { names: &["local"], arity: some(1, 1, None), imp: Imp::F(local) },
@@ -236,6 +239,35 @@ impl Args<'_> {
     pub(super) fn result(&self, x: f64) -> Result<Option<Value>, Flow> {
         if x.is_finite() { Ok(Some(Value::Num(x))) } else { Err(self.error("That number is too big".into())) }
     }
+}
+
+/// `WAIT time`, in 60ths of a second.
+fn wait(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
+    let sixtieths = a.num(0)?;
+    if sixtieths < 0.0 {
+        return Err(a.doesnt_like(0));
+    }
+    if sixtieths > 0.0 {
+        it.emit(Event::Wait(std::time::Duration::from_secs_f64(sixtieths / 60.0)))?;
+    }
+    Ok(None)
+}
+
+/// `SETSPEED level`, from 1 to 11, where 11 is Instant (ADR 0011).
+fn setspeed(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
+    let level = a.int(0)?;
+    if !(1..=11).contains(&level) {
+        return Err(a.doesnt_like(0));
+    }
+    it.control().speed.store(level as u8, std::sync::atomic::Ordering::Relaxed);
+    it.emit(Event::SetSpeed(level as u8))?;
+    Ok(None)
+}
+
+/// The level the speed slider shows, which `SETSPEED` changes too.
+fn speed(it: &mut Interpreter, _: &Args) -> Result<Option<Value>, Flow> {
+    let level = it.control().speed.load(std::sync::atomic::Ordering::Relaxed);
+    Ok(Some(Value::Num(if level == 0 { 11.0 } else { level as f64 })))
 }
 
 fn repcount(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {

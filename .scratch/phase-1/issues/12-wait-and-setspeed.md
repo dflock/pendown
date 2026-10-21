@@ -1,6 +1,6 @@
 # `WAIT`, `SETSPEED` and `SPEED`
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 02, 03
 
@@ -28,3 +28,18 @@ Blocked by: 02, 03
 - Animator tests cover: a `WAIT` at Instant taking its time; Stop and Pause during a `WAIT`; and `SETSPEED` changing the speed mid-program.
 
 ## Comments
+
+### 2026-10-21: done
+
+- **`WAIT time`** sends `Event::Wait(duration)`, in 60ths of a second.
+  - The animator counts it down in real frame time at every speed, including Instant, with the highlight on the `WAIT`.
+  - Pausing freezes it, and Stop ends it.
+  - `WAIT 0` sends nothing, and a negative time is an error.
+- **`SETSPEED level`** sends `Event::SetSpeed(level)`, from 1 to 11. Anything else is an error.
+  - The animator changes speed when it gets there, and reports it in its frame, so the app moves the slider.
+- **`SPEED`, decided:** it outputs the level the slider shows.
+  - `Control::speed` is an atomic that the animator keeps up to date, whether the slider moved or a `SETSPEED` ran.
+  - It's 0 when there's no slider, so `SPEED` outputs 11 in the CLI.
+  - The kdl's `SPEED` description says so, and `WAIT` has a `differs` note: it waits at every speed, and does nothing in the CLI.
+- **The CLI** ignores both events.
+- **Tests:** `tests/speed.rs` (3 tests), and 3 animator tests: a `WAIT` at Instant taking half a second with its highlight, Pause and Stop during a `WAIT`, and `SETSPEED` changing the speed mid-program.

@@ -1,6 +1,6 @@
 # Phase 1 check: examples, HiDPI and Wayland
 
-Status: ready-for-human
+Status: done
 Type: task
 Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15
 
@@ -42,3 +42,9 @@ The programs run as expected everywhere tested, and anything found is fixed or f
 - Try the app: `cargo run --release -p pendown`. Run, Pause, Step, Step instruction, Stop and the speed slider, on the examples and your own programs.
 - **The platform dialogs:** Open, Save As and Export PNG, and the "Save the changes?" prompt on New, Open and closing the window. The scripted session can't drive them.
 - **Untested platforms:** a real HiDPI display (the pixel buffer twice the size), Wayland, and a GPU other than the Intel HD 530. Check the speed, the memory and how the drawing looks.
+
+### 2026-10-21: closed
+
+- Checked by hand: the app works, and so do the platform dialogs and the "Save the changes?" prompts.
+- A fifth example, `flower.logo`, was added, and is a picture test too. The example tests now read only `.logo` files, since the folder can hold pictures.
+- **Still untested:** a real HiDPI display, Wayland, and GPUs other than the Intel HD 530. Worth checking whenever another machine is to hand.

@@ -257,7 +257,7 @@ Have the interpreter output a stream of turtle events in its own coordinate syst
 - `Turn { from, by }`, where `by` is the signed angle turned. Logo measures headings clockwise from north, and `RT 270` should visibly turn 270° clockwise, not take the short way round. So `from`/`to` alone isn't enough.
 - `Arc { center, radius, start_heading, angle, pen }`. Our `ARC` moves the turtle along the arc (see "Dialect and extensions"), so the animator moves the turtle sprite with it.
 - `Ellipse { center, radii, heading, pen, fill }` for `CIRCLE` and `ELLIPSE`, and `Rect { center, size, corner, heading, pen, fill }` for `SQUARE` and `RECTANGLE`. The turtle doesn't move.
-- `Label { at, text }`, drawn with gpui's `shape_line` + `ShapedLine::paint`.
+- `Label { at, text }`, drawn into the pixel buffer with vello_cpu, so the CLI draws it too. Spike 06 works out how (`.scratch/phase-2-spikes/issues/02-labels.md`).
 - `Fill`, `Filled { color, points }`, `Clean`, `SetBackground`, `ShowTurtle` / `HideTurtle`.
 - `Print(text)`, so console output stays in step with the drawing (see "Turtle speed" below).
 - `Wait(duration)` and `SetSpeed(speed)`.

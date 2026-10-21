@@ -87,11 +87,14 @@ pub struct Limits {
     /// Send an `Instruction` event before each instruction. The GUI needs
     /// them; the CLI doesn't.
     pub instruction_events: bool,
+    /// Stop with an error after this many instructions. The CLI uses it so
+    /// an endless program, such as `FOREVER`, still ends; the GUI has Stop.
+    pub max_instructions: Option<u64>,
 }
 
 impl Default for Limits {
     fn default() -> Limits {
-        Limits { max_depth: 10_000, stack_bytes: None, instruction_events: true }
+        Limits { max_depth: 10_000, stack_bytes: None, instruction_events: true, max_instructions: None }
     }
 }
 
@@ -310,6 +313,12 @@ impl Interpreter {
             return Err(Flow::Halt);
         }
         self.stats.instructions += 1;
+        if let Some(max) = self.limits.max_instructions
+            && self.stats.instructions > max
+        {
+            let message = format!("Stopped after {max} instructions: does this program ever end?");
+            return Err(Error::new(message, Some(span)).into());
+        }
         if self.limits.instruction_events {
             let line = Some((span.source, span.line));
             let starts_line = self.last_line != line;

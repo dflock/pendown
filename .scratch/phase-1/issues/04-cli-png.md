@@ -1,6 +1,6 @@
 # `pendown-cli`: PNG output
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 01
 
@@ -27,3 +27,19 @@ pendown-cli <program.logo> [--output <file.png>] [--size <width>x<height>]
 - Error output and exit codes have tests.
 
 ## Comments
+
+### 2026-10-21: done
+
+- **The command:** `pendown-cli <program.logo> [--output|-o <file.png>] [--size|-s WxH] [--limit N]`, using `clap`.
+  - The library (`src/lib.rs`) runs the program on a 256 MiB thread and draws the moves into `pendown-render`.
+  - It sends no `Instruction` events, and draws segments in batches of 4,096.
+- **Endless programs:** `--limit`, with a default of 10 million instructions. It's a new `Limits::max_instructions` in `pendown-logo`, with a test, and the error is "Stopped after N instructions: does this program ever end?".
+- **Output:**
+  - Printed output goes to stdout. Errors go to stderr as `file:line:column: message`, with the call chain.
+  - A parse error saves nothing. A runtime error saves the picture so far, and says so.
+  - The exit code is 1 for program errors and 2 for bad options.
+- **Tests:**
+  - `tests/cli.rs` (7 tests): the default output name, the options, a bad size, parse and runtime errors, the limit, and a missing file.
+  - `tests/pictures.rs` (4 pictures): a square, a palette-coloured spiral, a non-square size, and a tree.
+  - The picture tests allow a channel difference of 40 on up to 0.2% of pixels. `UPDATE_PICTURES=1` updates the saved pictures, and a failing test saves its picture next to them as `NAME.actual.png`.
+- **Docs:** `implementation-plan.md` ("CLI") now has the options, outputs and exit codes, and notes that SVG export comes later.

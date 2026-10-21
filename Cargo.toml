@@ -15,6 +15,7 @@ pendown-logo = { path = "crates/pendown-logo" }
 pendown-render = { path = "crates/pendown-render" }
 # `tree-sitter` gives real theme highlight and diagnostic colours (ADR 0008).
 gpui-kit = { version = "=0.8.0", features = ["tree-sitter"] }
+clap = { version = "4", features = ["derive"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 kdl = "6"
 smallvec = "1"

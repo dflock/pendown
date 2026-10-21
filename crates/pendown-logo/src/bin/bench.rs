@@ -50,7 +50,7 @@ fn stack_per_call() {
     let mut worst = 0;
     for (name, src) in shapes {
         let (depth, stack) = on_stack(move || {
-            let limits = Limits { max_depth: usize::MAX, stack_bytes: Some(STACK), instruction_events: true };
+            let limits = Limits { max_depth: usize::MAX, stack_bytes: Some(STACK), instruction_events: true, max_instructions: None };
             let mut it = interpreter(Box::new(Discard), limits);
             it.run_program(src).unwrap();
             (it.stats.max_depth, it.stats.max_stack)
@@ -65,7 +65,7 @@ fn stack_per_call() {
     // How deep it really gets before the stack guard stops it.
     let src = "TO DOWN :n\n IF :n > 0 [REPEAT 1 [IFELSE \"true [DOWN :n + 1 FD 0] []]]\nEND\nDOWN 1";
     let (depth, message) = on_stack(move || {
-        let limits = Limits { max_depth: usize::MAX, stack_bytes: Some(STACK), instruction_events: false };
+        let limits = Limits { max_depth: usize::MAX, stack_bytes: Some(STACK), instruction_events: false, max_instructions: None };
         let mut it = interpreter(Box::new(Discard), limits);
         let result = it.run_program(src);
         let Err(RunError::Runtime(e)) = result else { panic!("{result:?}") };

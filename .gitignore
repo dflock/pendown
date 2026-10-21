@@ -1,2 +1,5 @@
 refs/
 target/
+
+# Pictures from failing picture tests
+*.actual.png

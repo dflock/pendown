@@ -105,7 +105,7 @@ const MB: usize = 1024 * 1024;
 /// A small stack and a low depth limit: if a call that should be a tail call
 /// isn't one, these fail with "called itself too many times".
 fn tail_limits() -> Limits {
-    Limits { max_depth: 50, stack_bytes: Some(MB), instruction_events: false }
+    Limits { max_depth: 50, stack_bytes: Some(MB), instruction_events: false, max_instructions: None }
 }
 
 fn tail_run(src: &'static str) -> (Result<(), RunError>, String, usize) {
@@ -257,7 +257,7 @@ fn running_out_of_stack_is_the_same_friendly_error() {
     // A small stack and no real depth limit: the stack guard stops it.
     let src = "TO DOWN :n\n DOWN :n + 1\n PRINT :n\nEND\nDOWN 1";
     let message = on_stack(4 * MB, move || {
-        let limits = Limits { max_depth: usize::MAX, stack_bytes: Some(4 * MB), instruction_events: false };
+        let limits = Limits { max_depth: usize::MAX, stack_bytes: Some(4 * MB), instruction_events: false, max_instructions: None };
         run_with(src, limits).error().message.clone()
     });
     assert!(message.starts_with("DOWN called itself too many times"), "{message}");
@@ -599,4 +599,14 @@ fn the_first_definition_decides_the_spelling() {
     // Run starts again: the next definition decides.
     it.run_program("MAKE \"SIZE 4").unwrap();
     assert_eq!(it.parse_to_sexp("PRINT :size"), Ok(vec!["(print :SIZE)".to_string()]));
+}
+
+// The instruction limit, added for pendown-cli.
+
+#[test]
+fn an_endless_program_stops_at_the_instruction_limit() {
+    let src = "FOREVER [FD 1 RT 1]";
+    let r = run_with(src, Limits { max_instructions: Some(1000), instruction_events: false, ..Limits::default() });
+    assert_eq!(r.error().message, "Stopped after 1000 instructions: does this program ever end?");
+    assert_eq!(r.stats.instructions, 1001);
 }

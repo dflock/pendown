@@ -6,3 +6,9 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
+clap.workspace = true
+pendown-logo.workspace = true
+pendown-render.workspace = true
+
+[dev-dependencies]
+image.workspace = true

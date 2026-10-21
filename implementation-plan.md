@@ -327,6 +327,20 @@ That way frame cost depends on what's changing, not on how much has been drawn s
 
 The CLI reads the same event stream with no timing and renders it to a file. `WAIT` and `SETSPEED` do nothing there.
 
+```
+pendown-cli <program.logo> [--output <file.png>] [--size <width>x<height>] [--limit <instructions>]
+```
+
+- **`--output`** (`-o`) defaults to the program's name with `.png`.
+- **`--size`** (`-s`) defaults to `1000x1000`. The turtle area is fitted to it without stretching.
+- **`--limit`** defaults to 10 million instructions. A program that never ends, such as `FOREVER`, stops there with an error, and the picture is saved as far as it got.
+- **Output:** what the program prints goes to stdout. Errors go to stderr as `program.logo:LINE:COLUMN: message`, with the chain of calls after it.
+- **Exit codes:**
+  - 1 for a parse error, which saves nothing;
+  - 1 for a runtime error, which saves the picture as far as it got;
+  - 2 for a bad option.
+- **Later:** SVG export, drawn from the event stream rather than the pixel buffer.
+
 ### Open questions
 
 - ~~**Speed scale and units:**~~ Levels from 1 to 11, where 11 is Instant and each level below doubles the speed, from 5 to 2,560 steps a second (spike 04; see "Speed model").

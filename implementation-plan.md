@@ -47,6 +47,25 @@ In the GUI and runtime, phase 1 includes:
 - **Filled shapes (our extension):** `SETFILLCOLOR`/`FILLCOLOR`, which make the shapes draw filled.
 - **Settings:** `NAME`, `GLOBAL`, `CASEIGNOREDP`, `FULLPRINTP`, `PRINTDEPTHLIMIT`/`PRINTWIDTHLIMIT`, `LOGOVERSION`.
 
+In the GUI and runtime, phase 2 includes:
+
+- **A performance pass, first.** While a program runs, Pendown keeps one CPU core fully busy, even at slow speeds where the turtle barely moves. Measure before changing anything:
+  - Does the CPU go to the interpreter thread, the UI thread or vello_cpu's workers?
+  - Does it depend on the speed level, and does it stop when the program ends or is paused? After the end it should, since the app only asks for frames while the animator is running.
+  - Suspects:
+    - every frame re-renders the whole window, including the editor and the console, while only the canvas changes;
+    - the canvas image may be uploaded to the GPU again every frame;
+    - the lockstep round trip per line.
+  - **Goal:** a slow run costs little more than an idle window, and Instant mode is as fast as before. Spike 04's measurements are the baseline.
+- **Watching a program run.** Two panels that update as the turtle goes, in step with the highlighted instruction. A value flashes when it changes.
+  - **Repeat counters:** the counter of every `REPEAT` and `FOREVER` running, outermost first, such as `REPEAT 3 of 36 › REPEAT 2 of 4`. The innermost one is what `REPCOUNT` outputs. Phase 2's `FOR` adds its own counter.
+  - **Variables:** the current value of every variable the running line can see: the globals, and the inputs and locals of each procedure in the call chain, since scope is dynamic (see "Kept from UCBLogo: dynamic scope"). Names keep the spelling of their definition (ADR 0004).
+  - **Keeping in step:** at animated speeds the interpreter waits at every line (lockstep), so it can publish its counters and changed variables just before it waits, and the panels show exactly what the highlighted line sees. Shallow binding (ADR 0007) makes the changes cheap to find. At Instant the panels update once a frame, and may be ahead of the drawing, as when pausing from Instant.
+  - **Open questions:**
+    - Are these panels, or one panel with two sections?
+    - Are they always visible, or only while paused or stepping?
+    - How are long lists shown?
+
 ### Phase 3: Help, examples and tutorial (no new commands)
 
 Two of the headline features. They come after phase 2 so they cover the complete core language, and so the commands they document have settled down.
@@ -61,6 +80,12 @@ Two of the headline features. They come after phase 2 so they cover the complete
 - **Examples are tests:** a test runs every example through the interpreter and the CLI renderer and compares the result with a saved PNG. That keeps the documentation and the interpreter in agreement. Examples that use `RANDOM` need a fixed seed, so their output is repeatable.
 - **Tutorial:** a sequence of lessons, each with text and code, featuring Kame the turtle (ADR 0019). The code loads into the editor and runs from there. The lessons follow the phase 1 commands: moving and turning, `REPEAT`, procedures, inputs and variables, recursion, then colours and shapes.
 - **GUI:** a side panel next to the editor, with tabs for Help and Tutorial.
+- **A tree-sitter grammar for Logo,** published on its own, with a Zed extension that uses it. The editor's colours come from `pendown-logo`'s own tokens (ADR 0008), so there's no grammar yet. This comes after phase 2, which adds the last new syntax, `{...}` arrays.
+  - **Its own repository,** say `tree-sitter-logo`, since Zed extensions fetch grammars by git URL and commit. It has `grammar.js`, the generated parser, `queries/highlights.scm`, and tests.
+  - **What it can parse:** tree-sitter can't know a procedure's arity, so it can't group an instruction with its inputs as our parser does (ADR 0001). It parses tokens and structure: words, numbers, `"words`, `:variables`, operators, `[...]` lists, `(...)`, `{...}` arrays, comments, and `TO … END` definitions, both one-line and multi-line. That's enough for colours, brackets, outlines and folding.
+  - **Built-in commands:** `highlights.scm` lists them, generated from `pendown-logo.kdl`, with a test that it's up to date, like the `kdl` test that checks the command table.
+  - **The Zed extension:** `extension.toml`, `languages/logo/config.toml` (the `.logo` suffix, `;` comments, brackets) and the queries.
+  - **Open question:** should Pendown's own editor switch to the grammar, through gpui-kit's tree-sitter support? Our highlighter knows which procedures the program defines, which a grammar can't, so it probably stays.
 
 Open questions:
 
@@ -102,7 +127,7 @@ References in `refs/`: `ucblogo-code` (the C source, for checking exact behaviou
 A procedure can see the local variables of whatever procedure called it, not just globals. Every Logo works this way, and Logo teaching material relies on it.
 
 - **Implementation:** a stack of frames. Looking up a variable walks from the current frame down through its callers to the globals. `MAKE` sets the nearest existing variable with that name, or creates a global if there isn't one.
-- **GUI:** a later variable inspector should show the whole chain of frames, since that's what a running line can actually see.
+- **GUI:** phase 2's variable panel should show the whole chain of frames, since that's what a running line can actually see.
 
 ### Colours
 

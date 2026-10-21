@@ -66,6 +66,10 @@ impl EventSink for DrawingSink {
                 self.pending.clear();
                 self.drawing.borrow_mut().clean();
             }
+            Event::SetBackground { color } => {
+                self.draw();
+                self.drawing.borrow_mut().set_background(color);
+            }
             // A Sync only comes in lockstep, which the CLI never sets.
             Event::Sync(sync) => sync.reply(),
             _ => {}

@@ -10,6 +10,7 @@
 //!    Lists are only parsed into instructions when they're first run.
 //! 3. [`interp`] walks the instructions, eliminating tail calls (ADR 0007).
 
+mod colour;
 mod error;
 mod event;
 mod geometry;
@@ -22,6 +23,7 @@ mod reader;
 mod span;
 mod value;
 
+pub use colour::{NAMES as COLOUR_NAMES, PALETTE, Rgba};
 pub use error::{CallSite, Error, RunError};
 pub use geometry::{Area, TurtleMode};
 pub use event::{BatchSender, Event, EventSink, Halted, Pen, Point, SyncPoint};

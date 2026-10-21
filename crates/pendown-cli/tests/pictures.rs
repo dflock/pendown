@@ -106,3 +106,21 @@ fn wrapping_spiral() {
     // Starts near the right edge, so the spiral wraps round on itself.
     check("wrapping-spiral", "PU SETXY 350 0 PD\nREPEAT 120 [FD REPCOUNT * 6 RT 61]", 300, 300);
 }
+
+#[test]
+fn colours_and_pen_sizes() {
+    // Every colour form, a translucent pen where lines cross, and a
+    // background set after drawing, which goes under it.
+    let program = r##"
+SETPENSIZE 20
+SETPC 4 FD 300 BK 300 RT 45
+SETPC [0 200 255] FD 300 BK 300 RT 45
+SETPC "gold FD 300 BK 300 RT 45
+SETPC "#f0f FD 300 BK 300 RT 45
+SETPENSIZE 60
+SETPC [255 255 255 128] FD 300 BK 300
+SETPC "#00ff0080 RT 90 BK 150 FD 300
+SETBG "midnightblue
+"##;
+    check("colours", program, 300, 300);
+}

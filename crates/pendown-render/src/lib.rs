@@ -57,6 +57,7 @@ pub struct Drawing {
     dirty: Vec<bool>,
     columns: u32,
     area: f64,
+    background: [u8; 4],
     context: RenderContext,
     resources: Resources,
     threads: u16,
@@ -90,6 +91,7 @@ impl Drawing {
             dirty: Vec::new(),
             columns: 0,
             area: TURTLE_AREA,
+            background: BACKGROUND,
             context: RenderContext::new_with(1, 1, settings(threads)),
             resources: Resources::new(),
             threads,
@@ -111,11 +113,29 @@ impl Drawing {
         self.display.len()
     }
 
-    /// Clears the drawing, as `CLEAN` and Run do.
+    /// Clears the drawing, as `CLEAN` does.
     pub fn clean(&mut self) {
         self.display.clear();
         self.pending.clear();
         self.fill_background();
+    }
+
+    /// Clears the drawing and goes back to the default background, as Run
+    /// does (ADR 0006).
+    pub fn reset(&mut self) {
+        self.background = BACKGROUND;
+        self.clean();
+    }
+
+    /// Changes the background under everything already drawn, by drawing it
+    /// all again on the new colour. The background is always opaque.
+    pub fn set_background(&mut self, [r, g, b, _]: [u8; 4]) {
+        self.background = [r, g, b, 255];
+        self.fill_background();
+        let display = std::mem::take(&mut self.display);
+        let already_drawn = display.len() - self.pending.len();
+        self.draw(&display[..already_drawn]);
+        self.display = display;
     }
 
     /// Adds finished moves. They're drawn by the next `draw_pending`.
@@ -170,8 +190,10 @@ impl Drawing {
     }
 
     fn fill_background(&mut self) {
+        // Stored as BGRA, like everything in the buffer.
+        let [r, g, b, a] = self.background;
         for pixel in self.data.as_chunks_mut::<4>().0 {
-            *pixel = BACKGROUND;
+            *pixel = [b, g, r, a];
         }
         self.dirty.iter_mut().for_each(|d| *d = true);
     }
@@ -348,6 +370,39 @@ mod tests {
         d.clean();
         assert_eq!(d.segments(), 0);
         assert_eq!(d.pixel(50, 50), BACKGROUND);
+    }
+
+    #[test]
+    fn a_new_background_goes_under_the_drawing() {
+        // A pen 10 pixels wide, so the middle of the line is fully covered.
+        let thick = Pen { size: 100.0, ..RED };
+        let mut d = Drawing::new();
+        d.resize(100, 100);
+        d.push(&[Segment { from: p(-400.0, 0.0), to: p(400.0, 0.0), pen: thick }]);
+        d.draw_pending();
+        d.set_background([0, 0, 255, 128]);
+        assert_eq!(d.pixel(50, 10), [0, 0, 255, 255], "opaque, whatever the input");
+        assert_eq!(d.pixel(50, 50), [255, 0, 0, 255], "the line is still on top");
+        // A line pushed but not drawn yet is drawn once, by draw_pending.
+        d.push(&[Segment { from: p(0.0, -400.0), to: p(0.0, 400.0), pen: Pen { size: 100.0, ..WHITE } }]);
+        d.set_background([0, 255, 0, 255]);
+        d.draw_pending();
+        assert_eq!(d.pixel(50, 10), [255, 255, 255, 255]);
+        d.reset();
+        assert_eq!(d.pixel(50, 10), BACKGROUND);
+    }
+
+    #[test]
+    fn translucent_pens_blend() {
+        let mut d = Drawing::new();
+        d.resize(100, 100);
+        d.set_background([255, 255, 255, 255]);
+        let half_red = Pen { down: true, color: [255, 0, 0, 128], size: 100.0 };
+        d.push(&[Segment { from: p(-400.0, 0.0), to: p(400.0, 0.0), pen: half_red }]);
+        d.draw_pending();
+        let [r, g, b, a] = d.pixel(50, 50);
+        assert_eq!((r, a), (255, 255));
+        assert!((126..=128).contains(&g) && g == b, "about half way to red: {:?}", [r, g, b, a]);
     }
 
     #[test]

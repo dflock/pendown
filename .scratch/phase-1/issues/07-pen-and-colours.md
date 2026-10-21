@@ -1,6 +1,6 @@
 # Pen and colours
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 05
 
@@ -27,3 +27,23 @@ Blocked by: 05
 - A `pendown-cli` picture test uses several colour forms and pen sizes.
 
 ## Comments
+
+### 2026-10-21: done
+
+- **Colours** are in `src/colour.rs` (ADR 0015):
+  - UCBLogo's wxWidgets palette;
+  - the 148 CSS names, in sorted order and searched by binary search;
+  - `[r g b]` and `[r g b a]`, and `#rgb`, `#rgba`, `#rrggbb` and `#rrggbbaa`.
+  
+  An unknown name suggests up to three close names (Levenshtein distance, at least 2, or names that contain it). A bad hex word gets its own message.
+- **The commands** are in `prims/pen.rs`: `PENUP`/`PU`, `PENDOWN`/`PD`, `PENDOWNP`/`PENDOWN?`, `SETPENCOLOR`/`SETPC`, `PENCOLOR`/`PC`, `SETPENSIZE`, `PENSIZE`, `SETBACKGROUND`/`SETBG` and `BACKGROUND`/`BG`.
+  - The reporters output the form the colour was set in.
+  - `PENSIZE` outputs `[w w]`, because the pen is square.
+  - Run resets the pen, its colour and the background.
+- **The background:** `SetBackground { color }` is always opaque.
+  - `Drawing::set_background` redraws everything over the new colour, and `Drawing::reset` goes back to black, for Run.
+  - The animator reports the background in its frame, and the app and CLI pass it on.
+- **Tests:**
+  - `tests/pen.rs` (8 tests), and 4 colour unit tests;
+  - 2 new render tests: the background going under the drawing, and translucent blending;
+  - a `colours` picture.

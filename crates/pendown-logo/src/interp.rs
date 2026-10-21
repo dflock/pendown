@@ -14,6 +14,7 @@ use smallvec::SmallVec;
 
 use crate::{
     error::{CallSite, Error, RunError},
+    colour::{PALETTE, Rgba},
     event::{Event, EventSink, Pen, Point, SyncPoint},
     geometry::{Area, TurtleMode},
     names::{Names, Sym},
@@ -116,6 +117,8 @@ pub struct Turtle {
     /// Degrees clockwise from north.
     pub heading: f64,
     pub pen: Pen,
+    /// The pen colour in the form it was set, for `PENCOLOR`.
+    pub pen_colour: Value,
     pub shown: bool,
     pub mode: TurtleMode,
 }
@@ -125,7 +128,9 @@ impl Default for Turtle {
         Turtle {
             pos: Point { x: 0.0, y: 0.0 },
             heading: 0.0,
-            pen: Pen { down: true, color: [255, 255, 255, 255], size: 1.0 },
+            // UCBLogo's defaults: a white pen on a black background.
+            pen: Pen { down: true, color: PALETTE[7], size: 1.0 },
+            pen_colour: Value::Num(7.0),
             shown: true,
             mode: TurtleMode::Wrap,
         }
@@ -153,6 +158,8 @@ pub struct Interpreter {
     frames: Vec<Frame>,
     pub(crate) repcounts: Vec<i64>,
     pub(crate) turtle: Turtle,
+    /// The background colour, and the form it was set in.
+    pub(crate) background: (Rgba, Value),
     /// The turtle area, which Run doesn't change.
     pub(crate) area: Area,
     sink: Box<dyn EventSink>,
@@ -197,6 +204,7 @@ impl Interpreter {
             repcounts: Vec::new(),
             turtle: Turtle::default(),
             area: Area::default(),
+            background: (PALETTE[0], Value::Num(0.0)),
             sink,
             control,
             last_line: None,
@@ -218,6 +226,7 @@ impl Interpreter {
         self.names.forget_definitions();
         self.repcounts.clear();
         self.turtle = Turtle::default();
+        self.background = (PALETTE[0], Value::Num(0.0));
         self.last_line = None;
         self.console_entries = 0;
         self.run_source(text, SourceId::Editor)

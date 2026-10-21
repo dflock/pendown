@@ -171,7 +171,7 @@ impl App {
         self.stop(cx);
         let text = self.editor.read(cx).value().to_string();
         self.run_text = text.clone();
-        self.canvas.borrow_mut().drawing.clean();
+        self.canvas.borrow_mut().drawing.reset();
         self.console.clear();
         self.set_diagnostics(Vec::new(), cx);
         let (animator, run) = run::start(text, self.speed, channel);
@@ -271,6 +271,9 @@ impl App {
             let mut canvas = self.canvas.borrow_mut();
             if frame.cleaned {
                 canvas.drawing.clean();
+            }
+            if let Some(color) = frame.background {
+                canvas.drawing.set_background(color);
             }
             canvas.drawing.push(&frame.segments);
             drop(canvas);

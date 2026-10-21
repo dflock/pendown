@@ -68,6 +68,9 @@ pub struct Frame {
     /// A `CLEAN` happened this frame: clear the drawing before adding
     /// `segments`, which only holds the moves since the last one.
     pub cleaned: bool,
+    /// The background changed this frame, to this. It goes under
+    /// everything, so it doesn't matter where among `segments` it came.
+    pub background: Option<[u8; 4]>,
     pub printed: Vec<String>,
     pub highlight_changed: bool,
     /// Events taken this frame.
@@ -306,6 +309,7 @@ impl Animator {
                     out.segments.clear();
                     out.cleaned = true;
                 }
+                Event::SetBackground { color } => out.background = Some(color),
                 Event::Sync(sync) => {
                     // A Sync straight after the line start the step began
                     // on belongs to that line, so Step runs it. Any other

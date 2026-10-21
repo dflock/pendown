@@ -35,6 +35,9 @@ pub enum Event {
     HideTurtle,
     /// Clear the drawing. The turtle doesn't move.
     Clean,
+    /// A new background colour, always opaque. It goes under everything
+    /// already drawn.
+    SetBackground { color: [u8; 4] },
     /// Console output, including the newline if there is one.
     Print(String),
     /// The interpreter waits here until the front end replies (ADR 0011).

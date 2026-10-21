@@ -74,10 +74,7 @@ In the GUI and runtime, phase 2 includes:
   - **Repeat counters:** the counter of every `REPEAT` and `FOREVER` running, outermost first, such as `REPEAT 3 of 36 › REPEAT 2 of 4`. The innermost one is what `REPCOUNT` outputs. Phase 2's `FOR` adds its own counter.
   - **Variables:** the current value of every variable the running line can see: the globals, and the inputs and locals of each procedure in the call chain, since scope is dynamic (see "Kept from UCBLogo: dynamic scope"). Names keep the spelling of their definition (ADR 0004).
   - **Keeping in step:** at animated speeds the interpreter waits at every line (lockstep), so it can publish its counters and changed variables just before it waits, and the panels show exactly what the highlighted line sees. Shallow binding (ADR 0007) makes the changes cheap to find. At Instant the panels update once a frame, and may be ahead of the drawing, as when pausing from Instant.
-  - **Open questions:**
-    - Are these panels, or one panel with two sections?
-    - Are they always visible, or only while paused or stepping?
-    - How are long lists shown?
+  - **Layout:** two panels in the console area, beside the console's output, always visible. Both scroll and can be resized, for long lists of variables or values.
 
 ### Phase 3: Help, examples and tutorial (no new commands)
 

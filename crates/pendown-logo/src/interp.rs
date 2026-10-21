@@ -30,6 +30,8 @@ pub enum Flow {
     Stop(Span),
     Output(Value, Span),
     Error(Box<Error>),
+    /// `THROW tag`, on its way to a `CATCH` with the same tag (ADR 0021).
+    Throw { tag: Rc<str>, value: Option<Value>, span: Span },
     /// Stopped from outside (ADR 0007): `CATCH` must never handle this.
     Halt,
 }
@@ -72,8 +74,11 @@ enum Ret {
 /// replaced, putting them back when it ends. That's dynamic scope with O(1)
 /// lookups. A tail call adds its inputs to the current frame instead of
 /// pushing one, so the frame's size is bounded by the number of names.
+///
+/// Lambda templates and `FOR` push frames with no procedure, for their
+/// local variables.
 struct Frame {
-    proc: Rc<Proc>,
+    proc: Option<Rc<Proc>>,
     call_span: Span,
     saved: SmallVec<[(Sym, Option<Value>); 4]>,
 }
@@ -177,9 +182,24 @@ fn logo_version() -> f64 {
     format!("{major}.{minor}").parse().unwrap_or(0.0)
 }
 
+/// The slot fillers of the explicit-slot template running: `?1` is
+/// `values[0]`. `(?REST 1)` is what comes after member `index` of the first
+/// data input, worked out only if it's used.
+pub(crate) struct Slots {
+    pub(crate) values: Vec<Value>,
+    pub(crate) data: Rc<Vec<crate::prims::Data>>,
+    pub(crate) index: usize,
+}
+
 pub struct Interpreter {
     names: Names,
     specials: Specials,
+    pub(crate) slots: Vec<Slots>,
+    /// The error `CATCH "ERROR` caught last, as `ERROR` outputs it.
+    pub(crate) caught: Option<Value>,
+    /// How many `CATCH "ERROR`s are running: errors inside them don't run
+    /// `ERRACT`.
+    pub(crate) catching_errors: usize,
     pub(crate) vars: Vec<Option<Value>>,
     procs: Vec<Option<Rc<Proc>>>,
     frames: Vec<Frame>,
@@ -211,6 +231,16 @@ fn stack_addr() -> usize {
     std::hint::black_box(&marker) as *const u8 as usize
 }
 
+/// A `THROW` that no `CATCH` caught. `THROW "ERROR` is an error by design.
+fn uncaught(tag: &str, value: Option<Value>, span: Span) -> Error {
+    let message = match value {
+        _ if !tag.eq_ignore_ascii_case("error") => format!("Can't find a CATCH for {}", tag.to_uppercase()),
+        Some(v) => v.print_form(),
+        None => "THROW \"ERROR".to_string(),
+    };
+    Error::new(message, Some(span))
+}
+
 fn dont_say(v: &Value, span: Span) -> Flow {
     Error::new(format!("You don't say what to do with {}", v.show()), Some(span)).into()
 }
@@ -238,6 +268,9 @@ impl Interpreter {
         let mut it = Interpreter {
             names,
             specials,
+            slots: Vec::new(),
+            caught: None,
+            catching_errors: 0,
             vars: Vec::new(),
             procs: Vec::new(),
             frames: Vec::new(),
@@ -298,16 +331,29 @@ impl Interpreter {
         }
     }
 
-    /// `ERRACT`'s list, if it has one that isn't empty.
-    pub(crate) fn erract(&self) -> Option<Rc<List>> {
-        match self.special(self.specials.erract)? {
-            Value::List(list) if !list.items.is_empty() => Some(list.clone()),
-            _ => None,
+    /// Runs `ERRACT`'s list, if it has one, for an error that no `CATCH`
+    /// will handle, where the error happened, so it can see the variables
+    /// there. `ERRACT` has no value while it runs. An error in it replaces
+    /// the first.
+    fn run_erract(&mut self, error: &Error) -> Result<(), Flow> {
+        if self.catching_errors > 0 {
+            return Ok(());
         }
+        let sym = self.specials.erract as usize;
+        let list = match &self.vars[sym] {
+            Some(Value::List(list)) if !list.items.is_empty() => list.clone(),
+            _ => return Ok(()),
+        };
+        let span = error.span.unwrap_or(Span { source: SourceId::Editor, start: 0, end: 0, line: 0 });
+        let saved = self.vars[sym].take();
+        let result = self.run_list(&list, span, false);
+        self.vars[sym] = saved;
+        result.map(|_| ())
     }
 
-    pub(crate) fn erract_sym(&self) -> Sym {
-        self.specials.erract
+    /// The innermost procedure running, if any, for `ERROR`.
+    pub(crate) fn current_procedure(&self) -> Option<Rc<str>> {
+        self.frames.iter().rev().find_map(|f| f.proc.as_ref().map(|p| p.name.clone()))
     }
 
     /// Sends events somewhere else, and takes Stop and lockstep from a new
@@ -328,6 +374,9 @@ impl Interpreter {
         self.names.forget_definitions();
         self.grow();
         self.set_specials();
+        self.slots.clear();
+        self.caught = None;
+        self.catching_errors = 0;
         self.repcounts.clear();
         self.turtle = Turtle::default();
         self.background = (PALETTE[0], Value::Num(0.0));
@@ -403,7 +452,21 @@ impl Interpreter {
             match self.exec_instr(instr, false) {
                 Ok(_) => {}
                 Err(Flow::Halt) => return Err(RunError::Halted),
-                Err(Flow::Error(e)) => return Err(RunError::Runtime(*e)),
+                Err(Flow::Error(e)) => {
+                    // An error outside any procedure: inside one, `ERRACT`
+                    // has already run.
+                    if e.calls.is_empty() {
+                        match self.run_erract(&e) {
+                            Err(Flow::Error(other)) => return Err(RunError::Runtime(*other)),
+                            Err(Flow::Halt) => return Err(RunError::Halted),
+                            _ => {}
+                        }
+                    }
+                    return Err(RunError::Runtime(*e));
+                }
+                // `THROW "TOPLEVEL` ends the program, as if it had finished.
+                Err(Flow::Throw { tag, .. }) if tag.eq_ignore_ascii_case("toplevel") => return Ok(()),
+                Err(Flow::Throw { tag, value, span }) => return Err(RunError::Runtime(uncaught(&tag, value, span))),
                 Err(Flow::Stop(span)) => {
                     let e = Error::new("STOP can only be used inside a procedure", Some(span));
                     return Err(RunError::Runtime(e));
@@ -465,9 +528,9 @@ impl Interpreter {
         self.sink.send(event).map_err(|_| Flow::Halt)
     }
 
-    /// Checks the cancel flag and sends the `Instruction` event. In
-    /// lockstep, waits for the front end before starting a line.
-    fn begin(&mut self, span: Span) -> Result<(), Flow> {
+    /// Checks the cancel flag and the limit on instructions. Loops do this
+    /// on every pass, so even `FOREVER []` can be stopped.
+    pub(crate) fn tick(&mut self, span: Span) -> Result<(), Flow> {
         if self.control.cancel.load(Ordering::Relaxed) {
             return Err(Flow::Halt);
         }
@@ -478,6 +541,13 @@ impl Interpreter {
             let message = format!("Stopped after {max} instructions: does this program ever end?");
             return Err(Error::new(message, Some(span)).into());
         }
+        Ok(())
+    }
+
+    /// Checks the cancel flag and sends the `Instruction` event. In
+    /// lockstep, waits for the front end before starting a line.
+    fn begin(&mut self, span: Span) -> Result<(), Flow> {
+        self.tick(span)?;
         if self.limits.instruction_events {
             let line = Some((span.source, span.line));
             let starts_line = self.last_line != line;
@@ -566,6 +636,7 @@ impl Interpreter {
                 let list = self.eval_list(call, 1)?;
                 let block = self.list_block(&list, call.span)?;
                 for i in 1..=count {
+                    self.tick(call.span)?;
                     self.repcounts.push(i);
                     let r = self.run_block(&block, false);
                     self.repcounts.pop();
@@ -577,6 +648,7 @@ impl Interpreter {
                 let list = self.eval_list(call, 0)?;
                 let block = self.list_block(&list, call.span)?;
                 for i in 1.. {
+                    self.tick(call.span)?;
                     self.repcounts.push(i);
                     let r = self.run_block(&block, false);
                     self.repcounts.pop();
@@ -647,6 +719,118 @@ impl Interpreter {
     fn run_list(&mut self, list: &List, fallback: Span, tail: bool) -> Result<Option<Tail>, Flow> {
         let block = self.list_block(list, fallback)?;
         self.run_block(&block, tail)
+    }
+
+    /// Runs a list as instructions, as the loops do with their bodies.
+    pub(crate) fn run_commands(&mut self, list: &List, fallback: Span) -> Result<(), Flow> {
+        self.run_list(list, fallback, false).map(|_| ())
+    }
+
+    /// Runs a list as `RUN` does: it outputs if its last instruction does.
+    pub(crate) fn run_maybe(&mut self, list: &List, fallback: Span) -> Result<Option<Value>, Flow> {
+        let block = self.list_block(list, fallback)?;
+        self.run_block_maybe(&block)
+    }
+
+    /// Parses a list as instructions, for templates, which are parsed once
+    /// and run many times.
+    pub(crate) fn parse_block(&mut self, list: &List, fallback: Span) -> Result<Rc<Block>, Flow> {
+        self.list_block(list, fallback)
+    }
+
+    pub(crate) fn run_block_maybe(&mut self, block: &Block) -> Result<Option<Value>, Flow> {
+        let Some((last, rest)) = block.split_last() else { return Ok(None) };
+        self.run_block_slice(rest)?;
+        self.begin(last.span)?;
+        self.eval_maybe(&last.expr)
+    }
+
+    /// Evaluates an expression that may or may not output, as the last
+    /// instruction of a `RUN` list.
+    pub(crate) fn eval_maybe(&mut self, expr: &Expr) -> Result<Option<Value>, Flow> {
+        let Expr::Call(call) = expr else { return Ok(Some(self.eval(expr, "")?)) };
+        match call.target {
+            Target::Infix(_) => Ok(Some(self.eval(expr, "")?)),
+            Target::User(sym) => {
+                let proc = self.lookup(sym, call)?;
+                let args = self.eval_args(call)?;
+                self.call_user(proc, args, call.span)
+            }
+            Target::Prim(id) => match PRIMS[id].imp {
+                Imp::F(f) => {
+                    let vals = self.eval_args(call)?;
+                    f(self, &Args { call, vals: &vals })
+                }
+                Imp::IfElse => {
+                    let which = if self.eval_bool(call)? { 1 } else { 2 };
+                    let list = self.eval_list(call, which)?;
+                    self.run_maybe(&list, call.span)
+                }
+                Imp::If if call.args.len() == 3 => {
+                    let which = if self.eval_bool(call)? { 1 } else { 2 };
+                    let list = self.eval_list(call, which)?;
+                    self.run_maybe(&list, call.span)
+                }
+                _ => self.exec_prim(id, call, false).map(|_| None),
+            },
+        }
+    }
+
+    /// Runs `f` with `syms` as local variables holding `values`, as a lambda
+    /// template's inputs and `FOR`'s control variable are. They get their
+    /// old values back however `f` ends.
+    pub(crate) fn with_locals<T>(
+        &mut self,
+        syms: &[Sym],
+        values: Vec<Value>,
+        span: Span,
+        f: impl FnOnce(&mut Interpreter) -> Result<T, Flow>,
+    ) -> Result<T, Flow> {
+        let mut saved = SmallVec::new();
+        for (&sym, v) in syms.iter().zip(values) {
+            saved.push((sym, self.vars[sym as usize].replace(v)));
+        }
+        self.frames.push(Frame { proc: None, call_span: span, saved });
+        let result = f(self);
+        let frame = self.frames.pop().expect("pushed above");
+        for (sym, old) in frame.saved.into_iter().rev() {
+            self.vars[sym as usize] = old;
+        }
+        result
+    }
+
+    /// What a template's name stands for, if it's a procedure: for `APPLY
+    /// "SUM` and the like.
+    pub(crate) fn procedure_named(&mut self, name: &str) -> Option<(Target, Arity)> {
+        if let Some(id) = prims::lookup(name) {
+            return Some((Target::Prim(id), PRIMS[id].arity));
+        }
+        let sym = self.intern(name);
+        self.procs[sym as usize].as_ref().map(|p| (Target::User(sym), Arity::fixed(p.inputs.len())))
+    }
+
+    /// Calls a procedure with values already worked out, as a template does.
+    pub(crate) fn call_with(&mut self, target: Target, name: Rc<str>, args: Vec<Value>, span: Span) -> Result<Option<Value>, Flow> {
+        let args = args.into_iter().map(|v| Expr::Lit(v, span)).collect();
+        let call = Expr::Call(Box::new(Call { target, name, args, span }));
+        self.eval_maybe(&call)
+    }
+
+    /// Calls a procedure made from a template's text.
+    pub(crate) fn call_proc(&mut self, proc: Rc<Proc>, args: Vec<Value>, span: Span) -> Result<Option<Value>, Flow> {
+        self.call_user(proc, args.into_iter().collect(), span)
+    }
+
+    /// Parses lines of procedure text into a procedure, for a
+    /// procedure-text template, `[[x] [line] [line]]`.
+    pub(crate) fn make_proc(&mut self, name: &str, inputs: Vec<Sym>, lines: &[Value], fallback: Span) -> Result<Rc<Proc>, Flow> {
+        let mut body = Vec::new();
+        for line in lines {
+            let Value::List(list) = line else { unreachable!("procedure text is lists") };
+            let block = self.list_block(list, fallback)?;
+            body.extend(block.iter().cloned());
+        }
+        Ok(Rc::new(Proc { name: name.into(), inputs, body, title: fallback }))
     }
 
     /// Runs instructions. With `tail`, the last one is in tail position.
@@ -788,7 +972,7 @@ impl Interpreter {
         for (&sym, v) in proc.inputs.iter().zip(args) {
             saved.push((sym, self.vars[sym as usize].replace(v)));
         }
-        self.frames.push(Frame { proc: proc.clone(), call_span: span, saved });
+        self.frames.push(Frame { proc: Some(proc.clone()), call_span: span, saved });
 
         let mut current = proc;
         // Set once any tail call was written as an instruction, after which
@@ -811,13 +995,30 @@ impl Interpreter {
                             frame.saved.push((sym, slot.replace(v)));
                         }
                     }
-                    frame.proc = tail.proc.clone();
+                    frame.proc = Some(tail.proc.clone());
                     frame.call_span = tail.span;
                     current = tail.proc;
                 }
+                // `(THROW "ERROR message)` is an error where this procedure
+                // was called, as if it were a primitive.
+                Err(Flow::Throw { tag, value: Some(v), .. }) if tag.eq_ignore_ascii_case("error") => {
+                    let call_span = self.frames.last().expect("pushed above").call_span;
+                    let e = Error::new(v.print_form(), Some(call_span));
+                    break Err(match self.run_erract(&e) {
+                        Ok(()) => Flow::Error(Box::new(e)),
+                        Err(other) => other,
+                    });
+                }
+                Err(Flow::Throw { tag, value, span }) => break Err(Flow::Throw { tag, value, span }),
                 Err(Flow::Error(mut e)) => {
+                    if e.calls.is_empty()
+                        && let Err(other) = self.run_erract(&e)
+                    {
+                        break Err(other);
+                    }
                     let frame = self.frames.last().expect("pushed above");
-                    e.calls.push(CallSite { procedure: frame.proc.name.to_string(), span: frame.call_span });
+                    let name = frame.proc.as_ref().expect("a procedure's frame").name.to_string();
+                    e.calls.push(CallSite { procedure: name, span: frame.call_span });
                     break Err(Flow::Error(e));
                 }
                 Err(Flow::Halt) => break Err(Flow::Halt),
@@ -843,7 +1044,7 @@ impl Interpreter {
         if depth <= self.limits.max_depth && !out_of_stack {
             return Ok(());
         }
-        let calls_itself = self.frames.last().is_some_and(|f| std::ptr::eq(Rc::as_ptr(&f.proc), proc));
+        let calls_itself = self.frames.last().and_then(|f| f.proc.as_ref()).is_some_and(|p| std::ptr::eq(Rc::as_ptr(p), proc));
         let name = proc.name.to_uppercase();
         let message = if calls_itself {
             format!("{name} called itself too many times: {depth} calls deep. Does it have a way to STOP?")

@@ -67,7 +67,7 @@ impl Op {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Expr {
     Lit(Value, Span),
     Var(Sym, Span),
@@ -76,7 +76,7 @@ pub enum Expr {
     Call(Box<Call>),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Call {
     pub target: Target,
     /// The name as typed, for error messages.
@@ -121,7 +121,7 @@ impl Expr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Instr {
     pub expr: Expr,
     pub span: Span,
@@ -460,6 +460,15 @@ pub(crate) fn split_word(text: &str, span: Option<Span>, whole: Span, out: &mut 
     }
 }
 
+/// The number in a slot name such as `?2`.
+pub(crate) fn slot_number(word: &str) -> Option<u32> {
+    let digits = word.strip_prefix('?')?;
+    if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    digits.parse().ok()
+}
+
 /// Expressions nested deeper than this are an error, so the parser can't
 /// overflow the stack on silly input like ten thousand `(`.
 const MAX_NESTING: u32 = 1000;
@@ -539,6 +548,13 @@ impl Parser<'_, '_, '_> {
             Tok::Var(name) if name.is_empty() => Err(Error::new("A variable name is missing after :", Some(span))),
             Tok::Var(name) => Ok(Expr::Var(self.cx.names.intern(name), span)),
             Tok::RParen => Err(Error::new("Unexpected )", Some(span))),
+            // `?2` is `(? 2)`, the second slot of a template.
+            Tok::Word(name) if slot_number(name).is_some() => {
+                let n = slot_number(name).expect("checked");
+                let id = prims::lookup("?").expect("? is a primitive");
+                let args = vec![Expr::Lit(Value::Num(n as f64), span)];
+                Ok(Expr::Call(Box::new(Call { target: Target::Prim(id), name: name.clone(), args, span })))
+            }
             Tok::Word(name) => {
                 let name = name.clone();
                 let (target, arity) = self.resolve(&name, span)?;

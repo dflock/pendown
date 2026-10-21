@@ -47,7 +47,7 @@ fn word(letters: &[char]) -> Value {
 
 /// The members of a word or list as values: a word's letters are one-letter
 /// words. Arrays aren't accepted.
-fn members(a: &Args, i: usize) -> Result<Vec<Value>, Flow> {
+pub(super) fn members(a: &Args, i: usize) -> Result<Vec<Value>, Flow> {
     match parts(&a.vals[i]) {
         Parts::Letters(l) => Ok(l.iter().map(|c| word(&[*c])).collect()),
         Parts::Items(l) => Ok(l.items.clone()),

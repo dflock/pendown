@@ -3,18 +3,24 @@
 //! them.
 
 mod arithmetic;
+mod control;
 mod data;
 mod pen;
 mod shapes;
+mod templates;
 mod turtle;
 
 use std::{collections::HashMap, rc::Rc, sync::OnceLock};
 
 use arithmetic::*;
+use control::*;
 use data::*;
 use pen::*;
 use shapes::*;
+use templates::*;
 use turtle::*;
+
+pub use templates::Data;
 
 use crate::{
     error::Error,
@@ -111,6 +117,30 @@ pub static PRIMS: &[Prim] = &[
     Prim { names: &["setspeed"], arity: ONE, imp: Imp::F(setspeed) },
     Prim { names: &["speed"], arity: NONE, imp: Imp::F(speed) },
     Prim { names: &["output", "op"], arity: ONE, imp: Imp::Output },
+    Prim { names: &["run"], arity: ONE, imp: Imp::F(run) },
+    Prim { names: &["runresult"], arity: ONE, imp: Imp::F(runresult) },
+    Prim { names: &["ignore"], arity: ONE, imp: Imp::F(ignore) },
+    Prim { names: &["for"], arity: TWO, imp: Imp::F(for_) },
+    Prim { names: &["while"], arity: TWO, imp: Imp::F(while_) },
+    Prim { names: &["until"], arity: TWO, imp: Imp::F(until) },
+    Prim { names: &["do.while"], arity: TWO, imp: Imp::F(do_while) },
+    Prim { names: &["do.until"], arity: TWO, imp: Imp::F(do_until) },
+    Prim { names: &["case"], arity: TWO, imp: Imp::F(case) },
+    Prim { names: &["cond"], arity: ONE, imp: Imp::F(cond) },
+    Prim { names: &["catch"], arity: TWO, imp: Imp::F(catch) },
+    Prim { names: &["throw"], arity: some(1, 1, Some(2)), imp: Imp::F(throw) },
+    Prim { names: &["error"], arity: NONE, imp: Imp::F(error) },
+    // Templates (ADR 0021).
+    Prim { names: &["apply"], arity: TWO, imp: Imp::F(apply_) },
+    Prim { names: &["invoke"], arity: some(1, 2, None), imp: Imp::F(invoke) },
+    Prim { names: &["foreach"], arity: some(2, 2, None), imp: Imp::F(foreach) },
+    Prim { names: &["map"], arity: some(2, 2, None), imp: Imp::F(map) },
+    Prim { names: &["map.se"], arity: some(2, 2, None), imp: Imp::F(map_se) },
+    Prim { names: &["filter"], arity: TWO, imp: Imp::F(filter) },
+    Prim { names: &["find"], arity: TWO, imp: Imp::F(find) },
+    Prim { names: &["reduce"], arity: TWO, imp: Imp::F(reduce) },
+    Prim { names: &["?"], arity: some(0, 0, Some(1)), imp: Imp::F(slot) },
+    Prim { names: &["?rest"], arity: some(0, 0, Some(1)), imp: Imp::F(slot_rest) },
     Prim { names: &["make"], arity: TWO, imp: Imp::F(make) },
     Prim { names: &["local"], arity: some(1, 1, None), imp: Imp::F(local) },
     Prim { names: &["localmake"], arity: TWO, imp: Imp::F(localmake) },

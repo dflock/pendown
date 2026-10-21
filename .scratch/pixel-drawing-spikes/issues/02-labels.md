@@ -1,6 +1,7 @@
 # Spike: LABEL text in the pixel buffer
 
-Status: ready-for-agent
+Status: needs-triage
+Deferred: to phase 5, with the commands it tests
 Type: prototype
 
 ## Question
@@ -21,7 +22,7 @@ The commands are `LABEL text`, which draws starting at the turtle's position in 
   - one at each of several headings;
   - accented letters, a non-Latin script and an emoji;
   - a label over a line, and a line over a label;
-  - a label filled around with `FILL`, if spike 01's fill is ready.
+  - a label filled around with `FILL`, if the other spike's fill is ready.
 
 ## Answer these
 

@@ -1877,7 +1877,7 @@ logo {
         desc "fills in a region of the graphics window containing the turtle and bounded by lines that have been drawn earlier. This is not portable; it doesn’t work for all machines, and may not work exactly the same way on different machines."
         supported #true
         obsolete #false
-        phase 2
+        phase 5
       }
       filled {
         eg "FILLED color instructions"
@@ -1885,21 +1885,21 @@ logo {
         differs "The colour can be any of our colour forms: see SETPENCOLOR."
         supported #true
         obsolete #false
-        phase 2
+        phase 5
       }
       label {
         eg "LABEL text"
         desc "takes a word or list as input, and prints the input on the graphics window, starting at the turtle’s position."
         supported #true
         obsolete #false
-        phase 2
+        phase 5
       }
       setlabelheight {
         eg "SETLABELHEIGHT height"
         desc "command (wxWidgets only). Takes a positive integer argument and tries to set the font size so that the character height (including descenders) is that many turtle steps. This will be different from the number of screen pixels if SETSCRUNCH has been used. Also, note that SETSCRUNCH changes the font size to try to preserve this height in turtle steps. Note that the query operation corresponding to this command is LABELSIZE, not LABELHEIGHT, because it tells you the width as well as the height of characters in the current font."
         supported #true
         obsolete #false
-        phase 2
+        phase 5
       }
       textscreen {
         eg """
@@ -2023,7 +2023,7 @@ logo {
         desc "(wxWidgets only) outputs a list of two positive integers, the width and height of characters displayed by LABEL measured in turtle steps (which will be different from screen pixels if SETSCRUNCH has been used). There is no SETLABELSIZE because the width and height of a font are not separately controllable, so the inverse of this operation is SETLABELHEIGHT, which takes just one number for the desired height."
         supported #true
         obsolete #false
-        phase 2
+        phase 5
       }
     }
     pen-and-background-control {
@@ -2055,7 +2055,7 @@ logo {
         desc "sets the pen’s position to DOWN and mode to PAINT."
         supported #true
         obsolete #false
-        phase 2
+        phase 5
       }
       penerase {
         eg """
@@ -2065,7 +2065,7 @@ logo {
         desc "sets the pen’s position to DOWN and mode to ERASE."
         supported #true
         obsolete #false
-        phase 2
+        phase 5
       }
       penreverse {
         eg """
@@ -2075,7 +2075,7 @@ logo {
         desc "sets the pen’s position to DOWN and mode to REVERSE. (This may interact in system-dependent ways with use of color.)"
         supported #true
         obsolete #false
-        phase 2
+        phase 5
       }
       setpencolor {
         eg """
@@ -2136,7 +2136,7 @@ logo {
         see "pen"
         supported #true
         obsolete #false
-        phase 2
+        phase 5
       }
       setbackground {
         eg """
@@ -2182,7 +2182,7 @@ logo {
         desc "outputs one of the words PAINT, ERASE, or REVERSE according to the current pen mode."
         supported #true
         obsolete #false
-        phase 2
+        phase 5
       }
       pencolor {
         eg """
@@ -2231,7 +2231,7 @@ logo {
         see "setpen"
         supported #true
         obsolete #false
-        phase 2
+        phase 5
       }
       background {
         eg """

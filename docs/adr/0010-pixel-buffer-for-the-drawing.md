@@ -15,7 +15,7 @@ Spike 02 (`.scratch/phase-1-spikes/issues/02-pixel-buffer-streaming.md`) measure
 
 ## Decision
 
-- **The finished drawing lives in a pixel buffer** from the start of phase 1, even though `FILL` and the pen modes arrive in phase 2.
+- **The finished drawing lives in a pixel buffer** from the start of phase 1, even though `FILL` and the pen modes arrive in phase 5.
 - **vello_cpu draws into it,** with worker threads (one fewer than the CPUs), drawing onto the existing pixels with `TargetInit::SrcOver`. The buffer itself is a plain premultiplied RGBA byte buffer that we own, and our own code (flood fill, PNG export) works on it directly, so changing rasterizer later stays contained.
 - **Vector paths are only used for what's changing:** the move in progress and the turtle sprite. Frame cost then depends on what's changing, not on how much has been drawn.
 - **Completed moves are drawn into the buffer, and the buffer is shown with `window.paint_image`,** following these rules:

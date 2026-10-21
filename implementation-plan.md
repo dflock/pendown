@@ -32,18 +32,18 @@ The smallest Logo that is fun to draw with:
 
 In the GUI and runtime, phase 1 includes:
 
-- **The canvas and pixel buffer.** The pixel buffer is part of the design from the start, even though `FILL` and the pen modes that require it arrive in phase 2.
+- **The canvas and pixel buffer.** The pixel buffer is part of the design from the start, even though `FILL` and the pen modes that require it arrive in phase 5.
 - **The turtle speed system:** speed slider, Pause, Step, Stop, highlighting the running instruction, and `SETSPEED`. This is the playground's headline feature.
 - **Events:** `Move`, `Turn`, `Arc`, `Ellipse`, `Rect`, `Clean`, `SetBackground`, `ShowTurtle`/`HideTurtle`, `Print`, `Wait`, `SetSpeed`, `Instruction` and `Sync`.
 - **The CLI** rendering the event stream to a file.
 
-### Phase 2: Complete core language and richer drawing (87 commands)
+### Phase 2: Complete core language and filled shapes (76 commands)
 
 - **Data:** the rest of the word, list and array commands, multi-dimensional arrays, `PUSH`/`POP`/`QUEUE`/`DEQUEUE`, type and membership predicates, `ASCII`/`CHAR`, `LOWERCASE`/`UPPERCASE`.
 - **Control:** `RUN`/`RUNRESULT`, `FOR`, `WHILE`/`UNTIL`/`DO.WHILE`/`DO.UNTIL`, `CASE`/`COND`, `CATCH`/`THROW`/`ERROR`/`ERRACT`, `IGNORE`.
 - **Higher-order procedures:** `APPLY`, `INVOKE`, `FOREACH`, `MAP`, `MAP.SE`, `FILTER`, `FIND`, `REDUCE`.
 - **Arithmetic:** `EXP`/`LN`/`LOG10`, the radian trig functions, `ISEQ`/`RSEQ`, `RERANDOM`, `FORM`.
-- **Drawing:** `FILL`, `FILLED`, `LABEL`/`SETLABELHEIGHT`/`LABELSIZE`, the pen modes `PENPAINT`/`PENERASE`/`PENREVERSE`, `SETPALETTE`/`PALETTE`, `SETPEN`/`PEN`. These add the `Fill`, `Filled` and `Label` events and the pen mode in `Move`.
+- **Drawing:** `SETPALETTE`/`PALETTE`. The rest of UCBLogo's drawing commands, which work on pixels or need text, are in phase 5.
 - **Filled shapes (our extension):** `SETFILLCOLOR`/`FILLCOLOR`, which make the shapes draw filled.
 - **Settings:** `NAME`, `GLOBAL`, `CASEIGNOREDP`, `FULLPRINTP`, `PRINTDEPTHLIMIT`/`PRINTWIDTHLIMIT`, `LOGOVERSION`.
 
@@ -84,7 +84,7 @@ Two of the headline features. They come after phase 2 so they cover the complete
   - The GUI embeds the file at build time (`include_str!`) and parses it with the `kdl` crate (version 6, as used by the validator).
   - Browse by chapter and section, search by name and alias, and show help for the command under the editor's cursor.
   - It lists the commands the interpreter implements. Obsolete commands can be shown on request, with their `obsolete_reason`.
-- **Our own descriptions:** each command's `desc` is the manual's text, which describes UCBLogo: it mentions wxWidgets, percentage RGB values, `SETSCRUNCH` and so on. Add a `help` node to each supported command with our own description, written for our dialect, with the `differs` notes folded in. `desc` stays as the manual's reference for whoever implements the command. Writing them is real work: about 175 commands in phases 1 and 2.
+- **Our own descriptions:** each command's `desc` is the manual's text, which describes UCBLogo: it mentions wxWidgets, percentage RGB values, `SETSCRUNCH` and so on. Add a `help` node to each supported command with our own description, written for our dialect, with the `differs` notes folded in. `desc` stays as the manual's reference for whoever implements the command. Writing them is real work: about 165 commands in phases 1 and 2.
 - **Errors for obsolete commands:** use `obsolete_reason` in the error when someone runs an obsolete command, for example "EDIT isn't supported: use the editor", not just "I don't know how to EDIT". This is cheap and could be done earlier.
 - **Examples:** add one or more `example` nodes to each supported command. Each holds a short runnable program, with an optional title. This is different from `eg`, which only shows how to call the command. In the help panel, each example has **Run** and **Copy to editor** buttons.
 - **Examples are tests:** a test runs every example through the interpreter and the CLI renderer and compares the result with a saved PNG. That keeps the documentation and the interpreter in agreement. Examples that use `RANDOM` need a fixed seed, so their output is repeatable.
@@ -111,8 +111,9 @@ Open questions:
 
 These need the parts of the speed design that synchronise with the GUI: sync points before input, shared mouse state in turtle coordinates, and a console mode for when the program is waiting for input. It's worth building them as a separate step.
 
-### Phase 5: Advanced and niche (74 commands)
+### Phase 5: Advanced and niche (85 commands)
 
+- **Pixel drawing and text:** `FILL`, `FILLED`, `LABEL`/`SETLABELHEIGHT`/`LABELSIZE`, the pen modes `PENPAINT`/`PENERASE`/`PENREVERSE`/`PENMODE`, and `SETPEN`/`PEN`, which include the mode. These add the `Fill`, `Filled` and `Label` events and the pen mode in `Move`. Two spikes, drafted and then put off, come first: `.scratch/pixel-drawing-spikes/`.
 - **Language features:** objects (`KINDOF`, `ASK`, `TALKTO`, `USUAL`…), macros and backquote, property lists.
 - **I/O:** file access, `SHELL`.
 - **Low-level:** bitwise operations.
@@ -177,11 +178,11 @@ From LibreLogo and FMSLogo. Shapes are drawn **centred on the turtle** and turn 
 
 Circles and ellipses take radii, and squares and rectangles take side lengths, because that's how people usually measure each. The optional corner radius uses UCBLogo's usual parentheses for extra inputs, as with `(SENTENCE a b c)`.
 
-- **Outline:** drawn with the current pen (colour, size and, in phase 2, mode) when the pen is down.
+- **Outline:** drawn with the current pen (colour, size and, in phase 5, mode) when the pen is down.
 - **Fill (phase 2):** `SETFILLCOLOR colour` sets a fill colour, and `SETFILLCOLOR "none` turns filling off. `"none` is the default. When a fill colour is set, shapes are filled, even when the pen is up. So pen up with a fill colour gives a filled shape with no outline.
 - **Events:** `Ellipse { center, radii, heading, pen, fill }`, which `CIRCLE` uses too, with equal radii, and `Rect { center, size, corner, heading, pen, fill }` for `SQUARE` and `RECTANGLE`. At animated speeds the animator can draw the outline sweeping round, then the fill.
 
-Filling turtle-drawn polygons is already covered by UCBLogo's `FILLED colour [instructions]` and `FILL` (phase 2).
+Filling turtle-drawn polygons is already covered by UCBLogo's `FILLED colour [instructions]` and `FILL` (phase 5).
 
 ## Question
 
@@ -257,7 +258,7 @@ Have the interpreter output a stream of turtle events in its own coordinate syst
 - `Turn { from, by }`, where `by` is the signed angle turned. Logo measures headings clockwise from north, and `RT 270` should visibly turn 270° clockwise, not take the short way round. So `from`/`to` alone isn't enough.
 - `Arc { center, radius, start_heading, angle, pen }`. Our `ARC` moves the turtle along the arc (see "Dialect and extensions"), so the animator moves the turtle sprite with it.
 - `Ellipse { center, radii, heading, pen, fill }` for `CIRCLE` and `ELLIPSE`, and `Rect { center, size, corner, heading, pen, fill }` for `SQUARE` and `RECTANGLE`. The turtle doesn't move.
-- `Label { at, text }`, drawn into the pixel buffer with vello_cpu, so the CLI draws it too. Spike 06 works out how (`.scratch/phase-2-spikes/issues/02-labels.md`).
+- `Label { at, text }`, drawn into the pixel buffer with vello_cpu, so the CLI draws it too. A spike works out how (`.scratch/pixel-drawing-spikes/issues/02-labels.md`).
 - `Fill`, `Filled { color, points }`, `Clean`, `SetBackground`, `ShowTurtle` / `HideTurtle`.
 - `Print(text)`, so console output stays in step with the drawing (see "Turtle speed" below).
 - `Wait(duration)` and `SetSpeed(speed)`.

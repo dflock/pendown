@@ -1,6 +1,7 @@
 # Spike: FILL, FILLED and the pen modes on the pixel buffer
 
-Status: ready-for-agent
+Status: needs-triage
+Deferred: to phase 5, with the commands it tests
 Type: prototype
 
 ## Question

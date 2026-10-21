@@ -12,19 +12,23 @@ use gpui_kit::component::{
     button::{Button, ButtonVariants as _},
     h_flex,
     highlighter::{Diagnostic, DiagnosticSeverity},
-    input::{Editor, EditorState, InputHighlighter, Position, RangeDecoration, RangeDecorationCollection, RangeDecorationStyle},
+    input::{
+        Editor, EditorState, Input, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position, RangeDecoration,
+        RangeDecorationCollection, RangeDecorationStyle, Textarea, TextareaState,
+    },
     resizable::{h_resizable, resizable_panel},
     slider::{Slider, SliderEvent, SliderState},
     v_flex,
 };
-use gpui_kit::*;
+use gpui_kit::{prelude::FluentBuilder as _, *};
 use pendown::{
     animator::{Animator, Mode, Speed},
+    console::{ConsoleInput, Submit, defines},
     errors,
-    run::{self, Channel, DEFAULT_CHANNEL, Run},
+    run::{Channel, DEFAULT_CHANNEL, Job, Run, Session},
     speed::{INSTANT_LEVEL, describe, level_speed, speed_level},
 };
-use pendown_logo::RunError;
+use pendown_logo::{RunError, SourceId};
 
 use crate::{
     autotest::Autotest,
@@ -96,7 +100,19 @@ pub struct App {
     pub(crate) run_text: String,
     pub(crate) finished_at: Option<Instant>,
     pub(crate) stop_at: Option<Instant>,
+    /// The interpreter, which lives between runs for the console.
+    session: Session,
+    /// Console output, one line each.
     pub(crate) console: Vec<SharedString>,
+    console_dirty: bool,
+    console_output: Entity<TextareaState>,
+    console_input: Entity<InputState>,
+    console_entry: ConsoleInput,
+    /// Definitions typed at the console since the last Run, which "Copy to
+    /// editor" keeps.
+    console_definitions: Vec<String>,
+    /// The console entry that's running, if it defines procedures.
+    defining: Option<String>,
     last_frame: Option<Instant>,
     pub(crate) frame_intervals: Samples,
     pub(crate) events: usize,
@@ -116,15 +132,24 @@ impl App {
             );
             state.create_range_decorations_collection(vec![], cx)
         });
+        let console_output = cx.new(|cx| TextareaState::new(window, cx));
+        let console_input = cx.new(|cx| InputState::new(window, cx).placeholder("Type an instruction and press Enter"));
         let speed = level_speed(5);
         let speed_slider = cx.new(|_| {
             SliderState::new().min(1.0).max(INSTANT_LEVEL as f32).step(1.0).default_value(speed_level(speed) as f32)
         });
-        let subscriptions = vec![cx.subscribe_in(&speed_slider, window, |this, _, event: &SliderEvent, window, cx| {
-            if let SliderEvent::Change(value) = event {
-                this.set_speed(level_speed(value.end().round() as u8), window, cx);
-            }
-        })];
+        let subscriptions = vec![
+            cx.subscribe_in(&speed_slider, window, |this, _, event: &SliderEvent, window, cx| {
+                if let SliderEvent::Change(value) = event {
+                    this.set_speed(level_speed(value.end().round() as u8), window, cx);
+                }
+            }),
+            cx.subscribe_in(&console_input, window, |this, _, event: &InputEvent, window, cx| {
+                if let InputEvent::PressEnter { .. } = event {
+                    this.submit_console(window, cx);
+                }
+            }),
+        ];
         App {
             editor,
             highlight,
@@ -136,7 +161,14 @@ impl App {
             run_text: String::new(),
             finished_at: None,
             stop_at: None,
+            session: Session::new(),
             console: Vec::new(),
+            console_dirty: false,
+            console_output,
+            console_input,
+            console_entry: ConsoleInput::default(),
+            console_definitions: Vec::new(),
+            defining: None,
             last_frame: None,
             frame_intervals: Samples::default(),
             events: 0,
@@ -173,8 +205,23 @@ impl App {
         self.run_text = text.clone();
         self.canvas.borrow_mut().drawing.reset();
         self.console.clear();
+        self.console_dirty = true;
+        if !self.console_definitions.is_empty() {
+            self.print("Run cleared the procedures you defined in the console. \"Copy to editor\" keeps them.");
+        }
         self.set_diagnostics(Vec::new(), cx);
-        let (animator, run) = run::start(text, self.speed, channel);
+        self.start_job(Job::Program(text), channel, cx);
+    }
+
+    /// Runs a console entry against whatever the last run left (ADR 0006).
+    fn run_console(&mut self, entry: String, cx: &mut Context<Self>) {
+        self.stop(cx);
+        self.defining = defines(&entry).then(|| entry.clone());
+        self.start_job(Job::Console(entry), DEFAULT_CHANNEL, cx);
+    }
+
+    fn start_job(&mut self, job: Job, channel: Channel, cx: &mut Context<Self>) {
+        let (animator, run) = self.session.start(job, self.speed, channel);
         self.animator = Some(animator);
         self.run = Some(run);
         self.finished_at = None;
@@ -191,9 +238,81 @@ impl App {
         {
             animator.stop();
             self.stop_at = Some(Instant::now());
-            self.console.push("Stopped.".into());
+            self.print("Stopped.");
         }
         cx.notify();
+    }
+
+    /// Adds a line to the console.
+    pub(crate) fn print(&mut self, line: impl Into<SharedString>) {
+        self.console.push(line.into());
+        // A long-running program can print a lot: keep the newest.
+        if self.console.len() > 2000 {
+            self.console.drain(..self.console.len() - 2000);
+        }
+        self.console_dirty = true;
+    }
+
+    /// For the scripted session: as if the user typed `line` and pressed Enter.
+    pub(crate) fn type_into_console(&mut self, line: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.console_input.update(cx, |input, cx| input.set_value(line.to_string(), window, cx));
+        self.submit_console(window, cx);
+    }
+
+    fn submit_console(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.running() {
+            return;
+        }
+        let line = self.console_input.read(cx).value().to_string();
+        self.console_input.update(cx, |input, cx| input.set_value("", window, cx));
+        let prompt = if self.console_entry.continuing() { "…" } else { ">" };
+        self.print(format!("{prompt} {line}"));
+        match self.console_entry.submit(&line) {
+            Submit::More => {}
+            Submit::Run(entry) if entry.trim().is_empty() => {}
+            Submit::Run(entry) => self.run_console(entry, cx),
+        }
+    }
+
+    /// Up and Down in the console's input line go through its history.
+    fn recall(&mut self, older: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let text = if older { self.console_entry.older() } else { self.console_entry.newer() };
+        if let Some(text) = text.map(str::to_string) {
+            // A multi-line entry comes back on one line, which runs the same.
+            let text = text.replace('\n', " ");
+            self.console_input.update(cx, |input, cx| input.set_value(text, window, cx));
+        }
+    }
+
+    /// Appends the definitions typed at the console to the editor's program.
+    fn copy_definitions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let mut text = self.editor.read(cx).value().to_string();
+        for definition in self.console_definitions.drain(..) {
+            if !text.ends_with('\n') && !text.is_empty() {
+                text.push('\n');
+            }
+            text.push('\n');
+            text.push_str(&definition);
+            text.push('\n');
+        }
+        self.editor.update(cx, |state, cx| state.set_value(text, window, cx));
+        self.print("Copied the console's definitions to the editor.");
+    }
+
+    /// Puts new console lines into the text area, scrolled to the newest.
+    fn flush_console(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !std::mem::take(&mut self.console_dirty) {
+            return;
+        }
+        let text = self.console.iter().map(|l| l.as_ref()).collect::<Vec<_>>().join("\n");
+        let lines = self.console.len();
+        self.console_output.update(cx, |output, cx| {
+            output.set_value(text, window, cx);
+            if let (Some(rows), Some(line_height)) = (output.visible_row_range(), output.line_height()) {
+                let top = lines.saturating_sub(rows.len()) as f32;
+                output.set_scroll_offset(point(px(0.), -line_height * top), cx);
+            }
+        });
     }
 
     fn set_diagnostics(&mut self, diagnostics: Vec<Diagnostic>, cx: &mut Context<Self>) {
@@ -216,26 +335,37 @@ impl App {
 
     /// Shows errors as diagnostics on the code, and in the console with
     /// their call chains (ADR 0005).
+    /// An error in a console entry shows only in the console; one in the
+    /// editor's program also shows on the code.
     fn show_errors(&mut self, errors: Vec<pendown_logo::Error>, cx: &mut Context<Self>) {
         let mut diagnostics = Vec::new();
         for e in &errors {
-            let line = e.span.map_or(String::new(), |s| format!("Line {}: ", s.line + 1));
-            self.console.push(format!("{line}{}", e.message).into());
+            let where_ = match e.span {
+                Some(s) if s.source == SourceId::Editor => format!("Line {}: ", s.line + 1),
+                Some(_) => "In the console: ".to_string(),
+                None => String::new(),
+            };
+            self.print(format!("{where_}{}", e.message));
             for step in errors::chain(e) {
-                self.console.push(format!("    {step}").into());
+                self.print(format!("    {step}"));
             }
-            if let Some(span) = e.span {
+            if let Some(span) = e.span
+                && span.source == SourceId::Editor
+            {
                 let range = self.position(span.start as usize)..self.position(span.end as usize);
                 diagnostics.push(Diagnostic::new(range, e.message.clone()).with_severity(DiagnosticSeverity::Error));
             }
         }
-        self.set_diagnostics(diagnostics, cx);
+        if !diagnostics.is_empty() {
+            self.set_diagnostics(diagnostics, cx);
+        }
     }
 
     /// Moves the highlight to the running instruction, scrolling the editor
     /// to keep it in view (spike 01).
     fn show_highlight(&mut self, cx: &mut Context<Self>) {
-        let Some(span) = self.animator.as_ref().and_then(|a| a.highlight) else {
+        // Console entries aren't in the editor, so they aren't highlighted there.
+        let Some(span) = self.animator.as_ref().and_then(|a| a.highlight).filter(|s| s.source == SourceId::Editor) else {
             self.highlight.set(vec![], cx);
             return;
         };
@@ -278,7 +408,9 @@ impl App {
             canvas.drawing.push(&frame.marks);
             drop(canvas);
             for text in frame.printed {
-                self.console.extend(text.lines().map(|line| SharedString::from(line.to_string())));
+                for line in text.lines() {
+                    self.print(line.to_string());
+                }
             }
             if let Some(speed) = frame.speed {
                 // The animator has changed already: this moves the slider.
@@ -292,9 +424,11 @@ impl App {
         let animator = self.animator.as_ref().expect("checked above");
         if animator.finished() && self.finished_at.is_none() && !animator.stopped {
             self.finished_at = Some(now);
+            let defining = self.defining.take();
             match self.run.as_ref().and_then(|r| r.result()) {
                 Some(Err(RunError::Parse(errors))) => self.show_errors(errors, cx),
                 Some(Err(RunError::Runtime(e))) => self.show_errors(vec![e], cx),
+                Some(Ok(())) => self.console_definitions.extend(defining),
                 _ => {}
             }
         }
@@ -330,6 +464,7 @@ impl Render for App {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.tick(window, cx);
         self.drive_autotest(window, cx);
+        self.flush_console(window, cx);
         if self.animator.as_ref().is_some_and(|a| a.wants_frames()) || self.autotest.is_some() {
             window.request_animation_frame();
         }
@@ -426,16 +561,63 @@ impl Render for App {
                 ),
             )
             .child(
-                div()
-                    .id("console")
-                    .h(px(120.))
-                    .p_2()
+                v_flex()
+                    .h(px(170.))
                     .border_t_1()
                     .border_color(theme.border)
-                    .overflow_y_scroll()
-                    .font_family(theme.mono_font_family.clone())
-                    .text_xs()
-                    .children(self.console.iter().skip(self.console.len().saturating_sub(200)).cloned().map(|l| div().child(l))),
+                    .child(
+                        h_flex()
+                            .px_2()
+                            .py_1()
+                            .gap_2()
+                            .child(div().text_sm().text_color(theme.muted_foreground).child("Console"))
+                            .child(div().flex_1())
+                            .when(!self.console_definitions.is_empty(), |row| {
+                                row.child(
+                                    Button::new("copy-definitions")
+                                        .xsmall()
+                                        .ghost()
+                                        .label("Copy to editor")
+                                        .disabled(running)
+                                        .on_click(cx.listener(|this, _, window, cx| this.copy_definitions(window, cx))),
+                                )
+                            })
+                            .child(Button::new("clear-console").xsmall().ghost().label("Clear").on_click(cx.listener(
+                                |this, _, _, cx| {
+                                    this.console.clear();
+                                    this.console_dirty = true;
+                                    cx.notify();
+                                },
+                            ))),
+                    )
+                    .child(
+                        div().flex_1().min_h_0().px_1().child(
+                            Textarea::new(&self.console_output)
+                                .readonly(true)
+                                .bordered(false)
+                                .h_full()
+                                .font_family(theme.mono_font_family.clone())
+                                .text_xs(),
+                        ),
+                    )
+                    .child(
+                        div()
+                            .p_1()
+                            .capture_action(cx.listener(|this, _: &MoveUp, window, cx| {
+                                this.recall(true, window, cx);
+                                cx.stop_propagation();
+                            }))
+                            .capture_action(cx.listener(|this, _: &MoveDown, window, cx| {
+                                this.recall(false, window, cx);
+                                cx.stop_propagation();
+                            }))
+                            .child(
+                                Input::new(&self.console_input)
+                                    .small()
+                                    .disabled(running)
+                                    .font_family(theme.mono_font_family.clone()),
+                            ),
+                    ),
             )
     }
 }

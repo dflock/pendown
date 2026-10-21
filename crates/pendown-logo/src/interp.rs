@@ -227,6 +227,15 @@ impl Interpreter {
         }
     }
 
+    /// Sends events somewhere else, and takes Stop and lockstep from a new
+    /// `Control`, keeping everything else: procedures, variables, the turtle.
+    /// The GUI does this before each run or console entry, since each has
+    /// its own channel and can be stopped on its own.
+    pub fn set_output(&mut self, sink: Box<dyn EventSink>, control: Arc<Control>) {
+        self.sink = sink;
+        self.control = control;
+    }
+
     /// The Run button (ADR 0006): clear all procedures and variables, reset
     /// the turtle, parse the whole source, define every `TO`, then run the
     /// top-level instructions.

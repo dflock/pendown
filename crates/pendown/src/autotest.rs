@@ -83,6 +83,10 @@ enum Step {
     CheckFinishedWithin(Duration),
     CheckFramesAtMost(Duration),
     CheckConsole(&'static str),
+    /// Type a line into the console and press Enter.
+    Console(&'static str),
+    /// How many lines, arcs and shapes are drawn.
+    CheckDrawn(usize),
     Quit,
 }
 
@@ -94,6 +98,28 @@ fn script() -> Vec<Step> {
         Run(crate::app::WELCOME, level_speed(10)),
         WaitFinished,
         CheckFinishedWithin(Duration::from_secs(30)),
+        Say("The console uses what the last run left"),
+        Console("BOX 50"),
+        WaitFinished,
+        CheckDrawn(52),
+        CheckConsole("> BOX 50"),
+        Console("FOO"),
+        WaitFinished,
+        CheckConsole("In the console: I don't know how to FOO"),
+        Console("TO TRI :n"),
+        Console("REPEAT 3 [FD :n RT 120]"),
+        Console("END"),
+        WaitFinished,
+        Console("TRI 100"),
+        WaitFinished,
+        CheckDrawn(55),
+        Screenshot("console"),
+        Run(crate::app::WELCOME, Speed::Instant),
+        WaitFinished,
+        CheckConsole("Run cleared the procedures you defined in the console. \"Copy to editor\" keeps them."),
+        Console("TRI 10"),
+        WaitFinished,
+        CheckConsole("In the console: I don't know how to TRI"),
         Say("Highlighting follows the turtle"),
         Trace,
         Run(BOX, Speed::Animated(100.0)),
@@ -319,6 +345,13 @@ impl App {
                     let p50 = self.frame_intervals.percentile(50).unwrap_or_default();
                     let summary = self.frame_intervals.summary();
                     self.check(p50 <= limit, format!("frame intervals {summary}"));
+                }
+                Step::Console(line) => {
+                    self.type_into_console(line, window, cx);
+                }
+                Step::CheckDrawn(expected) => {
+                    let drawn = self.canvas.borrow().drawing.segments();
+                    self.check(drawn == expected, format!("{drawn} lines and shapes drawn"));
                 }
                 Step::CheckConsole(expected) => {
                     let found = self.console.iter().any(|l| l.as_ref() == expected);

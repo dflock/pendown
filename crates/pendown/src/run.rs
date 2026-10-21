@@ -1,4 +1,7 @@
-//! Starting a program on its own thread (ADR 0011).
+//! The interpreter's thread (ADR 0011). One interpreter lives for the whole
+//! session, so the console can use whatever the last run left (ADR 0006):
+//! it takes jobs one at a time, each with its own channel and `Control`, so
+//! each can be stopped on its own.
 
 use std::{
     sync::{Arc, Mutex, mpsc},
@@ -6,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use pendown_logo::{BatchSender, Control, Event, Interpreter, RunError};
+use pendown_logo::{BatchSender, Control, Event, EventSink, Halted, Interpreter, RunError};
 
 use crate::animator::{Animator, Speed};
 
@@ -25,13 +28,22 @@ pub struct Channel {
 /// Batches of 256 events, with room for 4 batches (spikes 03 and 04).
 pub const DEFAULT_CHANNEL: Channel = Channel { batch: 256, capacity: 4, max_wait: Duration::from_millis(4) };
 
-/// The interpreter's side of a run, as the GUI sees it.
+/// What the interpreter runs.
+#[derive(Clone, Debug)]
+pub enum Job {
+    /// The Run button: a clean slate, then the whole program.
+    Program(String),
+    /// A console entry, against what the last run left.
+    Console(String),
+}
+
+/// One job's progress, as the GUI sees it.
 pub struct Run {
     pub control: Arc<Control>,
     pub started: Instant,
-    /// How the program ended, once the thread finishes.
+    /// How the job ended, once it has.
     pub result: Arc<Mutex<Option<Result<(), RunError>>>>,
-    /// When the thread finished, for measuring how long Stop takes.
+    /// When it ended, for measuring how long Stop takes.
     pub exited: Arc<Mutex<Option<Instant>>>,
 }
 
@@ -45,31 +57,77 @@ impl Run {
     }
 }
 
-/// Starts `source` on a new interpreter thread, and returns the animator
-/// that plays its events.
+struct Command {
+    job: Job,
+    events: mpsc::SyncSender<Vec<Event>>,
+    channel: Channel,
+    control: Arc<Control>,
+    result: Arc<Mutex<Option<Result<(), RunError>>>>,
+    exited: Arc<Mutex<Option<Instant>>>,
+}
+
+/// Throws events away, between jobs.
+struct Discard;
+
+impl EventSink for Discard {
+    fn send(&mut self, _: Event) -> Result<(), Halted> {
+        Err(Halted)
+    }
+}
+
+/// The interpreter's thread, waiting for jobs.
+pub struct Session {
+    commands: mpsc::Sender<Command>,
+}
+
+impl Default for Session {
+    fn default() -> Session {
+        Session::new()
+    }
+}
+
+impl Session {
+    pub fn new() -> Session {
+        let (commands, rx) = mpsc::channel::<Command>();
+        thread::Builder::new()
+            .name("interpreter".into())
+            .stack_size(STACK)
+            .spawn(move || {
+                let mut it = Interpreter::new(Box::new(Discard), Arc::default());
+                it.limits.stack_bytes = Some(STACK);
+                // Jobs run one at a time, until the session is dropped.
+                for command in rx {
+                    let sink = BatchSender::new(command.events, command.channel.batch, command.channel.max_wait);
+                    it.set_output(Box::new(sink), command.control);
+                    let result = match &command.job {
+                        Job::Program(text) => it.run_program(text),
+                        Job::Console(text) => it.run_console(text),
+                    };
+                    // Dropping the sender tells the animator the job is over.
+                    it.set_output(Box::new(Discard), Arc::default());
+                    *command.result.lock().unwrap() = Some(result);
+                    *command.exited.lock().unwrap() = Some(Instant::now());
+                }
+            })
+            .expect("can start the interpreter thread");
+        Session { commands }
+    }
+
+    /// Starts a job, and returns the animator that plays its events. A job
+    /// started while another runs waits for it, so stop that one first.
+    pub fn start(&self, job: Job, speed: Speed, channel: Channel) -> (Animator, Run) {
+        let control = Arc::new(Control::default());
+        let (events, rx) = mpsc::sync_channel::<Vec<Event>>(channel.capacity);
+        let run = Run { control: control.clone(), started: Instant::now(), result: Arc::default(), exited: Arc::default() };
+        // The animator sets the lockstep flag and the speed before the job starts.
+        let animator = Animator::new(rx, control.clone(), speed);
+        let command = Command { job, events, channel, control, result: run.result.clone(), exited: run.exited.clone() };
+        self.commands.send(command).expect("the interpreter thread is running");
+        (animator, run)
+    }
+}
+
+/// Runs one program on a session of its own.
 pub fn start(source: String, speed: Speed, channel: Channel) -> (Animator, Run) {
-    let control = Arc::new(Control::default());
-    let (tx, rx) = mpsc::sync_channel::<Vec<Event>>(channel.capacity);
-    let run = Run {
-        control: control.clone(),
-        started: Instant::now(),
-        result: Arc::default(),
-        exited: Arc::default(),
-    };
-    // The animator sets the lockstep flag before the program starts.
-    let animator = Animator::new(rx, control.clone(), speed);
-    let (result, exited) = (run.result.clone(), run.exited.clone());
-    thread::Builder::new()
-        .name("interpreter".into())
-        .stack_size(STACK)
-        .spawn(move || {
-            let sink = BatchSender::new(tx, channel.batch, channel.max_wait);
-            let mut it = Interpreter::new(Box::new(sink), control);
-            it.limits.stack_bytes = Some(STACK);
-            let r = it.run_program(&source);
-            *result.lock().unwrap() = Some(r);
-            *exited.lock().unwrap() = Some(Instant::now());
-        })
-        .expect("can start the interpreter thread");
-    (animator, run)
+    Session::new().start(Job::Program(source), speed, channel)
 }

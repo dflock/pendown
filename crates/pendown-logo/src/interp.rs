@@ -17,6 +17,7 @@ use crate::{
     colour::{PALETTE, Rgba},
     event::{Event, EventSink, Pen, Point, SyncPoint},
     geometry::{Area, TurtleMode},
+    random::Random,
     names::{Names, Sym},
     parse::{self, Arity, Block, Call, Cx, Expr, Instr, Target},
     prims::{self, Args, Imp, PRIMS},
@@ -158,6 +159,9 @@ pub struct Interpreter {
     frames: Vec<Frame>,
     pub(crate) repcounts: Vec<i64>,
     pub(crate) turtle: Turtle,
+    /// `RANDOM`'s generator, seeded afresh on each Run unless `seed` is set.
+    pub(crate) random: Random,
+    seed: Option<u64>,
     /// The background colour, and the form it was set in.
     pub(crate) background: (Rgba, Value),
     /// The turtle area, which Run doesn't change.
@@ -205,6 +209,8 @@ impl Interpreter {
             turtle: Turtle::default(),
             area: Area::default(),
             background: (PALETTE[0], Value::Num(0.0)),
+            random: Random::new(Random::fresh_seed()),
+            seed: None,
             sink,
             control,
             last_line: None,
@@ -227,6 +233,7 @@ impl Interpreter {
         self.repcounts.clear();
         self.turtle = Turtle::default();
         self.background = (PALETTE[0], Value::Num(0.0));
+        self.random = Random::new(self.seed.unwrap_or_else(Random::fresh_seed));
         self.last_line = None;
         self.console_entries = 0;
         self.run_source(text, SourceId::Editor)
@@ -236,6 +243,13 @@ impl Interpreter {
     pub fn run_console(&mut self, text: &str) -> Result<(), RunError> {
         self.console_entries += 1;
         self.run_source(text, SourceId::Console(self.console_entries))
+    }
+
+    /// Makes every Run use this seed for `RANDOM`, so its drawings repeat:
+    /// for tests and the CLI. `None` picks a new seed for each Run, as the
+    /// GUI does (ADR 0006).
+    pub fn set_seed(&mut self, seed: Option<u64>) {
+        self.seed = seed;
     }
 
     /// Sets the turtle area's size in turtle steps, centred on 0, 0. The
@@ -542,6 +556,15 @@ impl Interpreter {
             }
         }
         Ok(None)
+    }
+
+    /// Runs a list as an expression that outputs a value, as `AND`, `OR` and
+    /// `NOT` do with list inputs.
+    pub(crate) fn run_expression(&mut self, list: &List, call: &Call) -> Result<Value, Flow> {
+        match self.run_list_value(list, call, false)? {
+            Ret::Value(v) => Ok(v),
+            Ret::Tail(_) => unreachable!("not in tail position"),
+        }
     }
 
     /// Runs a list whose last instruction outputs, as `IFELSE` does when

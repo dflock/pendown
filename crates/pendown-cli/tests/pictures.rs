@@ -14,7 +14,7 @@ const TOLERANCE: u8 = 40;
 const MAX_DIFFERENT: f64 = 0.002;
 
 fn check(name: &str, program: &str, width: u32, height: u32) {
-    let output = render(program, Options { width, height, limit: 10_000_000 });
+    let output = render(program, Options { width, height, limit: 10_000_000, seed: Some(1) });
     assert_eq!(output.result, Ok(()), "{name} should run without errors");
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/pictures").join(format!("{name}.png"));
     if std::env::var_os("UPDATE_PICTURES").is_some() {
@@ -137,4 +137,10 @@ PU SETXY -200 -350 PD SETPC "white
 REPEAT 4 [ARC 90 50 ARC -90 50]
 "#;
     check("arcs-and-shapes", program, 300, 300);
+}
+
+#[test]
+fn random_with_a_seed() {
+    let program = "REPEAT 200 [PU SETXY (RANDOM -500 500) (RANDOM -500 500) PD SETPC RANDOM 16 CIRCLE RANDOM 60]";
+    check("random", program, 300, 300);
 }

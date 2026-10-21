@@ -19,6 +19,7 @@ mod names;
 mod number;
 mod parse;
 mod prims;
+mod random;
 mod reader;
 mod span;
 mod value;

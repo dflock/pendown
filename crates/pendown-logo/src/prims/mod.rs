@@ -2,12 +2,14 @@
 //! and code; the code is in a module per area, as `pendown-logo.kdl` groups
 //! them.
 
+mod arithmetic;
 mod pen;
 mod shapes;
 mod turtle;
 
-use std::{cmp::Ordering, collections::HashMap, rc::Rc, sync::OnceLock};
+use std::{collections::HashMap, rc::Rc, sync::OnceLock};
 
+use arithmetic::*;
 use pen::*;
 use shapes::*;
 use turtle::*;
@@ -16,9 +18,8 @@ use crate::{
     error::Error,
     event::{Event, Point},
     interp::{Flow, Interpreter},
-    number,
     parse::{Arity, Call, Op},
-    value::{Value, equal},
+    value::Value,
 };
 
 pub type PrimId = usize;
@@ -116,8 +117,21 @@ pub static PRIMS: &[Prim] = &[
     Prim { names: &["sum"], arity: some(0, 2, None), imp: Imp::F(sum) },
     Prim { names: &["difference"], arity: TWO, imp: Imp::F(difference) },
     Prim { names: &["product"], arity: some(0, 2, None), imp: Imp::F(product) },
-    Prim { names: &["quotient"], arity: TWO, imp: Imp::F(quotient) },
+    Prim { names: &["quotient"], arity: some(1, 2, Some(2)), imp: Imp::F(quotient) },
+    Prim { names: &["remainder"], arity: TWO, imp: Imp::F(remainder) },
+    Prim { names: &["modulo"], arity: TWO, imp: Imp::F(modulo) },
     Prim { names: &["minus"], arity: ONE, imp: Imp::F(minus) },
+    Prim { names: &["int"], arity: ONE, imp: Imp::F(int) },
+    Prim { names: &["round"], arity: ONE, imp: Imp::F(round) },
+    Prim { names: &["sqrt"], arity: ONE, imp: Imp::F(sqrt) },
+    Prim { names: &["power"], arity: TWO, imp: Imp::F(power) },
+    Prim { names: &["sin"], arity: ONE, imp: Imp::F(sin) },
+    Prim { names: &["cos"], arity: ONE, imp: Imp::F(cos) },
+    Prim { names: &["arctan"], arity: some(1, 1, Some(2)), imp: Imp::F(arctan) },
+    Prim { names: &["random"], arity: some(1, 1, Some(2)), imp: Imp::F(random) },
+    Prim { names: &["and"], arity: some(0, 2, None), imp: Imp::F(and) },
+    Prim { names: &["or"], arity: some(0, 2, None), imp: Imp::F(or) },
+    Prim { names: &["not"], arity: ONE, imp: Imp::F(not) },
     Prim { names: &["equalp", "equal?"], arity: TWO, imp: Imp::F(equalp) },
     Prim { names: &["notequalp", "notequal?"], arity: TWO, imp: Imp::F(notequalp) },
     Prim { names: &["lessp", "less?"], arity: TWO, imp: Imp::F(lessp) },
@@ -203,7 +217,7 @@ impl Args<'_> {
     }
 
     /// Arithmetic results must be finite (ADR 0002).
-    fn result(&self, x: f64) -> Result<Option<Value>, Flow> {
+    pub(super) fn result(&self, x: f64) -> Result<Option<Value>, Flow> {
         if x.is_finite() { Ok(Some(Value::Num(x))) } else { Err(self.error("That number is too big".into())) }
     }
 }
@@ -298,62 +312,3 @@ fn word(_: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
     Ok(Some(Value::Word(out.into())))
 }
 
-fn sum(_: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    let mut total = 0.0;
-    for i in 0..a.vals.len() {
-        total += a.num(i)?;
-    }
-    a.result(total)
-}
-
-fn difference(_: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    a.result(a.num(0)? - a.num(1)?)
-}
-
-fn product(_: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    let mut total = 1.0;
-    for i in 0..a.vals.len() {
-        total *= a.num(i)?;
-    }
-    a.result(total)
-}
-
-fn quotient(_: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    let (x, y) = (a.num(0)?, a.num(1)?);
-    if y == 0.0 {
-        return Err(a.error("Can't divide by zero".into()));
-    }
-    a.result(x / y)
-}
-
-fn minus(_: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    a.result(-a.num(0)?)
-}
-
-fn equalp(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    Ok(Some(it.bool(equal(&a.vals[0], &a.vals[1]))))
-}
-
-fn notequalp(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    Ok(Some(it.bool(!equal(&a.vals[0], &a.vals[1]))))
-}
-
-fn compare(it: &mut Interpreter, a: &Args, test: fn(Ordering) -> bool) -> Result<Option<Value>, Flow> {
-    Ok(Some(it.bool(test(number::compare(a.num(0)?, a.num(1)?)))))
-}
-
-fn lessp(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    compare(it, a, Ordering::is_lt)
-}
-
-fn greaterp(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    compare(it, a, Ordering::is_gt)
-}
-
-fn lessequalp(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    compare(it, a, Ordering::is_le)
-}
-
-fn greaterequalp(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    compare(it, a, Ordering::is_ge)
-}

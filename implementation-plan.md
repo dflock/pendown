@@ -328,11 +328,12 @@ That way frame cost depends on what's changing, not on how much has been drawn s
 The CLI reads the same event stream with no timing and renders it to a file. `WAIT` and `SETSPEED` do nothing there.
 
 ```
-pendown-cli <program.logo> [--output <file.png>] [--size <width>x<height>] [--limit <instructions>]
+pendown-cli <program.logo> [--output <file.png>] [--size <width>x<height>] [--limit <instructions>] [--seed <n>]
 ```
 
 - **`--output`** (`-o`) defaults to the program's name with `.png`.
 - **`--size`** (`-s`) defaults to `1000x1000`. The turtle area is fitted to it without stretching.
+- **`--seed`** fixes `RANDOM`'s seed, so the picture is the same every time. Without it, each run is different.
 - **`--limit`** defaults to 10 million instructions. A program that never ends, such as `FOREVER`, stops there with an error, and the picture is saved as far as it got.
 - **Output:** what the program prints goes to stdout. Errors go to stderr as `program.logo:LINE:COLUMN: message`, with the chain of calls after it.
 - **Exit codes:**

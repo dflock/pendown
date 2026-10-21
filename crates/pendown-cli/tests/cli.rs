@@ -101,3 +101,13 @@ fn a_missing_program_is_an_error() {
     assert_eq!(r.status, 1);
     assert!(r.stderr.starts_with("nothing.logo: can't read it:"), "{}", r.stderr);
 }
+
+#[test]
+fn a_seed_makes_random_repeatable() {
+    let d = dir("seed");
+    std::fs::write(d.join("r.logo"), "REPEAT 5 [PRINT RANDOM 1000]").unwrap();
+    let a = cli(&d, &["r.logo", "--seed", "7"]);
+    let b = cli(&d, &["r.logo", "--seed", "7"]);
+    assert_eq!(a.status, 0);
+    assert_eq!(a.stdout, b.stdout);
+}

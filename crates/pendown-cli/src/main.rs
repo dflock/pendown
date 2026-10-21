@@ -26,6 +26,11 @@ struct Args {
     /// never ends, such as `FOREVER`, still finishes.
     #[arg(long, default_value_t = 10_000_000)]
     limit: u64,
+
+    /// The seed for `RANDOM`, so a program that uses it draws the same
+    /// picture every time. Without it, each run is different.
+    #[arg(long)]
+    seed: Option<u64>,
 }
 
 fn main() -> ExitCode {
@@ -40,7 +45,7 @@ fn main() -> ExitCode {
     };
     let output_path = args.output.unwrap_or_else(|| args.program.with_extension("png"));
     let (width, height) = args.size;
-    let output = render(&source, Options { width, height, limit: args.limit });
+    let output = render(&source, Options { width, height, limit: args.limit, seed: args.seed });
     print!("{}", output.printed);
 
     let save = || match std::fs::write(&output_path, &output.png) {

@@ -25,6 +25,9 @@ pub struct Options {
     pub height: u32,
     /// Stop with an error after this many instructions.
     pub limit: u64,
+    /// The seed for `RANDOM`, for a repeatable picture. Otherwise each run
+    /// is different.
+    pub seed: Option<u64>,
 }
 
 pub struct Output {
@@ -115,6 +118,7 @@ pub fn render(source: &str, options: Options) -> Output {
                 max_instructions: Some(options.limit),
                 ..Limits::default()
             };
+            it.set_seed(options.seed);
             let result = it.run_program(&source);
             drop(it);
             let png = drawing.borrow().png();

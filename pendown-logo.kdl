@@ -1941,6 +1941,26 @@ logo {
         phase #null
         obsolete_reason "Rearranges a single full-screen display between text and graphics. The GUI has a fixed layout with a canvas and a console."
       }
+      setspeed {
+        eg "SETSPEED level"
+        desc "sets how fast the turtle draws, as a level from 1 to 11. Level 11 is Instant: everything appears at once. Below it, each level is twice as fast as the one before, from 5 turtle steps a second at level 1 to 2,560 at level 10. The speed changes at exactly this point in the program, and the speed slider moves to match. The input must be a whole number from 1 to 11. When a picture is drawn with pendown-cli, SETSPEED does nothing."
+        see "speed" "wait"
+        supported #true
+        obsolete #false
+        phase 1
+        extension #true
+        source "Python turtle.speed()"
+      }
+      speed {
+        eg "SPEED"
+        desc "outputs the turtle's speed, as a level from 1 to 11. See SETSPEED."
+        see "setspeed"
+        supported #true
+        obsolete #false
+        phase 1
+        extension #true
+        source "Python turtle.speed()"
+      }
       setscrunch {
         eg "SETSCRUNCH xscale yscale"
         desc """

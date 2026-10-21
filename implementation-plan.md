@@ -15,11 +15,11 @@ The headline features are:
 `pendown-logo.kdl` is the source of truth for which commands we support. It has every command from the Berkeley Logo manual, and each one has:
 
 - **`obsolete` / `obsolete_reason`:** 103 commands are obsolete and will never be supported. Most of them are replaced by the GUI: printing out definitions, workspace listings, `EDIT`, `HELP`, `TRACE`/`STEP`, `PAUSE`, screen layout and console fonts. The rest are about old hardware or the UCBLogo installation (memory, file paths, aspect-ratio correction), or are superseded within the language (`TEST`/`IFTRUE`, `GOTO`).
-- **`phase`:** 1, 2, 4 or 5 for the remaining 263 (257 from the manual plus 6 of our own), or `#null` for obsolete commands.
+- **`phase`:** 1, 2, 4 or 5 for the remaining 265 (257 from the manual plus 8 of our own), or `#null` for obsolete commands.
 
 The file has the manual's description of every command, so the GUI's reference/help panel can be generated from it (phase 3).
 
-### Phase 1: Turtle drawing (87 commands)
+### Phase 1: Turtle drawing (89 commands)
 
 The smallest Logo that is fun to draw with:
 

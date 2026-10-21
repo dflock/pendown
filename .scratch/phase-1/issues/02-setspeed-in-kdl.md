@@ -1,6 +1,6 @@
 # `SETSPEED` and `SPEED` in `pendown-logo.kdl`
 
-Status: ready-for-agent
+Status: done
 Type: task
 
 ## What
@@ -22,3 +22,10 @@ Also check that the phase-1 count is right: 87 from the manual, plus these two. 
 The two entries are in the file, it still parses, and the plan's count matches the file.
 
 ## Comments
+
+### 2026-10-21: done
+
+- Added `setspeed` and `speed` to the turtle-and-window-control section, as phase-1 extensions with `source "Python turtle.speed()"`.
+- The file now has 368 commands: 265 with a phase, and 89 of them in phase 1, of which 8 are our own extensions.
+- The plan's counts are updated: "89 commands" for phase 1, and "265 (257 from the manual plus 8 of our own)".
+- Issue 01 adds a test that parses the file with the `kdl` crate.

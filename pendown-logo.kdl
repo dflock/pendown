@@ -3,13 +3,16 @@
 //   1  Turtle drawing: turtle and pen commands, procedures and recursion, variables,
 //      REPEAT / IF / STOP / OUTPUT, arithmetic, printing, and the few list commands
 //      needed for POS / SETPOS.
-//   2  Complete core language and richer drawing: the rest of words, lists and arrays,
-//      loops, CATCH / THROW, MAP / FILTER / FOREACH and friends, fills, labels,
-//      pen modes and the palette.
-//   3  Help panel, examples and tutorial: no new commands (see implementation-plan.md).
-//   4  Interactive programs: mouse, keyboard and console input, BUTTONACT / KEYACT.
-//   5  Advanced and niche: objects, macros, property lists, file I/O, SHELL, bitwise
-//      operations, introspection / metaprogramming and obscure library procedures.
+//   2  Complete core language and filled shapes: the rest of words, lists and arrays,
+//      loops, CATCH / THROW, MAP / FILTER / FOREACH and friends, SETFILLCOLOR and
+//      the palette.
+//   3  Performance: metrics and regression checks; no new commands.
+//   4  Watching a program run: repeat counter and variable panels; no new commands.
+//   5  Help panel, examples and tutorial: no new commands (see implementation-plan.md).
+//   6  Interactive programs: mouse, keyboard and console input, BUTTONACT / KEYACT.
+//   7  Advanced and niche: fills, labels and pen modes, objects, macros, property
+//      lists, file I/O, SHELL, bitwise operations, introspection / metaprogramming
+//      and obscure library procedures.
 //   #null  Obsolete: not planned (see obsolete_reason).
 // Our changes to UCBLogo (see "Dialect and extensions" in implementation-plan.md):
 //   extension #true  A command that isn't in the manual; `source` says where the idea came from.
@@ -125,7 +128,7 @@ logo {
         desc "outputs a unique word each time it’s invoked. The words are of the form G1, G2, etc."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     data-selectors {
@@ -411,7 +414,7 @@ logo {
         """
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       memberp {
         eg """
@@ -459,7 +462,7 @@ logo {
         """
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     queries {
@@ -482,7 +485,7 @@ logo {
         desc "outputs the integer (between 0 and 255) that represents the input character in the ASCII code. Interprets control characters as representing themselves. To find out the ASCII code of an arbitrary keystroke, use RAWASCII RC."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       char {
         eg "CHAR int"
@@ -540,14 +543,14 @@ logo {
         see "readlist"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       runparse {
         eg "RUNPARSE wordorlist"
         desc "outputs the list that would result if the input word or list were entered as an instruction line; characters such as infix operators and parentheses are separate members of the output. Note that sublists of a runparsed list are not themselves runparsed."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
   }
@@ -562,14 +565,14 @@ logo {
         desc "creates and outputs an object whose parent is object, or whose parents are object1, object2, etc., or the elements of objectlist. There must be at least one input, and if a list, it may not be empty."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       something {
         eg "SOMETHING"
         desc "creates and outputs an object whose parent is the Logo object. make \"foo something is equivalent to make \"foo kindof logo."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       oneof {
         eg """
@@ -586,7 +589,7 @@ logo {
         see "exist"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     mutators {
@@ -616,7 +619,7 @@ logo {
         see "oneof" "usual" "havemake"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       have {
         eg """
@@ -627,7 +630,7 @@ logo {
         see "havemake"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       havemake {
         eg "HAVEMAKE name value"
@@ -639,7 +642,7 @@ logo {
         see "have" "make"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     selectors {
@@ -648,7 +651,7 @@ logo {
         desc "outputs the current object (not its name!)."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       parents {
         eg "PARENTS"
@@ -668,14 +671,14 @@ logo {
         """
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       mynames {
         eg "MYNAMES"
         desc "output a list of the names of the object variables owned (not inherited) by the current object."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       mynamep {
         eg """
@@ -686,14 +689,14 @@ logo {
         see "mynames"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       myprocs {
         eg "MYPROCS"
         desc "outputs a list of the names of the procedures (methods) owned by (not inherited by) the current object."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       myprocp {
         eg """
@@ -704,7 +707,7 @@ logo {
         see "myprocs"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     messages {
@@ -714,7 +717,7 @@ logo {
         see "ask"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       ask {
         eg "ASK object runlist"
@@ -722,7 +725,7 @@ logo {
         see "talkto"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     queries {
@@ -731,14 +734,14 @@ logo {
         desc "outputs the object that owns the currently accessible variable named name. If there is no such accessible variable, or it’s a procedure-local variable, an error is signalled."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       whoseproc {
         eg "WHOSEPROC name"
         desc "outputs the object that owns the currently accessible procedure named name. If there is no such procedure, an error is signalled."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     usual {
@@ -784,7 +787,7 @@ logo {
       """
       supported #true
       obsolete #false
-      phase 5
+      phase 7
     }
   }
   communication {
@@ -833,7 +836,7 @@ logo {
         desc "reads a line from the read stream (initially the keyboard) and outputs that line as a list. The line is separated into members as though it were typed in square brackets in an instruction. If the read stream is a file, and the end of file is reached, READLIST outputs the empty word (not the empty list). READLIST processes backslash, vertical bar, and tilde characters in the read stream; the output list will not contain these characters but they will have had their usual effect. READLIST does not, however, treat semicolon as a comment character."
         supported #true
         obsolete #false
-        phase 4
+        phase 6
       }
       readword {
         eg """
@@ -843,7 +846,7 @@ logo {
         desc "reads a line from the read stream and outputs that line as a word. The output is a single word even if the line contains spaces, brackets, etc. If the read stream is a file, and the end of file is reached, READWORD outputs the empty list (not the empty word). READWORD processes backslash, vertical bar, and tilde characters in the read stream. In the case of a tilde used for line continuation, the output word does include the tilde and the newline characters, so that the user program can tell exactly what the user entered. Vertical bars in the line are also preserved in the output. Backslash characters are not preserved in the output."
         supported #true
         obsolete #false
-        phase 4
+        phase 6
       }
       readrawline {
         eg "READRAWLINE"
@@ -851,7 +854,7 @@ logo {
         see "readword"
         supported #true
         obsolete #false
-        phase 4
+        phase 6
       }
       readchar {
         eg """
@@ -862,7 +865,7 @@ logo {
         see "readlist"
         supported #true
         obsolete #false
-        phase 4
+        phase 6
       }
       readchars {
         eg """
@@ -873,7 +876,7 @@ logo {
         see "readlist" "readword"
         supported #true
         obsolete #false
-        phase 4
+        phase 6
       }
       shell {
         eg """
@@ -897,7 +900,7 @@ logo {
         """
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     file-access {
@@ -924,7 +927,7 @@ logo {
         desc "command. Opens the named file for reading. The read position is initially at the beginning of the file."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       openwrite {
         eg "OPENWRITE filename"
@@ -948,14 +951,14 @@ logo {
         """
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       openappend {
         eg "OPENAPPEND filename"
         desc "command. Opens the named file for writing. If the file already exists, the write position is initially set to the end of the old file, so that newly written data will be appended to it."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       openupdate {
         eg "OPENUPDATE filename"
@@ -963,21 +966,21 @@ logo {
         see "reader" "writer" "setreadpos" "setwritepos"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       close {
         eg "CLOSE filename"
         desc "command. Closes the named file. If the file was currently the reader or writer, then the reader or writer is changed to the keyboard or screen, as if SETREAD [] or SETWRITE [] had been done."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       allopen {
         eg "ALLOPEN"
         desc "outputs a list whose members are the names of all files currently open. This list does not include the dribble file, if any."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       closeall {
         eg "CLOSEALL  (library procedure)"
@@ -985,7 +988,7 @@ logo {
         see "foreach" "close"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       erasefile {
         eg """
@@ -995,7 +998,7 @@ logo {
         desc "command. Erases (deletes, removes) the named file, which should not currently be open."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       dribble {
         eg "DRIBBLE filename"
@@ -1020,7 +1023,7 @@ logo {
         see "readlist" "openread" "openupdate"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       setwrite {
         eg "SETWRITE filename"
@@ -1032,21 +1035,21 @@ logo {
         see "print" "openwrite" "openappend" "openupdate"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       reader {
         eg "READER"
         desc "outputs the name of the current read stream file, or the empty list if the read stream is the terminal."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       writer {
         eg "WRITER"
         desc "outputs the name of the current write stream file, or the empty list if the write stream is the screen."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       setreadpos {
         eg "SETREADPOS charpos"
@@ -1054,7 +1057,7 @@ logo {
         see "readlist"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       setwritepos {
         eg "SETWRITEPOS charpos"
@@ -1062,21 +1065,21 @@ logo {
         see "print"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       readpos {
         eg "READPOS"
         desc "outputs the file position of the current read stream file."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       writepos {
         eg "WRITEPOS"
         desc "outputs the file position of the current write stream file."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       eofp {
         eg """
@@ -1086,7 +1089,7 @@ logo {
         desc "predicate, outputs TRUE if there are no more characters to be read in the read stream file, FALSE otherwise."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       filep {
         eg """
@@ -1096,7 +1099,7 @@ logo {
         desc "predicate, outputs TRUE if a file of the specified name exists and can be read, FALSE otherwise."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     terminal-access {
@@ -1109,7 +1112,7 @@ logo {
         see "eofp" "readlist"
         supported #true
         obsolete #false
-        phase 4
+        phase 6
       }
       linep {
         eg """
@@ -1120,7 +1123,7 @@ logo {
         see "eofp"
         supported #true
         obsolete #false
-        phase 4
+        phase 6
       }
       cleartext {
         eg """
@@ -1130,7 +1133,7 @@ logo {
         desc "command. Clears the text window."
         supported #true
         obsolete #false
-        phase 4
+        phase 6
       }
       setcursor {
         eg "SETCURSOR vector"
@@ -1527,7 +1530,7 @@ logo {
         see "and"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       bitor {
         eg """
@@ -1538,7 +1541,7 @@ logo {
         see "or"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       bitxor {
         eg """
@@ -1548,7 +1551,7 @@ logo {
         desc "outputs the bitwise exclusive or of its inputs, which must be integers."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       bitnot {
         eg "BITNOT num"
@@ -1556,21 +1559,21 @@ logo {
         see "not"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       ashift {
         eg "ASHIFT num1 num2"
         desc "outputs num1 arithmetic-shifted to the left by num2 bits. If num2 is negative, the shift is to the right with sign extension. The inputs must be integers."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       lshift {
         eg "LSHIFT num1 num2"
         desc "outputs num1 logical-shifted to the left by num2 bits. If num2 is negative, the shift is to the right with zero fill. The inputs must be integers."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
   }
@@ -1877,7 +1880,7 @@ logo {
         desc "fills in a region of the graphics window containing the turtle and bounded by lines that have been drawn earlier. This is not portable; it doesn’t work for all machines, and may not work exactly the same way on different machines."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       filled {
         eg "FILLED color instructions"
@@ -1885,21 +1888,21 @@ logo {
         differs "The colour can be any of our colour forms: see SETPENCOLOR."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       label {
         eg "LABEL text"
         desc "takes a word or list as input, and prints the input on the graphics window, starting at the turtle’s position."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       setlabelheight {
         eg "SETLABELHEIGHT height"
         desc "command (wxWidgets only). Takes a positive integer argument and tries to set the font size so that the character height (including descenders) is that many turtle steps. This will be different from the number of screen pixels if SETSCRUNCH has been used. Also, note that SETSCRUNCH changes the font size to try to preserve this height in turtle steps. Note that the query operation corresponding to this command is LABELSIZE, not LABELHEIGHT, because it tells you the width as well as the height of characters in the current font."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       textscreen {
         eg """
@@ -2023,7 +2026,7 @@ logo {
         desc "(wxWidgets only) outputs a list of two positive integers, the width and height of characters displayed by LABEL measured in turtle steps (which will be different from screen pixels if SETSCRUNCH has been used). There is no SETLABELSIZE because the width and height of a font are not separately controllable, so the inverse of this operation is SETLABELHEIGHT, which takes just one number for the desired height."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     pen-and-background-control {
@@ -2055,7 +2058,7 @@ logo {
         desc "sets the pen’s position to DOWN and mode to PAINT."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       penerase {
         eg """
@@ -2065,7 +2068,7 @@ logo {
         desc "sets the pen’s position to DOWN and mode to ERASE."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       penreverse {
         eg """
@@ -2075,7 +2078,7 @@ logo {
         desc "sets the pen’s position to DOWN and mode to REVERSE. (This may interact in system-dependent ways with use of color.)"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       setpencolor {
         eg """
@@ -2136,7 +2139,7 @@ logo {
         see "pen"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       setbackground {
         eg """
@@ -2182,7 +2185,7 @@ logo {
         desc "outputs one of the words PAINT, ERASE, or REVERSE according to the current pen mode."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       pencolor {
         eg """
@@ -2231,7 +2234,7 @@ logo {
         see "setpen"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       background {
         eg """
@@ -2291,14 +2294,14 @@ logo {
         desc "outputs the coordinates of the mouse, provided that it’s within the graphics window, in turtle coordinates. If the mouse is outside the graphics window, then the last position within the window is returned. Exception: If a mouse button is pressed within the graphics window and held while the mouse is dragged outside the window, the mouse’s position is returned as if the window were big enough to include it."
         supported #true
         obsolete #false
-        phase 4
+        phase 6
       }
       clickpos {
         eg "CLICKPOS"
         desc "outputs the coordinates that the mouse was at when a mouse button was most recently pushed, provided that that position was within the graphics window, in turtle coordinates. (wxWidgets only)"
         supported #true
         obsolete #false
-        phase 4
+        phase 6
       }
       buttonp {
         eg """
@@ -2308,14 +2311,14 @@ logo {
         desc "outputs TRUE if a mouse button is down and the mouse is over the graphics window. Once the button is down, BUTTONP remains true until the button is released, even if the mouse is dragged out of the graphics window."
         supported #true
         obsolete #false
-        phase 4
+        phase 6
       }
       button {
         eg "BUTTON"
         desc "outputs 0 if no mouse button has been pushed inside the Logo window since the last call to BUTTON. Otherwise, it outputs an integer between 1 and 3 indicating which button was most recently pressed. Ordinarily 1 means left, 2 means right, and 3 means center, but operating systems may reconfigure these."
         supported #true
         obsolete #false
-        phase 4
+        phase 6
       }
     }
   }
@@ -2400,14 +2403,14 @@ logo {
         see "redefp"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       text {
         eg "TEXT procname"
         desc "outputs the text of the procedure named procname in the form expected by DEFINE: a list of lists, the first of which describes the inputs to the procedure and the rest of which are the lines of its body. The text does not reflect formatting information used when the procedure was defined, such as continuation lines and extra spaces."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       fulltext {
         eg "FULLTEXT procname"
@@ -2428,7 +2431,7 @@ logo {
         see "redefp" "save" "po" "pot"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     variable-definition {
@@ -2501,28 +2504,28 @@ logo {
         desc "command. Adds a property to the plistname property list with name propname and value value."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       gprop {
         eg "GPROP plistname propname"
         desc "outputs the value of the propname property in the plistname property list, or the empty list if there is no such property."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       remprop {
         eg "REMPROP plistname propname"
         desc "command. Removes the property named propname from the property list named plistname."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       plist {
         eg "PLIST plistname"
         desc "outputs a list whose odd-numbered members are the names, and whose even-numbered members are the values, of the properties in the property list named plistname. The output is a copy of the actual property list; changing properties later will not magically change a list output earlier by PLIST."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     workspace-predicates {
@@ -2534,7 +2537,7 @@ logo {
         desc "outputs TRUE if the input is the name of a procedure."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       primitivep {
         eg """
@@ -2544,7 +2547,7 @@ logo {
         desc "outputs TRUE if the input is the name of a primitive procedure (one built into Logo). Note that some of the procedures described in this document are library procedures, not primitives."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       definedp {
         eg """
@@ -2554,7 +2557,7 @@ logo {
         desc "outputs TRUE if the input is the name of a user-defined procedure, including a library procedure."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       namep {
         eg """
@@ -2564,7 +2567,7 @@ logo {
         desc "outputs TRUE if the input is the name of a variable."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       plistp {
         eg """
@@ -2574,7 +2577,7 @@ logo {
         desc "outputs TRUE if the input is the name of a nonempty property list. (In principle every word is the name of a property list; if you haven’t put any properties in it, PLIST of that name outputs an empty list, rather than giving an error message.)"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
     workspace-queries {
@@ -2670,7 +2673,7 @@ logo {
         desc "outputs a list of three numbers: the minimum, default, and maximum number of inputs for the procedure whose name is the input. It is an error if there is no such procedure. A maximum of -1 means that the number of inputs is unlimited."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       nodes {
         eg "NODES"
@@ -3436,7 +3439,7 @@ logo {
         see "output" "stop" "runresult"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       goto {
         eg "GOTO word"
@@ -3488,7 +3491,7 @@ logo {
         """
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       for {
         eg "FOR forcontrol instructionlist  (library procedure)"
@@ -3707,7 +3710,7 @@ logo {
         see "map"
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       cascade {
         eg """
@@ -3747,14 +3750,14 @@ logo {
         """
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       cascade.2 {
         eg "CASCADE.2 endtest temp1 startval1 temp2 startval2  (library procedure)"
         desc "outputs the result of invoking CASCADE with the same inputs. The only difference is that the default number of inputs is five instead of three."
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
       transfer {
         eg "TRANSFER endtest template inbasket  (library procedure)"
@@ -3767,7 +3770,7 @@ logo {
         """
         supported #true
         obsolete #false
-        phase 5
+        phase 7
       }
     }
   }
@@ -3880,13 +3883,13 @@ logo {
       see "to" "define" "apply" "stop" "output"
       supported #true
       obsolete #false
-      phase 5
+      phase 7
     }
     .defmacro {
       see ".macro"
       supported #true
       obsolete #false
-      phase 5
+      phase 7
     }
     macrop {
       eg """
@@ -3896,7 +3899,7 @@ logo {
       desc "outputs TRUE if its input is the name of a macro."
       supported #true
       obsolete #false
-      phase 5
+      phase 7
     }
     macroexpand {
       eg "MACROEXPAND expr  (library procedure)"
@@ -3912,7 +3915,7 @@ logo {
       """
       supported #true
       obsolete #false
-      phase 5
+      phase 7
     }
   }
   special-variables {
@@ -3921,7 +3924,7 @@ logo {
       desc "if TRUE, indicates that an attempt to use a procedure that doesn’t exist should be taken as an implicit getter or setter procedure (setter if the first three letters of the name are SET) for a variable of the same name (without the SET if appropriate)."
       supported #true
       obsolete #false
-      phase 5
+      phase 7
     }
     buttonact {
       eg "BUTTONACT  (variable)"
@@ -3938,7 +3941,7 @@ logo {
       """
       supported #true
       obsolete #false
-      phase 4
+      phase 6
     }
     caseignoredp {
       eg "CASEIGNOREDP  (variable)"
@@ -3953,7 +3956,7 @@ logo {
       desc "contains any text appearing after a hyphen on the command line used to start Logo."
       supported #true
       obsolete #false
-      phase 5
+      phase 7
     }
     erract {
       eg "ERRACT  (variable)"
@@ -3985,7 +3988,7 @@ logo {
       """
       supported #true
       obsolete #false
-      phase 4
+      phase 6
     }
     loadnoisily {
       eg "LOADNOISILY  (variable)"
@@ -4018,7 +4021,7 @@ logo {
       see "erase" "copydef"
       supported #true
       obsolete #false
-      phase 5
+      phase 7
     }
     startup {
       eg "STARTUP  (variable)"

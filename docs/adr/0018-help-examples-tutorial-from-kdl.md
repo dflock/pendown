@@ -9,7 +9,7 @@ Two of the headline features are extensive help, with a reference panel, and a b
 
 ## Decision
 
-These are phase 3, after phase 2, so they cover the complete core language once its commands have settled.
+These are phase 5, after phase 2, so they cover the complete core language once its commands have settled.
 
 - **The help panel is generated from `pendown-logo.kdl`,** embedded in the GUI at build time and parsed with the `kdl` crate. It's browsable by chapter and section, searchable by name and alias, and shows help for the command under the editor's cursor.
 - **Each supported command gets a `help` node** with our own description, written for our dialect with the `differs` notes folded in. `desc` stays as the manual's text, for whoever implements the command.

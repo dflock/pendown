@@ -15,9 +15,9 @@ The headline features are:
 `pendown-logo.kdl` is the source of truth for which commands we support. It has every command from the Berkeley Logo manual, and each one has:
 
 - **`obsolete` / `obsolete_reason`:** 103 commands are obsolete and will never be supported. Most of them are replaced by the GUI: printing out definitions, workspace listings, `EDIT`, `HELP`, `TRACE`/`STEP`, `PAUSE`, screen layout and console fonts. The rest are about old hardware or the UCBLogo installation (memory, file paths, aspect-ratio correction), or are superseded within the language (`TEST`/`IFTRUE`, `GOTO`).
-- **`phase`:** 1, 2, 4 or 5 for the remaining 265 (257 from the manual plus 8 of our own), or `#null` for obsolete commands.
+- **`phase`:** 1, 2, 6 or 7 for the remaining 265 (257 from the manual plus 8 of our own), or `#null` for obsolete commands.
 
-The file has the manual's description of every command, so the GUI's reference/help panel can be generated from it (phase 3).
+The file has the manual's description of every command, so the GUI's reference/help panel can be generated from it (phase 5).
 
 ### Phase 1: Turtle drawing (90 commands)
 
@@ -32,7 +32,7 @@ The smallest Logo that is fun to draw with:
 
 In the GUI and runtime, phase 1 includes:
 
-- **The canvas and pixel buffer.** The pixel buffer is part of the design from the start, even though `FILL` and the pen modes that require it arrive in phase 5.
+- **The canvas and pixel buffer.** The pixel buffer is part of the design from the start, even though `FILL` and the pen modes that require it arrive in phase 7.
 - **The turtle speed system:** speed slider, Pause, Step, Stop, highlighting the running instruction, and `SETSPEED`. This is the playground's headline feature.
 - **Events:** `Move`, `Turn`, `Arc`, `Ellipse`, `Rect`, `Clean`, `SetBackground`, `ShowTurtle`/`HideTurtle`, `Print`, `Wait`, `SetSpeed`, `Instruction` and `Sync`.
 - **The CLI** rendering the event stream to a file.
@@ -43,40 +43,45 @@ In the GUI and runtime, phase 1 includes:
 - **Control:** `RUN`/`RUNRESULT`, `FOR`, `WHILE`/`UNTIL`/`DO.WHILE`/`DO.UNTIL`, `CASE`/`COND`, `CATCH`/`THROW`/`ERROR`/`ERRACT`, `IGNORE`.
 - **Higher-order procedures:** `APPLY`, `INVOKE`, `FOREACH`, `MAP`, `MAP.SE`, `FILTER`, `FIND`, `REDUCE`.
 - **Arithmetic:** `EXP`/`LN`/`LOG10`, the radian trig functions, `ISEQ`/`RSEQ`, `RERANDOM`, `FORM`.
-- **Drawing:** `SETPALETTE`/`PALETTE`. The rest of UCBLogo's drawing commands, which work on pixels or need text, are in phase 5.
+- **Drawing:** `SETPALETTE`/`PALETTE`. The rest of UCBLogo's drawing commands, which work on pixels or need text, are in phase 7.
 - **Filled shapes (our extension):** `SETFILLCOLOR`/`FILLCOLOR`, which make the shapes draw filled.
 - **Settings:** `NAME`, `GLOBAL`, `CASEIGNOREDP`, `FULLPRINTP`, `PRINTDEPTHLIMIT`/`PRINTWIDTHLIMIT`, `LOGOVERSION`.
 
-In the GUI and runtime, phase 2 includes:
+### Phase 3: Performance (no new commands)
 
-- **Performance, measured all the time (ADR 0020).** While a program runs, Pendown keeps one CPU core fully busy, even at slow speeds where the turtle barely moves. Rather than a one-off fix, phase 2 starts by building in measurement, so the cause shows up now and regressions show up later.
-  - **A `metrics` module** in each crate that does work: counters and timings cheap enough to leave in, kept as atomics and read by whoever reports them.
-    - **On by default in debug builds, off in release.** `PENDOWN_METRICS=1` turns it on in a release build, and `PENDOWN_METRICS=0` off in a debug one. Off, each measurement is one check of a flag.
-  - **What's measured:**
-    - **UI thread, per frame:** the time spent rendering, in the animator, drawing into the pixel buffer and uploading the canvas image, the events taken, and how often the window re-renders.
-    - **Interpreter:** instructions a second, the time spent waiting in lockstep or on a full channel, and the time spent running.
-    - **CPU time for each thread:** the UI, the interpreter and vello_cpu's workers. That answers "who is using the core" directly. It's read from `/proc/self/task` on Linux at first; other platforms come later.
-  - **Where it's shown:**
-    - At the end of each run, a one-line summary on stderr, such as `run 3.2 s: 190 frames, UI 4.1 ms a frame, CPU UI 35% interpreter 2% vello 0%`.
-    - In the GUI, an overlay of the live numbers, toggled by a key.
-    - The CLI prints its summary on stderr: the run, the drawing and the PNG encoding.
-    - Debug builds are much slower than release, so their timings are for comparison with each other, not for budgets.
-  - **Catching regressions:**
-    - **Budgets in `cargo test`,** for numbers that don't depend on the machine. For example, a slow run of a fixed program renders the window at most once per animation frame, and re-uploads the canvas only when it changed. The animator tests already drive a real interpreter with made-up frame times, so they can count these exactly. A test that fails is a regression to fix, or a budget to change on purpose, in the same commit.
-    - **Timings against a baseline:** a `perf` binary runs fixed programs in release (the interpreter, the renderer, the animator with no window, and Instant mode end to end). It compares them with `perf/baseline.json`, committed in the repo, and fails if anything is more than 20% slower. Spike 03's `bench` becomes part of it. Updating the baseline is a deliberate commit that says why.
-    - There's no CI yet, so each phase's check, and every merge to main, runs `perf`. If CI is added, it runs the budget tests, and timings only on a fixed machine.
-  - **Then the first fix,** from what the numbers show. Suspects:
-    - every frame re-renders the whole window, including the editor and the console, while only the canvas changes;
-    - the canvas image may be uploaded to the GPU again every frame;
-    - the lockstep round trip per line.
-  - **Goal:** a slow run costs little more than an idle window, and Instant mode is as fast as before. Spike 04's measurements are the starting baseline.
-- **Watching a program run.** Two panels that update as the turtle goes, in step with the highlighted instruction. A value flashes when it changes.
-  - **Repeat counters:** the counter of every `REPEAT` and `FOREVER` running, outermost first, such as `REPEAT 3 of 36 › REPEAT 2 of 4`. The innermost one is what `REPCOUNT` outputs. Phase 2's `FOR` adds its own counter.
-  - **Variables:** the current value of every variable the running line can see: the globals, and the inputs and locals of each procedure in the call chain, since scope is dynamic (see "Kept from UCBLogo: dynamic scope"). Names keep the spelling of their definition (ADR 0004).
-  - **Keeping in step:** at animated speeds the interpreter waits at every line (lockstep), so it can publish its counters and changed variables just before it waits, and the panels show exactly what the highlighted line sees. Shallow binding (ADR 0007) makes the changes cheap to find. At Instant the panels update once a frame, and may be ahead of the drawing, as when pausing from Instant.
-  - **Layout:** two panels in the console area, beside the console's output, always visible. Both scroll and can be resized, for long lists of variables or values.
+While a program runs, Pendown keeps one CPU core fully busy, even at slow speeds where the turtle barely moves. Rather than a one-off fix, this phase builds in measurement that stays (ADR 0020), so the cause shows up now and regressions show up later.
 
-### Phase 3: Help, examples and tutorial (no new commands)
+- **A `metrics` module** in each crate that does work: counters and timings cheap enough to leave in, kept as atomics and read by whoever reports them.
+  - **On by default in debug builds, off in release.** `PENDOWN_METRICS=1` turns it on in a release build, and `PENDOWN_METRICS=0` off in a debug one. Off, each measurement is one check of a flag.
+- **What's measured:**
+  - **UI thread, per frame:** the time spent rendering, in the animator, drawing into the pixel buffer and uploading the canvas image, the events taken, and how often the window re-renders.
+  - **Interpreter:** instructions a second, the time spent waiting in lockstep or on a full channel, and the time spent running.
+  - **CPU time for each thread:** the UI, the interpreter and vello_cpu's workers. That answers "who is using the core" directly. It's read from `/proc/self/task` on Linux at first; other platforms come later.
+- **Where it's shown:**
+  - At the end of each run, a one-line summary on stderr, such as `run 3.2 s: 190 frames, UI 4.1 ms a frame, CPU UI 35% interpreter 2% vello 0%`.
+  - In the GUI, an overlay of the live numbers, toggled by a key.
+  - The CLI prints its summary on stderr: the run, the drawing and the PNG encoding.
+  - Debug builds are much slower than release, so their timings are for comparison with each other, not for budgets.
+- **Catching regressions:**
+  - **Budgets in `cargo test`,** for numbers that don't depend on the machine. For example, a slow run of a fixed program renders the window at most once per animation frame, and re-uploads the canvas only when it changed. The animator tests already drive a real interpreter with made-up frame times, so they can count these exactly. A test that fails is a regression to fix, or a budget to change on purpose, in the same commit.
+  - **Timings against a baseline:** a `perf` binary runs fixed programs in release (the interpreter, the renderer, the animator with no window, and Instant mode end to end). It compares them with `perf/baseline.json`, committed in the repo, and fails if anything is more than 20% slower. Spike 03's `bench` becomes part of it. Updating the baseline is a deliberate commit that says why.
+  - There's no CI yet, so each phase's check, and every merge to main, runs `perf`. If CI is added, it runs the budget tests, and timings only on a fixed machine.
+- **Then the first fix,** from what the numbers show. Suspects:
+  - every frame re-renders the whole window, including the editor and the console, while only the canvas changes;
+  - the canvas image may be uploaded to the GPU again every frame;
+  - the lockstep round trip per line.
+- **Goal:** a slow run costs little more than an idle window, and Instant mode is as fast as before. Spike 04's measurements are the starting baseline.
+
+### Phase 4: Watching a program run (no new commands)
+
+Two panels that update as the turtle goes, in step with the highlighted instruction. A value flashes when it changes.
+
+- **Repeat counters:** the counter of every `REPEAT` and `FOREVER` running, outermost first, such as `REPEAT 3 of 36 › REPEAT 2 of 4`. The innermost one is what `REPCOUNT` outputs. Phase 2's `FOR` adds its own counter.
+- **Variables:** the current value of every variable the running line can see: the globals, and the inputs and locals of each procedure in the call chain, since scope is dynamic (see "Kept from UCBLogo: dynamic scope"). Names keep the spelling of their definition (ADR 0004).
+- **Keeping in step:** at animated speeds the interpreter waits at every line (lockstep), so it can publish its counters and changed variables just before it waits, and the panels show exactly what the highlighted line sees. Shallow binding (ADR 0007) makes the changes cheap to find. At Instant the panels update once a frame, and may be ahead of the drawing, as when pausing from Instant.
+- **Layout:** two panels in the console area, beside the console's output, always visible. Both scroll and can be resized, for long lists of variables or values.
+
+### Phase 5: Help, examples and tutorial (no new commands)
 
 Two of the headline features. They come after phase 2 so they cover the complete core language, and so the commands they document have settled down.
 
@@ -104,14 +109,14 @@ Open questions:
 - **Where examples run:** on the main canvas (replacing the user's drawing), or on a small canvas in the help panel?
 - **Pictures:** show a pre-rendered picture of each example's output in the help panel? The snapshot tests already produce them.
 
-### Phase 4: Interactive programs (14 commands)
+### Phase 6: Interactive programs (14 commands)
 
 - **Mouse:** `MOUSEPOS`, `CLICKPOS`, `BUTTONP`/`BUTTON`, and the `BUTTONACT`/`KEYACT` handlers.
 - **Keyboard and console:** `READLIST`, `READWORD`, `READRAWLINE`, `READCHAR`, `READCHARS`, `KEYP`, `LINEP`, `CLEARTEXT`.
 
 These need the parts of the speed design that synchronise with the GUI: sync points before input, shared mouse state in turtle coordinates, and a console mode for when the program is waiting for input. It's worth building them as a separate step.
 
-### Phase 5: Advanced and niche (85 commands)
+### Phase 7: Advanced and niche (85 commands)
 
 - **Pixel drawing and text:** `FILL`, `FILLED`, `LABEL`/`SETLABELHEIGHT`/`LABELSIZE`, the pen modes `PENPAINT`/`PENERASE`/`PENREVERSE`/`PENMODE`, and `SETPEN`/`PEN`, which include the mode. These add the `Fill`, `Filled` and `Label` events and the pen mode in `Move`. Two spikes, drafted and then put off, come first: `.scratch/pixel-drawing-spikes/`.
 - **Language features:** objects (`KINDOF`, `ASK`, `TALKTO`, `USUAL`…), macros and backquote, property lists.
@@ -124,7 +129,7 @@ These need the parts of the speed design that synchronise with the GUI: sync poi
 
 ## Dialect and extensions
 
-We implement **UCBLogo**: it's the closest thing Logo has to a standard, it's the best documented, and most later Logos (FMSLogo, jsLogo) follow it. Where the dialects differ, it's mostly in commands we've marked obsolete or put in phase 5.
+We implement **UCBLogo**: it's the closest thing Logo has to a standard, it's the best documented, and most later Logos (FMSLogo, jsLogo) follow it. Where the dialects differ, it's mostly in commands we've marked obsolete or put in phase 7.
 
 "Our Logo" is UCBLogo's core plus a few deliberate changes and extensions, listed here. They're recorded in `pendown-logo.kdl` too, so the help panel covers them:
 
@@ -138,7 +143,7 @@ References in `refs/`: `ucblogo-code` (the C source, for checking exact behaviou
 A procedure can see the local variables of whatever procedure called it, not just globals. Every Logo works this way, and Logo teaching material relies on it.
 
 - **Implementation:** a stack of frames. Looking up a variable walks from the current frame down through its callers to the globals. `MAKE` sets the nearest existing variable with that name, or creates a global if there isn't one.
-- **GUI:** phase 2's variable panel should show the whole chain of frames, since that's what a running line can actually see.
+- **GUI:** phase 4's variable panel should show the whole chain of frames, since that's what a running line can actually see.
 
 ### Colours
 
@@ -178,11 +183,11 @@ From LibreLogo and FMSLogo. Shapes are drawn **centred on the turtle** and turn 
 
 Circles and ellipses take radii, and squares and rectangles take side lengths, because that's how people usually measure each. The optional corner radius uses UCBLogo's usual parentheses for extra inputs, as with `(SENTENCE a b c)`.
 
-- **Outline:** drawn with the current pen (colour, size and, in phase 5, mode) when the pen is down.
+- **Outline:** drawn with the current pen (colour, size and, in phase 7, mode) when the pen is down.
 - **Fill (phase 2):** `SETFILLCOLOR colour` sets a fill colour, and `SETFILLCOLOR "none` turns filling off. `"none` is the default. When a fill colour is set, shapes are filled, even when the pen is up. So pen up with a fill colour gives a filled shape with no outline.
 - **Events:** `Ellipse { center, radii, heading, pen, fill }`, which `CIRCLE` uses too, with equal radii, and `Rect { center, size, corner, heading, pen, fill }` for `SQUARE` and `RECTANGLE`. At animated speeds the animator can draw the outline sweeping round, then the fill.
 
-Filling turtle-drawn polygons is already covered by UCBLogo's `FILLED colour [instructions]` and `FILL` (phase 5).
+Filling turtle-drawn polygons is already covered by UCBLogo's `FILLED colour [instructions]` and `FILL` (phase 7).
 
 ## Question
 

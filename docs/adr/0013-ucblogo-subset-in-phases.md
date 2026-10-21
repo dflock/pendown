@@ -9,7 +9,7 @@ Classic Logo assumes a full screen with no GUI or editor, so many of its command
 
 ## Decision
 
-- **Implement a subset of UCBLogo,** in phases, starting with turtle and drawing commands and adding the more advanced parts later. The phases are described in `implementation-plan.md`: 1 turtle drawing, 2 the complete core language and richer drawing, 3 help, examples and tutorial, 4 interactive programs, 5 advanced and niche.
+- **Implement a subset of UCBLogo,** in phases, starting with turtle and drawing commands and adding the more advanced parts later. The phases are described in `implementation-plan.md`: 1 turtle drawing, 2 the complete core language and filled shapes, 3 performance, 4 watching a program run, 5 help, examples and tutorial, 6 interactive programs, 7 advanced and niche, including fills, labels and pen modes.
 - **Commands made unnecessary by the GUI, or tied to old hardware or the UCBLogo installation, are obsolete** and will never be supported: printing out definitions, workspace listings, `ERASE`, `EDIT`, `SAVE`/`LOAD`, `HELP`, `TRACE`/`STEP`, `PAUSE`, screen layout, console fonts, memory management, file paths, aspect-ratio correction, plus `TEST`/`IFTRUE`/`IFFALSE` and `GOTO`, which are superseded in the language.
 - **`pendown-logo.kdl` is the source of truth** for what we support. Every command from the Berkeley Logo manual is in it, organised by chapter and section, with:
   - `obsolete` and `obsolete_reason`;

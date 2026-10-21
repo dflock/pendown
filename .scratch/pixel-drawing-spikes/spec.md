@@ -1,8 +1,8 @@
 # Pixel drawing spikes
 
-Status: deferred to phase 5. These were drafted for phase 2, then put off along with the commands they test.
+Status: deferred to phase 7. These were drafted for phase 2, then put off along with the commands they test.
 
-Time-boxed experiments to take the risks out of the drawing commands that work on pixels or need text: `FILL`, `FILLED`, `LABEL`, and the pen modes. See "Phase 5" in `implementation-plan.md` for the scope, and `docs/adr/` for decisions already made. Run them before those commands' spec is written.
+Time-boxed experiments to take the risks out of the drawing commands that work on pixels or need text: `FILL`, `FILLED`, `LABEL`, and the pen modes. See "Phase 7" in `implementation-plan.md` for the scope, and `docs/adr/` for decisions already made. Run them before those commands' spec is written.
 
 As in phase 1, each spike answers specific questions and ends with a short write-up under `## Comments` in its issue: what worked, what didn't, numbers measured, and anything that should change the plan or an ADR. Spike code is throwaway, but whatever works is expected to move into `pendown-render`.
 

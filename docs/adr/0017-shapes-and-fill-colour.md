@@ -23,6 +23,6 @@ New commands, all drawn **centred on the turtle**, turned with its heading. The 
 
 ## Consequences
 
-- UCBLogo's `FILLED` and `FILL` (phase 5) still cover filling shapes drawn by the turtle.
+- UCBLogo's `FILLED` and `FILL` (phase 7) still cover filling shapes drawn by the turtle.
 - `SETFC` and `FC` are our own short names; no other Logo uses them.
 - All six commands are in `pendown-logo.kdl` with `extension #true` and a `source`.

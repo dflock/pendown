@@ -352,6 +352,24 @@ fn shapes_sweep_round_and_pen_up_shapes_take_no_time() {
 }
 
 #[test]
+fn filled_shapes_with_the_pen_up_take_the_time_of_their_outline() {
+    let (mut animator, _run) = start("PU SETFC \"red CIRCLE 50", Speed::Animated(100.0));
+    let (mut frames, mut marks) = (0, Vec::new());
+    while !animator.finished() && frames < 1000 {
+        let out = frame(&mut animator, FRAME);
+        assert!(animator.partial(0.1).is_none(), "no outline to show");
+        marks.extend(out.marks);
+        frames += 1;
+    }
+    // 314 steps round at 100 a second, after PU and SETFC hold the
+    // highlight for 10 steps each, since they move nothing.
+    let expected = (std::f64::consts::PI + 0.2) / FRAME.as_secs_f64();
+    assert!((frames as f64 - expected).abs() <= 3.0, "{frames} frames");
+    assert_eq!(marks.len(), 1, "the fill appears at the end");
+    assert_eq!(marks[0].fill(), Some([255, 0, 0, 255]));
+}
+
+#[test]
 fn wait_takes_its_time_even_at_instant() {
     let (mut animator, _run) = start("FD 10 WAIT 30 FD 10", Speed::Instant);
     let mut frames = 0;

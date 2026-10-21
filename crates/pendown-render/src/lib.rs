@@ -145,7 +145,7 @@ impl Drawing {
     /// Adds finished lines, arcs and shapes. They're drawn by the next
     /// `draw_pending`. Marks drawn with the pen up are left out.
     pub fn push(&mut self, marks: &[Mark]) {
-        let drawn = marks.iter().filter(|m| m.pen().down);
+        let drawn = marks.iter().filter(|m| m.visible());
         self.display.extend(drawn.clone());
         self.pending.extend(drawn);
     }
@@ -231,13 +231,19 @@ impl Drawing {
             if mark.closed() {
                 path.close_path();
             }
-            let pen = mark.pen();
-            let [r, g, b, a] = pen.color;
             // Red and blue swapped, so the buffer is BGRA.
-            self.context.set_paint(vello_cpu::color::AlphaColor::from_rgba8(b, g, r, a));
+            let paint = |[r, g, b, a]: [u8; 4]| vello_cpu::color::AlphaColor::from_rgba8(b, g, r, a);
+            let pen = mark.pen();
+            if let Some(fill) = mark.fill() {
+                self.context.set_paint(paint(fill));
+                self.context.fill_path(&path);
+            }
             let width = pen_width(pen, scale);
-            self.context.set_stroke(Stroke::new(width).with_caps(Cap::Round).with_join(Join::Round));
-            self.context.stroke_path(&path);
+            if pen.down {
+                self.context.set_paint(paint(pen.color));
+                self.context.set_stroke(Stroke::new(width).with_caps(Cap::Round).with_join(Join::Round));
+                self.context.stroke_path(&path);
+            }
             self.mark_dirty(left, top, right, bottom, width / 2.0 + 2.0);
         }
         self.context.flush();
@@ -425,16 +431,35 @@ mod tests {
         let mut d = Drawing::new();
         d.resize(1000, 1000);
         let thick = Pen { size: 6.0, ..RED };
-        d.push(&[Mark::Ellipse { center: p(0.0, 0.0), radii: (200.0, 200.0), heading: 0.0, pen: thick }]);
-        d.push(&[Mark::Rect { center: p(0.0, 0.0), size: (100.0, 100.0), corner: 0.0, heading: 45.0, pen: thick }]);
+        d.push(&[Mark::Ellipse { center: p(0.0, 0.0), radii: (200.0, 200.0), heading: 0.0, pen: thick, fill: None }]);
+        d.push(&[Mark::Rect { center: p(0.0, 0.0), size: (100.0, 100.0), corner: 0.0, heading: 45.0, pen: thick, fill: None }]);
         d.draw_pending();
         assert_eq!(d.pixel(500, 300), [255, 0, 0, 255], "the top of the circle");
         assert_eq!(d.pixel(500, 500), BACKGROUND, "not filled");
         // The square is turned 45 degrees, so its corner is straight ahead.
         assert_eq!(d.pixel(500, 430), [255, 0, 0, 255]);
         // Pen-up marks aren't drawn or kept.
-        d.push(&[Mark::Ellipse { center: p(0.0, 0.0), radii: (100.0, 100.0), heading: 0.0, pen: Pen { down: false, ..thick } }]);
+        d.push(&[Mark::Ellipse { center: p(0.0, 0.0), radii: (100.0, 100.0), heading: 0.0, pen: Pen { down: false, ..thick }, fill: None }]);
         assert_eq!(d.segments(), 2);
+    }
+
+    #[test]
+    fn shapes_can_be_filled() {
+        let mut d = Drawing::new();
+        d.resize(1000, 1000);
+        let thick = Pen { size: 6.0, ..RED };
+        let green = Some([0, 255, 0, 255]);
+        d.push(&[Mark::Ellipse { center: p(0.0, 0.0), radii: (200.0, 200.0), heading: 0.0, pen: thick, fill: green }]);
+        // With the pen up, a filled shape has no outline.
+        let blue = Some([0, 0, 255, 255]);
+        let up = Pen { down: false, ..thick };
+        d.push(&[Mark::Rect { center: p(300.0, 300.0), size: (100.0, 100.0), corner: 0.0, heading: 0.0, pen: up, fill: blue }]);
+        d.draw_pending();
+        assert_eq!(d.pixel(500, 500), [0, 255, 0, 255], "filled");
+        assert_eq!(d.pixel(500, 300), [255, 0, 0, 255], "the outline on top");
+        assert_eq!(d.pixel(800, 200), [0, 0, 255, 255], "the square's middle");
+        assert_eq!(d.pixel(849, 200), [0, 0, 255, 255], "and its edge, with no outline");
+        assert_eq!(d.segments(), 2, "both are kept");
     }
 
     #[test]

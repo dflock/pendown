@@ -75,6 +75,17 @@ fn phase_1_examples() {
 }
 
 #[test]
+fn filled_shapes() {
+    let program = "
+SETFC \"gold CIRCLE 200
+SETFC [0 0 255 128] PU SETXY 150 150 SQUARE 250 PD
+SETPC \"white SETFC \"#ff000080 RT 30 (RECTANGLE 300 100 30)
+SETFC \"none HOME ELLIPSE 100 50
+";
+    check("filled-shapes", program, 300, 300);
+}
+
+#[test]
 fn square() {
     check("square", "REPEAT 4 [FD 300 RT 90]", 250, 250);
 }

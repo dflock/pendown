@@ -125,6 +125,10 @@ pub struct Turtle {
     pub pen: Pen,
     /// The pen colour in the form it was set, for `PENCOLOR`.
     pub pen_colour: Value,
+    /// What shapes are filled with, if anything (ADR 0017), and the form it
+    /// was set in, for `FILLCOLOR`.
+    pub fill: Option<Rgba>,
+    pub fill_colour: Value,
     pub shown: bool,
     pub mode: TurtleMode,
 }
@@ -137,6 +141,8 @@ impl Default for Turtle {
             // UCBLogo's defaults: a white pen on a black background.
             pen: Pen { down: true, color: PALETTE[7], size: 1.0 },
             pen_colour: Value::Num(7.0),
+            fill: None,
+            fill_colour: Value::word("none"),
             shown: true,
             mode: TurtleMode::Wrap,
         }
@@ -208,6 +214,8 @@ pub struct Interpreter {
     /// `RANDOM`'s generator, seeded afresh on each Run unless `seed` is set.
     pub(crate) random: Random,
     seed: Option<u64>,
+    /// The colours that numbers stand for, which `SETPALETTE` changes.
+    pub(crate) palette: [Rgba; 16],
     /// The background colour, and the form it was set in.
     pub(crate) background: (Rgba, Value),
     /// The turtle area, which Run doesn't change.
@@ -278,6 +286,7 @@ impl Interpreter {
             turtle: Turtle::default(),
             area: Area::default(),
             background: (PALETTE[0], Value::Num(0.0)),
+            palette: PALETTE,
             random: Random::new(Random::fresh_seed()),
             seed: None,
             sink,
@@ -380,6 +389,7 @@ impl Interpreter {
         self.repcounts.clear();
         self.turtle = Turtle::default();
         self.background = (PALETTE[0], Value::Num(0.0));
+        self.palette = PALETTE;
         self.random = Random::new(self.seed.unwrap_or_else(Random::fresh_seed));
         self.last_line = None;
         self.console_entries = 0;

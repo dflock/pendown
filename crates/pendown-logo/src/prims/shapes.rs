@@ -61,7 +61,7 @@ pub(super) fn arc(it: &mut Interpreter, a: &Args) -> Out {
 
 fn ellipse_event(it: &mut Interpreter, radii: (f64, f64)) -> Out {
     let t = &it.turtle;
-    let event = Event::Ellipse { center: t.pos, radii, heading: t.heading, pen: t.pen, fill: None };
+    let event = Event::Ellipse { center: t.pos, radii, heading: t.heading, pen: t.pen, fill: t.fill };
     it.emit(event)?;
     Ok(None)
 }
@@ -71,7 +71,7 @@ fn rect_event(it: &mut Interpreter, a: &Args, size: (f64, f64), corner_input: us
     // A corner can't be rounder than half the shorter side.
     let corner = corner.min(size.0.min(size.1) / 2.0);
     let t = &it.turtle;
-    let event = Event::Rect { center: t.pos, size, corner, heading: t.heading, pen: t.pen, fill: None };
+    let event = Event::Rect { center: t.pos, size, corner, heading: t.heading, pen: t.pen, fill: t.fill };
     it.emit(event)?;
     Ok(None)
 }

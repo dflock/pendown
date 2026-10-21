@@ -11,8 +11,10 @@ use crate::Segment;
 pub enum Mark {
     Line(Segment),
     Arc { center: Point, radius: f64, start_heading: f64, angle: f64, pen: Pen },
-    Ellipse { center: Point, radii: (f64, f64), heading: f64, pen: Pen },
-    Rect { center: Point, size: (f64, f64), corner: f64, heading: f64, pen: Pen },
+    /// Shapes are filled with `fill`, if there is one, then outlined if the
+    /// pen is down (ADR 0017).
+    Ellipse { center: Point, radii: (f64, f64), heading: f64, pen: Pen, fill: Option<[u8; 4]> },
+    Rect { center: Point, size: (f64, f64), corner: f64, heading: f64, pen: Pen, fill: Option<[u8; 4]> },
 }
 
 impl From<Segment> for Mark {
@@ -44,6 +46,19 @@ impl Mark {
             Mark::Line(s) => s.pen,
             Mark::Arc { pen, .. } | Mark::Ellipse { pen, .. } | Mark::Rect { pen, .. } => *pen,
         }
+    }
+
+    pub fn fill(&self) -> Option<[u8; 4]> {
+        match self {
+            Mark::Ellipse { fill, .. } | Mark::Rect { fill, .. } => *fill,
+            Mark::Line(_) | Mark::Arc { .. } => None,
+        }
+    }
+
+    /// Whether drawing it changes anything: an outline with the pen down,
+    /// or a fill.
+    pub fn visible(&self) -> bool {
+        self.pen().down || self.fill().is_some()
     }
 
     /// Whether the outline goes all the way round.
@@ -144,7 +159,7 @@ mod tests {
 
     #[test]
     fn a_circles_length_is_its_circumference() {
-        let circle = Mark::Ellipse { center: p(0.0, 0.0), radii: (100.0, 100.0), heading: 0.0, pen: PEN };
+        let circle = Mark::Ellipse { center: p(0.0, 0.0), radii: (100.0, 100.0), heading: 0.0, pen: PEN, fill: None };
         assert!((circle.length() - std::f64::consts::TAU * 100.0).abs() < 0.1);
         let points = circle.outline(0.1);
         assert!(close(points[0], p(0.0, 100.0)), "starts straight ahead");
@@ -154,20 +169,20 @@ mod tests {
     #[test]
     fn ellipses_turn_with_the_heading() {
         // At heading 90, "along" points east.
-        let e = Mark::Ellipse { center: p(0.0, 0.0), radii: (20.0, 50.0), heading: 90.0, pen: PEN };
+        let e = Mark::Ellipse { center: p(0.0, 0.0), radii: (20.0, 50.0), heading: 90.0, pen: PEN, fill: None };
         assert!(close(e.outline(0.1)[0], p(50.0, 0.0)));
     }
 
     #[test]
     fn rectangles() {
-        let r = Mark::Rect { center: p(0.0, 0.0), size: (200.0, 100.0), corner: 0.0, heading: 0.0, pen: PEN };
+        let r = Mark::Rect { center: p(0.0, 0.0), size: (200.0, 100.0), corner: 0.0, heading: 0.0, pen: PEN, fill: None };
         let points = r.outline(0.1);
         assert_eq!(points.len(), 6);
         assert!(close(points[0], p(0.0, 50.0)) && close(points[1], p(100.0, 50.0)) && close(points[2], p(100.0, -50.0)));
         assert!((r.length() - 600.0).abs() < 1e-6);
         // Rounded corners make it shorter: each corner trades 2r for a
         // quarter circle.
-        let rounded = Mark::Rect { center: p(0.0, 0.0), size: (200.0, 100.0), corner: 10.0, heading: 0.0, pen: PEN };
+        let rounded = Mark::Rect { center: p(0.0, 0.0), size: (200.0, 100.0), corner: 10.0, heading: 0.0, pen: PEN, fill: None };
         let expected = 600.0 - 4.0 * 20.0 + std::f64::consts::TAU * 10.0;
         assert!((rounded.length() - expected).abs() < 0.1, "{}", rounded.length());
     }
@@ -185,7 +200,7 @@ mod tests {
     fn partial_outlines() {
         let line = Mark::Line(Segment { from: p(0.0, 0.0), to: p(0.0, 100.0), pen: PEN });
         assert_eq!(line.partial(0.25, 0.1), [p(0.0, 0.0), p(0.0, 25.0)]);
-        let square = Mark::Rect { center: p(0.0, 0.0), size: (100.0, 100.0), corner: 0.0, heading: 0.0, pen: PEN };
+        let square = Mark::Rect { center: p(0.0, 0.0), size: (100.0, 100.0), corner: 0.0, heading: 0.0, pen: PEN, fill: None };
         // Half way round from the top middle: the bottom middle.
         assert!(close(*square.partial(0.5, 0.1).last().unwrap(), p(0.0, -50.0)));
     }

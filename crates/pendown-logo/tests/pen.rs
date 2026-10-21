@@ -82,3 +82,35 @@ fn colour_errors() {
     assert_eq!(error("SETPENSIZE 0"), "SETPENSIZE doesn't like 0 as input");
     assert_eq!(error("SETPENSIZE \"thick"), "SETPENSIZE doesn't like thick as input");
 }
+
+#[test]
+fn the_palette() {
+    assert_eq!(output("SHOW PALETTE 4"), "[255 0 0]\n");
+    assert_eq!(output("SETPALETTE 8 [10 20 30] SHOW PALETTE 8"), "[10 20 30]\n");
+    assert_eq!(output("SETPALETTE 9 \"#ff000080 SHOW PALETTE 9"), "[255 0 0 128]\n");
+    let r = run("SETPALETTE 8 \"red SETPC 8 FD 10");
+    assert_eq!(pens(&r), [([255, 0, 0, 255], 1.0, true)]);
+    // Run puts the palette back.
+    assert_eq!(output("SHOW PALETTE 8"), "[155 96 59]\n");
+    assert_eq!(error("SETPALETTE 7 \"red"), "SETPALETTE doesn't like 7 as input");
+    assert_eq!(error("SETPALETTE 8 4"), "SETPALETTE doesn't like 4 as input");
+    assert_eq!(error("SHOW PALETTE 16"), "PALETTE doesn't like 16 as input");
+}
+
+#[test]
+fn fill_colours() {
+    use pendown_logo::Event;
+    let fills = |r: &Run| -> Vec<Option<[u8; 4]>> {
+        r.events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Ellipse { fill, .. } | Event::Rect { fill, .. } => Some(*fill),
+                _ => None,
+            })
+            .collect()
+    };
+    let r = run("CIRCLE 10 SETFC \"orange SQUARE 10 SETFILLCOLOR [1 2 3 4] CIRCLE 5 SETFC \"none CIRCLE 5");
+    assert_eq!(fills(&r), [None, Some([255, 165, 0, 255]), Some([1, 2, 3, 4]), None]);
+    assert_eq!(output("SHOW FILLCOLOR SETFC \"orange SHOW FC SETFC 4 SHOW FC"), "none\norange\n4\n");
+    assert_eq!(error("SETFC \"nosuch"), "I don't know the colour \"nosuch\"");
+}

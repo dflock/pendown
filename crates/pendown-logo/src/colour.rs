@@ -211,9 +211,15 @@ impl ColourError {
 /// Reads a colour in any of its forms. The forms can't be confused: a number
 /// is a palette index, a list is RGB or RGBA, a word starting with `#` is
 /// hex, and any other word is a name.
+#[cfg(test)]
 pub fn parse(value: &Value) -> Result<Rgba, ColourError> {
+    parse_with(value, &PALETTE)
+}
+
+/// Like `parse`, with the palette as `SETPALETTE` has left it.
+pub fn parse_with(value: &Value, palette: &[Rgba; 16]) -> Result<Rgba, ColourError> {
     if let Some(n) = value.as_num() {
-        return if n.fract() == 0.0 && (0.0..16.0).contains(&n) { Ok(PALETTE[n as usize]) } else { Err(ColourError::NotAColour) };
+        return if n.fract() == 0.0 && (0.0..16.0).contains(&n) { Ok(palette[n as usize]) } else { Err(ColourError::NotAColour) };
     }
     match value {
         Value::List(list) => {

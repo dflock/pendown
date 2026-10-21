@@ -325,11 +325,11 @@ impl Animator {
                     let mark = Mark::Arc { center, radius, start_heading, angle, pen };
                     self.current = Some(Current::Mark { mark, length: mark.length(), done: 0.0 });
                 }
-                Event::Ellipse { center, radii, heading, pen, .. } => {
-                    self.start_shape(Mark::Ellipse { center, radii, heading, pen });
+                Event::Ellipse { center, radii, heading, pen, fill } => {
+                    self.start_shape(Mark::Ellipse { center, radii, heading, pen, fill });
                 }
-                Event::Rect { center, size, corner, heading, pen, .. } => {
-                    self.start_shape(Mark::Rect { center, size, corner, heading, pen });
+                Event::Rect { center, size, corner, heading, pen, fill } => {
+                    self.start_shape(Mark::Rect { center, size, corner, heading, pen, fill });
                 }
                 Event::Print(text) => out.printed.push(text),
                 Event::ShowTurtle => self.shown = true,
@@ -368,10 +368,12 @@ impl Animator {
         out
     }
 
-    /// A shape sweeps round as the pen draws it. With the pen up, there's
-    /// nothing to see, so it takes no time.
+    /// A shape sweeps round as the pen draws it, and its fill, if it has
+    /// one, appears when it's done. A filled shape with the pen up takes the
+    /// same time, with nothing to see until the fill. With the pen up and no
+    /// fill, there's nothing to see at all, so it takes no time.
     fn start_shape(&mut self, mark: Mark) {
-        if mark.pen().down {
+        if mark.visible() {
             self.idle_instruction = false;
             self.current = Some(Current::Mark { mark, length: mark.length(), done: 0.0 });
         }

@@ -48,7 +48,7 @@ struct DrawingSink {
 
 impl DrawingSink {
     fn add(&mut self, mark: Mark) {
-        if mark.pen().down {
+        if mark.visible() {
             self.pending.push(mark);
             if self.pending.len() >= DRAW_BATCH {
                 self.draw();
@@ -73,9 +73,9 @@ impl EventSink for DrawingSink {
             Event::Arc { center, radius, start_heading, angle, pen } => {
                 self.add(Mark::Arc { center, radius, start_heading, angle, pen })
             }
-            Event::Ellipse { center, radii, heading, pen, .. } => self.add(Mark::Ellipse { center, radii, heading, pen }),
-            Event::Rect { center, size, corner, heading, pen, .. } => {
-                self.add(Mark::Rect { center, size, corner, heading, pen })
+            Event::Ellipse { center, radii, heading, pen, fill } => self.add(Mark::Ellipse { center, radii, heading, pen, fill }),
+            Event::Rect { center, size, corner, heading, pen, fill } => {
+                self.add(Mark::Rect { center, size, corner, heading, pen, fill })
             }
             Event::Print(text) => self.printed.borrow_mut().push_str(&text),
             Event::Clean => {

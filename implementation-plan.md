@@ -263,25 +263,30 @@ interpreter thread ──(bounded channel of events)──▶ animator (UI threa
 - **A bounded channel keeps the two in step.** The channel holds only a limited number of events, so when it's full the interpreter blocks until the animator catches up. At slow speeds the interpreter therefore stays only a few events ahead of what's on screen, and pausing the animator automatically pauses the program.
 - **Events go in batches.** One channel send per event manages only 2–11 M events a second, more than the rest of the interpreter costs (spike 03). Batching makes runs 2.5–5 times faster: 9–12 M instructions a second for drawing loops, about ten times what the pixel buffer can draw.
   - The interpreter sends a `Vec<Event>` of up to 256 events when it's full, when it has been open for 4 ms, and at the end of the run. The channel holds 4 batches.
-  - At slow speeds, the interpreter can be up to about 1,000 events ahead of the screen.
+  - At animated speeds the interpreter waits at each line anyway (see "How highlighting and stepping work"), so the channel's size doesn't decide how far ahead it gets. Spike 04 tried channels from 4 to 32 batches; once Instant waits out its slice, larger ones gained only about 0.02 s on a 131,000-move drawing.
   - Every sync point sends the open batch first, including each line while stepping, so the animator can reach the `Sync` it's waiting for.
 - **Turtle queries never wait for the GUI.** `POS`, `HEADING`, `PENDOWNP` and similar are answered from the interpreter's own turtle state. Only the drawing lags behind.
 - **Sync points.** Before anything that depends on what the user sees, the interpreter sends a `Sync` event with a one-shot reply channel and waits until the animator reaches it. That applies to reading input, reading the mouse or keyboard, and the end of the program.
-- **Driving frames.** While events are queued or a move is part-way through, the animator calls `window.request_animation_frame()` (`window.rs:2730`) each frame, and stops calling it when idle. Each frame it uses `try_recv` to take as many events as the current speed and elapsed time allow, so no async plumbing is needed. gpui's docs say *decorative* animations should respect `App::reduce_motion`. This animation isn't decorative, because the user chose the speed, so it shouldn't be skipped.
+- **Driving frames.** While events are queued or a move is part-way through, the animator calls `window.request_animation_frame()` (`window.rs:2730`) each frame, and stops calling it when idle. Each frame it uses `try_recv` to take as many events as the current speed and elapsed time allow, so no async plumbing is needed. In two cases it waits briefly on the channel (`recv_timeout`) instead: in Instant mode, until its slice is used up, and for up to 4 ms after replying to a `Sync`, when the next line's events are microseconds away. gpui's docs say *decorative* animations should respect `App::reduce_motion`. This animation isn't decorative, because the user chose the speed, so it shouldn't be skipped.
 
 ### Speed model
 
-- **Instant:** each frame, process events for a fixed time slice (around 8 ms) and paint once. This gives the same "everything appears at once" feel as other Logos, while the UI stays responsive on huge or endless programs.
-- **Animated speeds:** a slider sets a distance per second and an angle per second. The turtle glides along each `FD` and visibly rotates on each `RT`/`LT`, rather than jumping from one command to the next. Small moves cost little, so recursive drawings speed up naturally when they get into fine detail.
+- **Speed levels from 1 to 11.** Level 11 is Instant. Below it, each level doubles the speed of the one before, from 5 turtle steps a second at level 1 to 2,560 at level 10. Levels are easy to say ("try speed 3") and to write in a program (`SETSPEED 3`). The GUI shows the steps per second next to the slider.
+- **Instant:** each frame, process events for a fixed time slice (8 ms) and paint once. This gives the same "everything appears at once" feel as other Logos, while the UI stays responsive on huge or endless programs.
+  - The animator must wait for events until the slice is used up, not just take what's in the channel. Otherwise the channel's size caps Instant at a channelful a frame: a 131,000-move tree took 8.9 s that way, and 0.2 s with waiting (spike 04).
+  - Drawing is capped at about 6 ms of segments a frame, estimated from the measured cost per segment.
+- **Animated speeds:** turtle steps per second, and turning at 3 degrees per step, so at 100 steps a second `FD 50` takes 0.5 s and `RT 90` takes 0.3 s. The turtle glides along each `FD` and visibly rotates on each `RT`/`LT`, rather than jumping from one command to the next. Small moves cost little, so recursive drawings speed up naturally when they get into fine detail.
+- **Instructions that don't move the turtle,** such as `REPEAT`, `MAKE` or a procedure call, keep the highlight for the time it takes to move 10 steps, at most 0.25 s. Otherwise they'd flash past too fast to see at any speed.
 - **Changes apply immediately**, even mid-move, because only the animator reads the speed.
 - **`WAIT`** is a `Wait` event that the animator honours at every speed, including Instant, because a program that says `WAIT` means it.
-- **`SETSPEED n` / `SPEED`** would be a Logo-level extension that sends a `SetSpeed` event, so the speed changes at exactly that point in the program. Python's `turtle.speed()` is a well-known example of the same idea.
+- **`SETSPEED n` / `SPEED`** would be a Logo-level extension that sends a `SetSpeed` event, so the speed changes at exactly that point in the program. `n` is a level from 1 to 11. Python's `turtle.speed()` is a well-known example of the same idea.
 
 ### Controls
 
-- **Speed slider**: changes only the animator's speed.
-- **Pause / Resume**: the animator stops taking events, the channel fills up, and the interpreter blocks.
+- **Speed slider**: levels from 1 to 11. It changes only the animator's speed, and applies on the next frame, even in the middle of a move.
+- **Pause / Resume**: the animator stops taking events. At animated speeds the interpreter is already waiting at the start of the next line; at Instant, it carries on until the channel is full.
 - **Step**: while paused, run exactly one line of code, the same way UCBLogo's `STEP` command does. All the drawing and output that line produces plays at the current speed, with each instruction highlighted as it runs, then the program pauses again at the start of the next line.
+- **Step instruction**: while paused, run to the next instruction, including inside brackets. One-line loops need it: a one-line `FOREVER [FD 1 RT 1]` never reaches another line, so Step alone could never stop in it.
 - **Stop**: set a cancel flag that the interpreter checks on every evaluation step, and drop the channel so a blocked interpreter wakes up and exits. This should behave like UCBLogo's `THROW "TOPLEVEL`, which ends all running procedures, but the program's own `CATCH` must not be able to intercept it.
 
 #### How highlighting and stepping work
@@ -289,7 +294,11 @@ interpreter thread ──(bounded channel of events)──▶ animator (UI threa
 Before running each instruction, the interpreter sends an `Instruction { span, starts_line }` event. `span` covers just that instruction, so in `REPEAT 4 [FD 50 RT 90]` the highlight moves from `REPEAT` to `FD 50` to `RT 90` and round again. `starts_line` is set on the first instruction run from each line.
 
 - **Running normally:** `Instruction` is an ordinary event. The animator only uses it to move the highlight in the editor.
-- **Paused or stepping:** the GUI sets a shared `stepping` flag, an atomic the interpreter reads. While it's set, the interpreter treats each `Instruction` with `starts_line` like `Sync`: it waits for the animator to reply before running that line.
+- **Lockstep:** the GUI sets a shared `lockstep` flag, an atomic the interpreter reads. While it's set, the interpreter sends a `Sync` after each `Instruction` with `starts_line`, and waits for the animator to reply before running that line.
+  - It's set while paused or stepping, and at every animated speed. Only Instant, running, leaves it off.
+  - Lockstep costs a round trip of about 10 µs per line, which allows about 25,000 lines a second at animated speeds (spike 04), far faster than anyone can watch.
+- **Pausing:** the animator holds the next `Sync` it reaches instead of replying, so the interpreter waits before the highlighted line. Step releases the held `Sync` and plays until it holds the next one. Resume releases it and carries on.
+- **Pausing from Instant** leaves the interpreter ahead, a few hundred lines at most, because it wasn't in lockstep. The first Step plays those lines, which have already run, and after that stepping is exact. That's accepted: lockstep at Instant would make programs with many short lines several times slower.
 
 This matters because the channel lets the interpreter run several events ahead of the drawing. If `Instruction` were only a marker, a paused program could already have run a few lines past the highlighted one, including effects that aren't events, such as `MAKE` or file writes. Waiting at each line keeps the highlight and the program's real position in step, which a later variable inspector would also rely on.
 
@@ -320,11 +329,11 @@ The CLI reads the same event stream with no timing and renders it to a file. `WA
 
 ### Open questions
 
-- **Speed scale and units:** Python-style levels from 0 to 10, or a slider in pixels per second?
+- ~~**Speed scale and units:**~~ Levels from 1 to 11, where 11 is Instant and each level below doubles the speed, from 5 to 2,560 steps a second (spike 04; see "Speed model").
 - ~~What does the highlight show?~~ The running instruction, not the whole line.
-- **What does Step step over:** Step currently runs one source line, so `REPEAT 4 [FD 50 RT 90]` is one step, with the highlight moving through its instructions as it plays. Would a second "Step instruction" button, which stops inside the brackets, be useful as well?
+- ~~**What does Step step over:**~~ Step runs one source line, so `REPEAT 4 [FD 50 RT 90]` is one step. A second button, Step instruction, stops inside the brackets, and one-line loops need it (spike 04; see "Controls").
 - ~~Does `STEP` itself work?~~ No: `STEP`, `TRACE` and their relatives are marked obsolete in `pendown-logo.kdl`. Stepping and tracing are debugger controls in the GUI.
-- ~~**Channel size:**~~ Batches of up to 256 events, at most 4 ms old, with room for 4 batches (spike 03; see "Architecture").
+- ~~**Channel size:**~~ Batches of up to 256 events, at most 4 ms old, with room for 4 batches (spike 03, confirmed by spike 04; see "Architecture").
 
 ## Checked against the Berkeley Logo manual
 

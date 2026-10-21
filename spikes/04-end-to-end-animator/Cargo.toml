@@ -1,0 +1,23 @@
+[package]
+name = "spike-04-end-to-end-animator"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Throwaway spike: see .scratch/phase-1-spikes/issues/04-end-to-end-animator.md
+[workspace]
+
+[dependencies]
+# The same features as spike 01, so the spikes share compiled dependencies.
+gpui-kit = { version = "=0.8.0", features = ["tree-sitter"] }
+# gpui's `RenderImage` is built from `image` frames.
+image = { version = "0.25", default-features = false }
+pendown-logo = { path = "../03-interpreter-core" }
+vello_cpu = { version = "0.3", features = ["multithreading"] }
+
+[profile.dev.package."*"]
+opt-level = 2
+
+# See ADR 0007: unoptimised, deep recursion runs out of stack far sooner.
+[profile.dev.package.pendown-logo]
+opt-level = 1

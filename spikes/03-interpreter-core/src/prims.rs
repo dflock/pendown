@@ -51,6 +51,9 @@ pub static PRIMS: &[Prim] = &[
     Prim { names: &["right", "rt"], arity: ONE, imp: Imp::F(right) },
     Prim { names: &["left", "lt"], arity: ONE, imp: Imp::F(left) },
     Prim { names: &["heading"], arity: Arity::fixed(0), imp: Imp::F(heading) },
+    Prim { names: &["penup", "pu"], arity: Arity::fixed(0), imp: Imp::F(penup) },
+    Prim { names: &["pendown", "pd"], arity: Arity::fixed(0), imp: Imp::F(pendown) },
+    Prim { names: &["setpencolor", "setpc"], arity: ONE, imp: Imp::F(setpencolor) },
     Prim { names: &["repeat"], arity: TWO, imp: Imp::Repeat },
     Prim { names: &["repcount"], arity: Arity::fixed(0), imp: Imp::F(repcount) },
     Prim { names: &["forever"], arity: ONE, imp: Imp::Forever },
@@ -183,6 +186,59 @@ fn left(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
 
 fn heading(it: &mut Interpreter, _: &Args) -> Result<Option<Value>, Flow> {
     Ok(Some(Value::Num(it.turtle.heading)))
+}
+
+fn penup(it: &mut Interpreter, _: &Args) -> Result<Option<Value>, Flow> {
+    it.turtle.pen.down = false;
+    Ok(None)
+}
+
+fn pendown(it: &mut Interpreter, _: &Args) -> Result<Option<Value>, Flow> {
+    it.turtle.pen.down = true;
+    Ok(None)
+}
+
+/// UCBLogo's default palette (ADR 0015).
+const PALETTE: [[u8; 3]; 16] = [
+    [0, 0, 0],
+    [0, 0, 255],
+    [0, 255, 0],
+    [0, 255, 255],
+    [255, 0, 0],
+    [255, 0, 255],
+    [255, 255, 0],
+    [255, 255, 255],
+    [155, 96, 59],
+    [197, 136, 18],
+    [100, 162, 64],
+    [120, 187, 187],
+    [255, 149, 119],
+    [144, 113, 208],
+    [255, 163, 0],
+    [183, 183, 183],
+];
+
+/// A palette number or an `[r g b]` list from 0 to 255. Names, hex and
+/// opacity are left out of this spike.
+fn setpencolor(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
+    let [r, g, b] = match &a.vals[0] {
+        Value::List(list) if list.items.len() == 3 => {
+            let mut rgb = [0u8; 3];
+            for (c, item) in rgb.iter_mut().zip(&list.items) {
+                match item.as_num() {
+                    Some(n) if (0.0..=255.0).contains(&n) => *c = n.round() as u8,
+                    _ => return Err(a.doesnt_like(0)),
+                }
+            }
+            rgb
+        }
+        v => match v.as_num() {
+            Some(n) if n.fract() == 0.0 && (0.0..16.0).contains(&n) => PALETTE[n as usize],
+            _ => return Err(a.doesnt_like(0)),
+        },
+    };
+    it.turtle.pen.color = [r, g, b, 255];
+    Ok(None)
 }
 
 fn repcount(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {

@@ -22,8 +22,8 @@ mod span;
 mod value;
 
 pub use error::{CallSite, Error, RunError};
-pub use event::{BatchSender, Event, EventSink, Halted, Pen, Point};
-pub use interp::{Interpreter, Limits, STACK_MARGIN, Stats};
+pub use event::{BatchSender, Event, EventSink, Halted, Pen, Point, SyncPoint};
+pub use interp::{Control, Interpreter, Limits, STACK_MARGIN, Stats};
 pub use number::{format_number, parse_number};
 pub use span::{SourceId, Span};
 pub use value::Value;

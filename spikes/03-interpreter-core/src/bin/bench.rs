@@ -5,7 +5,7 @@
 use std::{
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::Ordering,
         mpsc,
     },
     thread,
@@ -31,7 +31,7 @@ fn on_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
 }
 
 fn interpreter(sink: Box<dyn EventSink>, limits: Limits) -> Interpreter {
-    let mut it = Interpreter::new(sink, Arc::new(AtomicBool::new(false)));
+    let mut it = Interpreter::new(sink, Arc::default());
     it.limits = limits;
     it
 }
@@ -157,8 +157,8 @@ fn rss_mib() -> f64 {
 
 fn memory() {
     println!("## Memory: SPIRAL for 20 s, through a channel, with Instruction events\n");
-    let cancel = Arc::new(AtomicBool::new(false));
-    let flag = cancel.clone();
+    let control: Arc<pendown_logo::Control> = Arc::default();
+    let flag = control.clone();
     let (tx, rx) = mpsc::sync_channel::<Event>(1024);
     let interp = thread::Builder::new()
         .stack_size(STACK)
@@ -176,7 +176,7 @@ fn memory() {
         }
         thread::sleep(Duration::from_secs(1));
     }
-    cancel.store(true, Ordering::Relaxed);
+    control.cancel.store(true, Ordering::Relaxed);
     let (result, stats) = interp.join().unwrap();
     let events = drain.join().unwrap();
     println!(

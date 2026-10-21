@@ -5,7 +5,8 @@ use std::{
     rc::Rc,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        mpsc,
     },
 };
 
@@ -13,7 +14,7 @@ use smallvec::SmallVec;
 
 use crate::{
     error::{CallSite, Error, RunError},
-    event::{Event, EventSink, Pen, Point},
+    event::{Event, EventSink, Pen, Point, SyncPoint},
     names::{Names, Sym},
     parse::{self, Arity, Block, Call, Cx, Expr, Instr, Target},
     prims::{self, Args, Imp, PRIMS},
@@ -123,6 +124,20 @@ impl Default for Turtle {
     }
 }
 
+/// Flags shared between the interpreter thread and the front end.
+#[derive(Debug, Default)]
+pub struct Control {
+    /// Stop: checked before every instruction (ADR 0011).
+    pub cancel: AtomicBool,
+    /// Wait for the front end before running each line, with a `Sync` after
+    /// the line's first `Instruction` (ADR 0012). The GUI sets this while
+    /// paused or stepping, and at animated speeds.
+    pub lockstep: AtomicBool,
+    /// How many lines the interpreter has started, so the front end can see
+    /// how far ahead of the highlight it is.
+    pub lines_started: AtomicU64,
+}
+
 pub struct Interpreter {
     names: Names,
     pub(crate) vars: Vec<Option<Value>>,
@@ -131,7 +146,7 @@ pub struct Interpreter {
     pub(crate) repcounts: Vec<i64>,
     pub(crate) turtle: Turtle,
     sink: Box<dyn EventSink>,
-    cancel: Arc<AtomicBool>,
+    control: Arc<Control>,
     last_line: Option<(SourceId, u32)>,
     console_entries: u32,
     stack_base: usize,
@@ -163,7 +178,7 @@ fn didnt_output(name: &str, to: &str, span: Span) -> Flow {
 }
 
 impl Interpreter {
-    pub fn new(sink: Box<dyn EventSink>, cancel: Arc<AtomicBool>) -> Interpreter {
+    pub fn new(sink: Box<dyn EventSink>, control: Arc<Control>) -> Interpreter {
         Interpreter {
             names: Names::default(),
             vars: Vec::new(),
@@ -172,7 +187,7 @@ impl Interpreter {
             repcounts: Vec::new(),
             turtle: Turtle::default(),
             sink,
-            cancel,
+            control,
             last_line: None,
             console_entries: 0,
             stack_base: 0,
@@ -280,9 +295,10 @@ impl Interpreter {
         self.sink.send(event).map_err(|_| Flow::Halt)
     }
 
-    /// Checks the cancel flag and sends the `Instruction` event.
+    /// Checks the cancel flag and sends the `Instruction` event. In
+    /// lockstep, waits for the front end before starting a line.
     fn begin(&mut self, span: Span) -> Result<(), Flow> {
-        if self.cancel.load(Ordering::Relaxed) {
+        if self.control.cancel.load(Ordering::Relaxed) {
             return Err(Flow::Halt);
         }
         self.stats.instructions += 1;
@@ -291,6 +307,25 @@ impl Interpreter {
             let starts_line = self.last_line != line;
             self.last_line = line;
             self.emit(Event::Instruction { span, starts_line })?;
+            if starts_line {
+                self.control.lines_started.fetch_add(1, Ordering::Relaxed);
+                if self.control.lockstep.load(Ordering::Relaxed) {
+                    self.sync()?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Sends a `Sync`, flushing any batched events so the front end can
+    /// reach it, and waits for the reply.
+    pub(crate) fn sync(&mut self) -> Result<(), Flow> {
+        let (tx, rx) = mpsc::sync_channel(1);
+        self.emit(Event::Sync(SyncPoint(tx)))?;
+        self.sink.flush().map_err(|_| Flow::Halt)?;
+        rx.recv().map_err(|_| Flow::Halt)?;
+        if self.control.cancel.load(Ordering::Relaxed) {
+            return Err(Flow::Halt);
         }
         Ok(())
     }

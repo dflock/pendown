@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     sync::mpsc::SyncSender,
     time::{Duration, Instant},
 };
@@ -32,6 +33,33 @@ pub enum Event {
     Turn { from: f64, by: f64 },
     /// Console output, including the newline if there is one.
     Print(String),
+    /// The interpreter waits here until the front end replies (ADR 0011).
+    /// In lockstep, one follows each `Instruction` that starts a line, so
+    /// the program can't run a line before the animator gets to it.
+    Sync(SyncPoint),
+}
+
+/// The reply half of a `Sync`. Replying lets the interpreter go on; dropping
+/// it without replying stops the program.
+#[derive(Clone)]
+pub struct SyncPoint(pub(crate) SyncSender<()>);
+
+impl SyncPoint {
+    pub fn reply(self) {
+        let _ = self.0.send(());
+    }
+}
+
+impl PartialEq for SyncPoint {
+    fn eq(&self, _: &SyncPoint) -> bool {
+        true
+    }
+}
+
+impl fmt::Debug for SyncPoint {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("SyncPoint")
+    }
 }
 
 /// The receiver has gone away, so the program should stop.

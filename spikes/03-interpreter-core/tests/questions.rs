@@ -5,7 +5,7 @@ use std::{
     rc::Rc,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::Ordering,
         mpsc,
     },
     thread,
@@ -45,7 +45,7 @@ impl EventSink for StopAfterMoves {
 
 fn interpreter() -> (Interpreter, Shared) {
     let events = Shared::default();
-    let it = Interpreter::new(Box::new(events.clone()), Arc::new(AtomicBool::new(false)));
+    let it = Interpreter::new(Box::new(events.clone()), Arc::default());
     (it, events)
 }
 
@@ -121,7 +121,7 @@ fn spiral_runs_in_constant_space() {
     let (moves, result, stats) = on_stack(MB, || {
         let moves = Rc::new(RefCell::new(0));
         let sink = StopAfterMoves { moves: moves.clone(), limit: 1_000_000 };
-        let mut it = Interpreter::new(Box::new(sink), Arc::new(AtomicBool::new(false)));
+        let mut it = Interpreter::new(Box::new(sink), Arc::default());
         it.limits = tail_limits();
         // The one-line form from the issue.
         let result = it.run_program("TO SPIRAL :n FD :n RT 90 SPIRAL :n + 1 END\nSPIRAL 1");
@@ -540,9 +540,9 @@ fn number_errors() {
 
 #[test]
 fn stop_ends_forever_promptly() {
-    let cancel = Arc::new(AtomicBool::new(false));
+    let control: Arc<pendown_logo::Control> = Arc::default();
     let (tx, rx) = mpsc::sync_channel(1024);
-    let flag = cancel.clone();
+    let flag = control.clone();
     let interp = thread::spawn(move || {
         let mut it = Interpreter::new(Box::new(tx), flag);
         it.run_program("FOREVER [FD 1 RT 1]").clone()
@@ -550,7 +550,7 @@ fn stop_ends_forever_promptly() {
     let drain = thread::spawn(move || rx.into_iter().count());
     thread::sleep(Duration::from_millis(200));
     let start = Instant::now();
-    cancel.store(true, Ordering::Relaxed);
+    control.cancel.store(true, Ordering::Relaxed);
     let result = interp.join().unwrap();
     let latency = start.elapsed();
     let events = drain.join().unwrap();
@@ -566,7 +566,7 @@ fn stop_wakes_a_blocked_interpreter() {
     // interpreter blocks once it's full. Dropping the receiver wakes it.
     let (tx, rx) = mpsc::sync_channel(16);
     let interp = thread::spawn(move || {
-        let mut it = Interpreter::new(Box::new(tx), Arc::new(AtomicBool::new(false)));
+        let mut it = Interpreter::new(Box::new(tx), Arc::default());
         it.run_program("FOREVER [FD 1 RT 1]").clone()
     });
     thread::sleep(Duration::from_millis(100));

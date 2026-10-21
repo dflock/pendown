@@ -38,5 +38,5 @@ Blocked by: 03
   - Diagnostics count columns in UTF-16, as LSP positions do.
 - **Tests:**
   - `syntax` unit tests: colours, errors while typing and a timing test;
-  - the scripted session types `FOOBAR 3` and `REPEAT 4 [FD]` and checks both diagnostics, then checks they go away. It has 36 checks, all passing.
+  - the scripted session types `FOOBAR 3` and `REPEAT 4 [FD]` and checks both diagnostics, then checks they go away. It has 33 checks, all passing.
 - **Also fixed:** "Run cleared the procedures you defined in the console" now shows once, not on every Run.

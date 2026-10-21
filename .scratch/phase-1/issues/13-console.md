@@ -48,4 +48,4 @@ The console from ADR 0006: output, and an input line that runs instructions agai
 - **Tests:**
   - `tests/session.rs` (2 tests): the console using the last run's procedures and variables, `TO` at the console, Run clearing it, and a stopped job not stopping the next;
   - `console` unit tests (4): multi-line entry, history, spotting definitions;
-  - the scripted session's console checks, now 25 checks in all, all passing.
+  - the scripted session's console checks, now 23 checks in all, all passing.

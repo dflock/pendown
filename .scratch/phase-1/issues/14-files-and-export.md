@@ -34,5 +34,5 @@ Blocked by: 03
 - **Export PNG** saves the pixel buffer at the canvas's device resolution, without the turtle.
   - **Bug found and fixed:** the buffer only draws new marks when the canvas paints, so an export straight after a run was blank. Export now draws anything pending first.
 - **The last folder** is remembered between sessions in `$XDG_CONFIG_HOME/pendown/last-folder` (or `~/.config`, or `%APPDATA%`; `PENDOWN_SETTINGS` overrides it).
-- **The scripted session** checks the title before and after edits and saves, saving, opening again, and that an export is the canvas's size with something drawn. 33 checks, all passing.
+- **The scripted session** checks the title before and after edits and saves, saving, opening again, and that an export is the canvas's size with something drawn. 30 checks, all passing.
 - **Not checked automatically:** the platform file dialogs and the "Save the changes?" prompts. The scripted session calls `save_to`, `open_path` and `export_to` directly. Try them by hand, which issue 16 covers.

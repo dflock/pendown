@@ -1,0 +1,36 @@
+; A garden of shapes: the turtle, the pen, colours and shapes.
+
+TO FLOWER :size :colour
+  SETPC :colour
+  REPEAT 6 [
+    ARC 60 :size
+    RT 120
+    ARC 60 :size
+    RT 60
+  ]
+END
+
+SETBG "midnightblue
+SETPENSIZE 3
+
+; Flowers along the bottom, each a different kind of colour.
+PU SETXY -300 -250 PD FLOWER 60 "gold
+PU SETX 0 PD FLOWER 50 [255 120 180]
+PU SETX 300 PD FLOWER 70 "#8f8
+PU SETY 250 PD FLOWER 40 13
+
+; A sun, and the sky's shapes.
+PU HOME SETPOS [-300 300] PD
+SETPC "orange CIRCLE 60
+PU SETXY 150 320 PD SETPC [200 200 255 160]
+ELLIPSE 120 40
+PU SETXY 0 100 SETHEADING 30 PD SETPC "white
+SQUARE 80
+(RECTANGLE 200 100 20)
+LT 30
+PU BK 100 PD
+SETPC "#ffffff80 (SQUARE 120 30)
+PRINT PENDOWNP
+PRINT PC
+PRINT PENSIZE
+PRINT BG

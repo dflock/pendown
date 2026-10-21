@@ -48,6 +48,8 @@ cargo run --release -p pendown
 
 Run the tests with `cargo test`. Debug builds work too, but drawing is much faster in release.
 
+`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, stepping, stopping, the console, files and errors. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
+
 Type a program in the editor and press **Run**. Use the speed slider to choose how fast the turtle draws. Try the console too: after a run, it knows every procedure your program defined, so you can type `FLOWER 80` and watch.
 
 ### The CLI
@@ -71,5 +73,6 @@ The crates are in `crates/`. `spikes/` holds the experiments made before phase 1
 
 ## Learn more
 
+- `examples/phase-1/` has programs that between them use every command Pendown supports so far.
 - `pendown-logo.kdl` lists every Logo command, which ones Pendown supports, and how ours differ from UCBLogo.
 - `docs/adr/` records the design decisions and why we made them.

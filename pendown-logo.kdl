@@ -25,7 +25,7 @@ logo {
         desc "outputs a word formed by concatenating its inputs."
         supported #true
         obsolete #false
-        phase 2
+        phase 1
       }
       list {
         eg """

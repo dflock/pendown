@@ -14,12 +14,18 @@ const TOLERANCE: u8 = 40;
 const MAX_DIFFERENT: f64 = 0.002;
 
 fn check(name: &str, program: &str, width: u32, height: u32) {
+    check_output(name, program, width, height);
+}
+
+/// Checks the picture, and returns what the program printed.
+fn check_output(name: &str, program: &str, width: u32, height: u32) -> String {
     let output = render(program, Options { width, height, limit: 10_000_000, seed: Some(1) });
     assert_eq!(output.result, Ok(()), "{name} should run without errors");
+    let printed = output.printed.clone();
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/pictures").join(format!("{name}.png"));
     if std::env::var_os("UPDATE_PICTURES").is_some() {
         std::fs::write(&path, &output.png).unwrap();
-        return;
+        return printed;
     }
     let expected = image::open(&path)
         .unwrap_or_else(|e| panic!("{}: {e}. Run with UPDATE_PICTURES=1 to create it", path.display()))
@@ -36,6 +42,30 @@ fn check(name: &str, program: &str, width: u32, height: u32) {
         let failed = path.with_extension("actual.png");
         std::fs::write(&failed, &output.png).unwrap();
         panic!("{name}: {different} pixels differ ({:.2}%); the new picture is in {}", share * 100.0, failed.display());
+    }
+    printed
+}
+
+/// The programs in `examples/phase-1/`, which between them use every phase-1
+/// command (checked by `pendown-logo`'s `tests/kdl.rs`). Each one's picture
+/// and printed output are saved, as `example-NAME.png` and `.txt`.
+#[test]
+fn phase_1_examples() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/phase-1");
+    let mut programs: Vec<_> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().path()).collect();
+    programs.sort();
+    assert!(programs.len() >= 4);
+    for path in programs {
+        let name = format!("example-{}", path.file_stem().unwrap().to_string_lossy());
+        let program = std::fs::read_to_string(&path).unwrap();
+        let printed = check_output(&name, &program, 400, 400);
+        let expected_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/pictures").join(format!("{name}.txt"));
+        if std::env::var_os("UPDATE_PICTURES").is_some() {
+            std::fs::write(&expected_path, &printed).unwrap();
+            continue;
+        }
+        let expected = std::fs::read_to_string(&expected_path).unwrap();
+        assert_eq!(printed, expected, "{name} printed");
     }
 }
 

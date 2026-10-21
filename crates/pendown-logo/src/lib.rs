@@ -33,3 +33,9 @@ pub use interp::{Control, Interpreter, Limits, STACK_MARGIN, Stats};
 pub use number::{format_number, parse_number};
 pub use span::{SourceId, Span};
 pub use value::Value;
+
+/// Every built-in command's names, the first being the one the manual uses
+/// first, for checking against `pendown-logo.kdl`.
+pub fn command_names() -> impl Iterator<Item = &'static [&'static str]> {
+    prims::PRIMS.iter().map(|p| p.names)
+}

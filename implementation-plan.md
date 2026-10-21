@@ -19,7 +19,7 @@ The headline features are:
 
 The file has the manual's description of every command, so the GUI's reference/help panel can be generated from it (phase 3).
 
-### Phase 1: Turtle drawing (89 commands)
+### Phase 1: Turtle drawing (90 commands)
 
 The smallest Logo that is fun to draw with:
 
@@ -27,7 +27,7 @@ The smallest Logo that is fun to draw with:
 - **Shapes and colours (our extensions):** `CIRCLE`, `ELLIPSE`, `SQUARE` and `RECTANGLE` outlines, and every colour form (palette number, RGB or RGBA list, CSS name, hex) everywhere a colour is accepted.
 - **Language:** `TO`/`END` with inputs and recursion, `MAKE`/`LOCAL`/`LOCALMAKE`/`THING`, `REPEAT`/`REPCOUNT`/`FOREVER`, `IF`/`IFELSE`, `STOP`/`OUTPUT`, `WAIT`, `PRINT`/`TYPE`/`SHOW`.
 - **Arithmetic and logic:** arithmetic, `SIN`/`COS`/`ARCTAN`, `RANDOM`, comparisons, `AND`/`OR`/`NOT`.
-- **Lists:** only what drawing needs, mainly for `POS`/`SETPOS`: `LIST`, `SENTENCE`, `FIRST`, `LAST`, `BUTFIRST`, `BUTLAST`, `ITEM`, `COUNT`, `EMPTYP`.
+- **Lists and words:** only what drawing needs, mainly for `POS`/`SETPOS`: `LIST`, `SENTENCE`, `FIRST`, `LAST`, `BUTFIRST`, `BUTLAST`, `ITEM`, `COUNT`, `EMPTYP`, and `WORD`.
 - **Syntax that isn't a command in the manual:** `END`, the infix operators `+ - * / = < > <= >= <>`, `:var` and `"word`, `[...]` lists, `(...)` for variable numbers of inputs, `;` comments. It's described in the manual's Introduction (chapter 1), which `pendown-logo.kdl` leaves out.
 
 In the GUI and runtime, phase 1 includes:
@@ -37,7 +37,7 @@ In the GUI and runtime, phase 1 includes:
 - **Events:** `Move`, `Turn`, `Arc`, `Ellipse`, `Rect`, `Clean`, `SetBackground`, `ShowTurtle`/`HideTurtle`, `Print`, `Wait`, `SetSpeed`, `Instruction` and `Sync`.
 - **The CLI** rendering the event stream to a file.
 
-### Phase 2: Complete core language and richer drawing (88 commands)
+### Phase 2: Complete core language and richer drawing (87 commands)
 
 - **Data:** the rest of the word, list and array commands, multi-dimensional arrays, `PUSH`/`POP`/`QUEUE`/`DEQUEUE`, type and membership predicates, `ASCII`/`CHAR`, `LOWERCASE`/`UPPERCASE`.
 - **Control:** `RUN`/`RUNRESULT`, `FOR`, `WHILE`/`UNTIL`/`DO.WHILE`/`DO.UNTIL`, `CASE`/`COND`, `CATCH`/`THROW`/`ERROR`/`ERRACT`, `IGNORE`.

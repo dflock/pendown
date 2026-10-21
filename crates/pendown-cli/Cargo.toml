@@ -1,0 +1,8 @@
+[package]
+name = "pendown-cli"
+description = "Runs Pendown Logo programs and saves the drawing"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]

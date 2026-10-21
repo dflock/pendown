@@ -1,0 +1,31 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+# The spikes are kept as a record. Each is its own workspace, sharing
+# `spikes/target`.
+exclude = ["spikes"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+pendown-logo = { path = "crates/pendown-logo" }
+pendown-render = { path = "crates/pendown-render" }
+# `tree-sitter` gives real theme highlight and diagnostic colours (ADR 0008).
+gpui-kit = { version = "=0.8.0", features = ["tree-sitter"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+kdl = "6"
+smallvec = "1"
+vello_cpu = { version = "0.3", features = ["multithreading"] }
+
+# Dependencies build optimised even in debug builds: gpui and vello_cpu are
+# far too slow without it.
+[profile.dev.package."*"]
+opt-level = 2
+
+# Unoptimised, a Logo call can use 43 KB of stack, so 256 MB holds only about
+# 6,000 nested calls. At opt-level 1 it's about 5 KB, as in release (ADR 0007).
+[profile.dev.package.pendown-logo]
+opt-level = 1

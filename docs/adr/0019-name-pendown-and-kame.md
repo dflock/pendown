@@ -1,7 +1,7 @@
 # 19. The project is called Pendown, and the tutorial's turtle is Kame
 
 Status: Accepted
-Date: 2026-10-18
+Date: 2026-10-18. Updated 2026-10-21 with `pendown-render`.
 
 ## Context
 
@@ -14,6 +14,8 @@ The project needed a name. Names used by other Logo projects or products were ru
   - `pendown`: the GUI app, the main thing users run. Its window title is "Pendown".
   - `pendown-cli`: the CLI, which renders programs to files.
   - `pendown-logo`: the interpreter library, with no GUI code (ADR 0009). Earlier documents call this "the logo crate".
+  - `pendown-render`: the display list and the pixel buffer, drawn with vello_cpu (ADRs 0003 and 0010), and PNG encoding. It has no gpui code, so the GUI and the CLI share it, as ADR 0003 requires. It can't live in `pendown-logo`, which has no drawing code, or in `pendown`, which the CLI shouldn't depend on.
+- **Layout:** the workspace's `Cargo.toml` is at the repo root, with the crates in `crates/`. The spikes in `spikes/` are kept as a record, outside the workspace.
 - **The turtle character in the tutorial and help is called Kame,** Japanese for turtle. Lessons can talk about what Kame does: "Tell Kame to go forward 100 steps".
 
 ## Consequences

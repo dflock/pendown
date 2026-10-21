@@ -1,6 +1,6 @@
 # Workspace, with `pendown-logo` and `pendown-render` from the spikes
 
-Status: ready-for-agent
+Status: done
 Type: task
 
 ## What
@@ -30,3 +30,18 @@ Set up the Cargo workspace from `spec.md`, and move the spikes' code into it.
 - The spikes still build on their own, untouched.
 
 ## Comments
+
+### 2026-10-21: done
+
+- **The workspace:** a root `Cargo.toml` with `crates/*` and `[workspace.dependencies]`. It sets `opt-level = 1` for `pendown-logo` in dev builds, and excludes `spikes/`.
+- **`pendown-logo`** is spike 03's crate with spike 04's additions. Spike 03's tests are now `tests/spike03.rs`. ADR 0004's spelling rule is fixed: `Names::define` is used by `TO`, its inputs and `MAKE`, and Run forgets the spellings. There are new tests for it, and `tests/kdl.rs` checks that `pendown-logo.kdl` parses with the `kdl` crate. 41 tests.
+- **`pendown-render`** has the `Drawing` type:
+  - the display list, and the BGRA pixel buffer drawn by vello_cpu;
+  - `take_dirty_tiles` and `tile_bgra` for the GUI;
+  - `resize`, which re-renders;
+  - `png` and `pixel`.
+  
+  It has 6 tests: pixels, the fitting, re-rendering, `CLEAN`, dirty tiles, and tile and PNG bytes.
+- **`pendown` and `pendown-cli`** are stubs for issues 03 and 04.
+- **Docs:** ADR 0019 now lists `pendown-render` and the layout, and `README.md` has the crates and test command.
+- `cargo test` and `cargo clippy --all-targets` are clean, and all four spikes still build on their own.

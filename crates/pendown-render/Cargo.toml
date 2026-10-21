@@ -1,0 +1,11 @@
+[package]
+name = "pendown-render"
+description = "Draws Pendown's turtle events into a pixel buffer, for the GUI and the CLI"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+image.workspace = true
+pendown-logo.workspace = true
+vello_cpu.workspace = true

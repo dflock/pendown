@@ -46,6 +46,8 @@ cd pendown
 cargo run --release -p pendown
 ```
 
+Run the tests with `cargo test`. Debug builds work too, but drawing is much faster in release.
+
 Type a program in the editor and press **Run**. Use the speed slider to choose how fast the turtle draws. Try the console too: after a run, it knows every procedure your program defined, so you can type `FLOWER 80` and watch.
 
 ### The CLI
@@ -53,7 +55,7 @@ Type a program in the editor and press **Run**. Use the speed slider to choose h
 `pendown-cli` runs a program without a window and saves the drawing:
 
 ```sh
-cargo run --release -p pendown-cli -- flower.logo -o flower.png
+cargo run --release -p pendown-cli -- flower.logo --output flower.png --size 800x600
 ```
 
 ## What's in the box
@@ -63,6 +65,9 @@ cargo run --release -p pendown-cli -- flower.logo -o flower.png
 | `pendown` | The app: editor, canvas, console, help and tutorial |
 | `pendown-cli` | Runs programs from the command line and renders them to images |
 | `pendown-logo` | The Logo interpreter, as a library with no GUI code |
+| `pendown-render` | Draws the turtle's moves into a picture, for the app and the CLI |
+
+The crates are in `crates/`. `spikes/` holds the experiments made before phase 1, kept as a record; each builds on its own.
 
 ## Learn more
 

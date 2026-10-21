@@ -1,0 +1,12 @@
+[package]
+name = "pendown-logo"
+description = "The Pendown Logo interpreter, with no GUI code"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+smallvec.workspace = true
+
+[dev-dependencies]
+kdl.workspace = true

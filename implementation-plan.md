@@ -49,14 +49,27 @@ In the GUI and runtime, phase 1 includes:
 
 In the GUI and runtime, phase 2 includes:
 
-- **A performance pass, first.** While a program runs, Pendown keeps one CPU core fully busy, even at slow speeds where the turtle barely moves. Measure before changing anything:
-  - Does the CPU go to the interpreter thread, the UI thread or vello_cpu's workers?
-  - Does it depend on the speed level, and does it stop when the program ends or is paused? After the end it should, since the app only asks for frames while the animator is running.
-  - Suspects:
+- **Performance, measured all the time (ADR 0020).** While a program runs, Pendown keeps one CPU core fully busy, even at slow speeds where the turtle barely moves. Rather than a one-off fix, phase 2 starts by building in measurement, so the cause shows up now and regressions show up later.
+  - **A `metrics` module** in each crate that does work: counters and timings cheap enough to leave in, kept as atomics and read by whoever reports them.
+    - **On by default in debug builds, off in release.** `PENDOWN_METRICS=1` turns it on in a release build, and `PENDOWN_METRICS=0` off in a debug one. Off, each measurement is one check of a flag.
+  - **What's measured:**
+    - **UI thread, per frame:** the time spent rendering, in the animator, drawing into the pixel buffer and uploading the canvas image, the events taken, and how often the window re-renders.
+    - **Interpreter:** instructions a second, the time spent waiting in lockstep or on a full channel, and the time spent running.
+    - **CPU time for each thread:** the UI, the interpreter and vello_cpu's workers. That answers "who is using the core" directly. It's read from `/proc/self/task` on Linux at first; other platforms come later.
+  - **Where it's shown:**
+    - At the end of each run, a one-line summary on stderr, such as `run 3.2 s: 190 frames, UI 4.1 ms a frame, CPU UI 35% interpreter 2% vello 0%`.
+    - In the GUI, an overlay of the live numbers, toggled by a key.
+    - The CLI prints its summary on stderr: the run, the drawing and the PNG encoding.
+    - Debug builds are much slower than release, so their timings are for comparison with each other, not for budgets.
+  - **Catching regressions:**
+    - **Budgets in `cargo test`,** for numbers that don't depend on the machine. For example, a slow run of a fixed program renders the window at most once per animation frame, and re-uploads the canvas only when it changed. The animator tests already drive a real interpreter with made-up frame times, so they can count these exactly. A test that fails is a regression to fix, or a budget to change on purpose, in the same commit.
+    - **Timings against a baseline:** a `perf` binary runs fixed programs in release (the interpreter, the renderer, the animator with no window, and Instant mode end to end). It compares them with `perf/baseline.json`, committed in the repo, and fails if anything is more than 20% slower. Spike 03's `bench` becomes part of it. Updating the baseline is a deliberate commit that says why.
+    - There's no CI yet, so each phase's check, and every merge to main, runs `perf`. If CI is added, it runs the budget tests, and timings only on a fixed machine.
+  - **Then the first fix,** from what the numbers show. Suspects:
     - every frame re-renders the whole window, including the editor and the console, while only the canvas changes;
     - the canvas image may be uploaded to the GPU again every frame;
     - the lockstep round trip per line.
-  - **Goal:** a slow run costs little more than an idle window, and Instant mode is as fast as before. Spike 04's measurements are the baseline.
+  - **Goal:** a slow run costs little more than an idle window, and Instant mode is as fast as before. Spike 04's measurements are the starting baseline.
 - **Watching a program run.** Two panels that update as the turtle goes, in step with the highlighted instruction. A value flashes when it changes.
   - **Repeat counters:** the counter of every `REPEAT` and `FOREVER` running, outermost first, such as `REPEAT 3 of 36 › REPEAT 2 of 4`. The innermost one is what `REPCOUNT` outputs. Phase 2's `FOR` adds its own counter.
   - **Variables:** the current value of every variable the running line can see: the globals, and the inputs and locals of each procedure in the call chain, since scope is dynamic (see "Kept from UCBLogo: dynamic scope"). Names keep the spelling of their definition (ADR 0004).

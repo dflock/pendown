@@ -24,4 +24,4 @@ Reporters (`PENCOLOR`, `BACKGROUND`, `FILLCOLOR`) output the colour in the form 
 ## Consequences
 
 - UCBLogo programs that use RGB lists will come out darker, since their values are read as 0–255 instead of percentages.
-- The pixel buffer has to blend colours with opacity (spike 02 checks this).
+- The pixel buffer blends colours with opacity. Spike 02 found it matches gpui's blending, but a translucent line is darker where two moves meet, since each move is its own stroke (ADR 0010).

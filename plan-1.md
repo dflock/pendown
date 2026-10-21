@@ -110,7 +110,7 @@ Everywhere a colour is accepted (`SETPENCOLOR`, `SETBACKGROUND`, `SETFILLCOLOR`,
 
 - **Palette number:** 0 to 15, with UCBLogo's default colours: 0 black, 1 blue, 2 green, 3 cyan, 4 red, 5 magenta, 6 yellow, 7 white, 8 brown, 9 tan, 10 forest, 11 aqua, 12 salmon, 13 purple, 14 orange, 15 grey. `SETPALETTE` (phase 2) can redefine numbers from 8 up, as in UCBLogo.
 - **RGB list:** `[r g b]` with each value **from 0 to 255**. This is a deliberate change: UCBLogo uses percentages from 0 to 99, but 0 to 255 is what everyone knows from CSS and image editors. FMSLogo also uses 0 to 255.
-- **RGBA list:** `[r g b a]`, where `a` is the opacity, also from 0 to 255 (0 is invisible, 255 is solid). The pixel buffer blends it.
+- **RGBA list:** `[r g b a]`, where `a` is the opacity, also from 0 to 255 (0 is invisible, 255 is solid). The pixel buffer blends it. Each move is drawn separately, so a translucent line is darker where two moves meet.
 - **CSS colour name:** `SETPENCOLOR "red`, `SETBACKGROUND "cornflowerblue`, the 148 CSS named colours, case-insensitive. jsLogo does the same.
 - **Hex:** `"#ff8800`, plus the CSS short form `"#f80` and the forms with opacity, `"#ff880080` and `"#f808`. `#` is allowed in a Logo word, so no new syntax is needed.
 
@@ -202,7 +202,7 @@ That's very close to the structure we want: a gpui-kit layout for the editor and
 The canvas keeps nothing from one frame to the next, so the paint callback redraws every segment each time. That's fine for typical Logo drawings. For very large ones, such as deep recursive fractals with 100k+ segments, use one of these:
 
 - Combine runs of segments with the same pen into a single path.
-- Rasterize the drawing into a pixel buffer, either in the `pendown-logo` crate or with `tiny-skia`, and show it with `paint_image`.
+- Rasterize the drawing into a pixel buffer with `vello_cpu`, and show it with `paint_image`. (Spike 02 picked vello_cpu over `tiny-skia`, which is about 4 to 14 times slower: see ADR 0010.)
 
 A pixel buffer would also make `FILL` (flood fill) and saving to PNG straightforward.
 

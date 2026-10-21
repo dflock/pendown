@@ -1,0 +1,32 @@
+[package]
+name = "spike-02-pixel-buffer-streaming"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Throwaway spike: see .scratch/phase-1-spikes/issues/02-pixel-buffer-streaming.md
+[workspace]
+
+[features]
+# The window needs gpui. `bin/offline.rs` doesn't, so it can be built without
+# it, for example with `-C target-cpu=native`, without rebuilding gpui.
+default = ["window", "vello"]
+window = ["dep:gpui-kit", "dep:image"]
+vello = ["dep:vello_cpu"]
+
+[[bin]]
+name = "spike-02-pixel-buffer-streaming"
+path = "src/main.rs"
+required-features = ["window"]
+
+[dependencies]
+# The same features as spike 01, so the spikes share compiled dependencies.
+gpui-kit = { version = "=0.8.0", features = ["tree-sitter"], optional = true }
+# gpui's `RenderImage` is built from `image` frames.
+image = { version = "0.25", default-features = false, optional = true }
+tiny-skia = "0.12"
+# The alternative rasterizer, compared with tiny-skia.
+vello_cpu = { version = "0.3", optional = true, features = ["multithreading"] }
+
+[profile.dev.package."*"]
+opt-level = 2

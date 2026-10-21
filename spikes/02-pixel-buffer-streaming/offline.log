@@ -1,0 +1,139 @@
+## Drawing 20,000 segments (random walk, pen width 1.5 turtle steps)
+1280 × 800, scale 0.80:
+  one path per segment, round caps: 140.4 ms, 7.02 µs each
+  one path per segment, butt caps: 109.9 ms, 5.50 µs each
+  one path per run of the same colour: 107.0 ms, 5.35 µs each
+  one path per segment, 1 px wide: 45.7 ms, 2.28 µs each
+  one path per segment, all opaque: 130.3 ms, 6.51 µs each
+2560 × 1600, scale 1.60:
+  one path per segment, round caps: 264.4 ms, 13.22 µs each
+  one path per segment, butt caps: 225.1 ms, 11.26 µs each
+  one path per run of the same colour: 207.2 ms, 10.36 µs each
+  one path per segment, 1 px wide: 90.2 ms, 4.51 µs each
+  one path per segment, all opaque: 253.4 ms, 12.67 µs each
+
+## Re-rendering a 60,000-segment display list at 2560 × 1600, as on a resize
+  tiny-skia, one thread: 800.0 ms, 13.33 µs each
+  tiny-skia, 4 bands on 4 threads: 247.6 ms, 4.13 µs each (3464 pixels differ from one thread)
+  tiny-skia, 8 bands on 8 threads: 214.6 ms, 3.58 µs each (6818 pixels differ from one thread)
+  vello_cpu, 0 worker threads: 226.5 ms, 3.78 µs each
+  vello_cpu, 7 worker threads: 55.3 ms, 0.92 µs each
+  vello_cpu, 500 segments a frame onto the drawing, 0 worker threads: n=60 mean=3.56ms p50=3.33ms p95=4.63ms max=7.01ms
+  vello_cpu, 500 segments a frame onto the drawing, 7 worker threads: n=60 mean=2.60ms p50=2.13ms p95=4.75ms max=6.90ms
+  tiny-skia, 500 segments a frame, for comparison: n=60 mean=6.35ms p50=6.28ms p95=7.53ms max=8.37ms
+
+## Converting 2560 × 1600 to BGRA (30 runs)
+  pixel by pixel with extend_from_slice: n=30 mean=6.53ms p50=5.93ms p95=9.75ms max=9.79ms
+  a u32 at a time into a zeroed Vec: n=30 mean=5.09ms p50=4.64ms p95=6.99ms max=7.28ms
+  demultiply too: n=30 mean=28.44ms p50=28.30ms p95=29.76ms max=30.25ms
+  plain copy (to_vec), for drawing with swapped colours: n=30 mean=1.17ms p50=1.15ms p95=1.33ms max=1.42ms
+
+## Blending an RGBA pen colour: red [255 0 0 128] over blue [0 0 255]
+  Expected for one layer: (128, 0, 127, 255); for two layers: (192, 0, 63, 255).
+  one stroke: (128, 0, 127, 255)
+  corner where two separate strokes overlap: (192, 0, 64, 255)
+  corner of one two-segment path: (128, 0, 127, 255)
+
+## Flood fill at anti-aliased edges
+Each shape is drawn one side at a time, then filled from its centre (4-connected).
+Leaks: fill colour more than w/2 + 1.5 px outside the line. Gaps: no fill more than w/2 + 1.5 px inside.
+Halo: pixels just inside the line that look more like the background than the fill or the line.
+
+circle, 1 px:
+  | tolerance | edges | leaks | gaps | halo | filled |
+  |---|---|---|---|---|---|
+  | 0 | plain | 0 | 0 | 394 | 69756 |
+  | 32 | plain | 0 | 0 | 284 | 69866 |
+  | 64 | plain | 0 | 0 | 194 | 69956 |
+  | 128 | plain | 87500 | 0 | 0 | 159122 |
+  | 192 | plain | 87500 | 0 | 0 | 159546 |
+  | 250 | plain | 87500 | 0 | 0 | 159964 |
+  | 0 | blended | 0 | 0 | 0 | 69756 |
+  | 32 | blended | 0 | 0 | 0 | 69866 |
+  | 64 | blended | 0 | 0 | 0 | 69956 |
+  | 128 | blended | 87500 | 0 | 0 | 159122 |
+  | 192 | blended | 87500 | 0 | 0 | 159546 |
+  | 250 | blended | 87500 | 0 | 0 | 159964 |
+
+circle, 3 px:
+  | tolerance | edges | leaks | gaps | halo | filled |
+  |---|---|---|---|---|---|
+  | 0 | plain | 0 | 0 | 377 | 68757 |
+  | 32 | plain | 0 | 0 | 226 | 68908 |
+  | 64 | plain | 0 | 0 | 126 | 69008 |
+  | 128 | plain | 0 | 0 | 0 | 69192 |
+  | 192 | plain | 0 | 0 | 0 | 69396 |
+  | 250 | plain | 0 | 0 | 0 | 69660 |
+  | 0 | blended | 0 | 0 | 0 | 68757 |
+  | 32 | blended | 0 | 0 | 0 | 68908 |
+  | 64 | blended | 0 | 0 | 0 | 69008 |
+  | 128 | blended | 0 | 0 | 0 | 69192 |
+  | 192 | blended | 0 | 0 | 0 | 69396 |
+  | 250 | blended | 0 | 0 | 0 | 69660 |
+
+star, 1 px:
+  | tolerance | edges | leaks | gaps | halo | filled |
+  |---|---|---|---|---|---|
+  | 0 | plain | 0 | 0 | 537 | 33892 |
+  | 32 | plain | 0 | 0 | 398 | 34031 |
+  | 64 | plain | 0 | 0 | 268 | 34161 |
+  | 128 | plain | 122606 | 0 | 0 | 158921 |
+  | 192 | plain | 122606 | 0 | 0 | 159458 |
+  | 250 | plain | 122606 | 0 | 0 | 159962 |
+  | 0 | blended | 0 | 0 | 2 | 33892 |
+  | 32 | blended | 0 | 0 | 2 | 34031 |
+  | 64 | blended | 0 | 0 | 2 | 34161 |
+  | 128 | blended | 122606 | 0 | 0 | 158921 |
+  | 192 | blended | 122606 | 0 | 0 | 159458 |
+  | 250 | blended | 122606 | 0 | 0 | 159962 |
+
+square at 30°, 0.5 px:
+  | tolerance | edges | leaks | gaps | halo | filled |
+  |---|---|---|---|---|---|
+  | 0 | plain | 0 | 0 | 812 | 44188 |
+  | 32 | plain | 0 | 0 | 608 | 44392 |
+  | 64 | plain | 113504 | 0 | 404 | 159192 |
+  | 128 | plain | 113504 | 0 | 0 | 160000 |
+  | 192 | plain | 113504 | 0 | 0 | 160000 |
+  | 250 | plain | 113504 | 0 | 0 | 160000 |
+  | 0 | blended | 0 | 0 | 145 | 44188 |
+  | 32 | blended | 0 | 0 | 142 | 44392 |
+  | 64 | blended | 113504 | 0 | 142 | 159192 |
+  | 128 | blended | 113504 | 0 | 0 | 160000 |
+  | 192 | blended | 113504 | 0 | 0 | 160000 |
+  | 250 | blended | 113504 | 0 | 0 | 160000 |
+
+pale grey circle, 1 px:
+  | tolerance | edges | leaks | gaps | halo | filled |
+  |---|---|---|---|---|---|
+  | 0 | plain | 0 | 0 | 392 | 69756 |
+  | 32 | plain | 87500 | 0 | 0 | 159247 |
+  | 64 | plain | 87500 | 0 | 0 | 160000 |
+  | 128 | plain | 87500 | 0 | 0 | 160000 |
+  | 192 | plain | 87500 | 0 | 0 | 160000 |
+  | 250 | plain | 87500 | 0 | 0 | 160000 |
+  | 0 | blended | 0 | 0 | 0 | 69756 |
+  | 32 | blended | 87500 | 0 | 0 | 159247 |
+  | 64 | blended | 87500 | 0 | 0 | 160000 |
+  | 128 | blended | 87500 | 0 | 0 | 160000 |
+  | 192 | blended | 87500 | 0 | 0 | 160000 |
+  | 250 | blended | 87500 | 0 | 0 | 160000 |
+
+red on blue, 1 px:
+  | tolerance | edges | leaks | gaps | halo | filled |
+  |---|---|---|---|---|---|
+  | 0 | plain | 0 | 0 | 394 | 69756 |
+  | 32 | plain | 0 | 0 | 254 | 69896 |
+  | 64 | plain | 0 | 0 | 110 | 70040 |
+  | 128 | plain | 87500 | 0 | 0 | 159414 |
+  | 192 | plain | 87500 | 0 | 0 | 160000 |
+  | 250 | plain | 87500 | 0 | 0 | 160000 |
+  | 0 | blended | 0 | 0 | 0 | 69756 |
+  | 32 | blended | 0 | 0 | 0 | 69896 |
+  | 64 | blended | 0 | 0 | 0 | 70040 |
+  | 128 | blended | 87500 | 0 | 0 | 159414 |
+  | 192 | blended | 87500 | 0 | 0 | 160000 |
+  | 250 | blended | 87500 | 0 | 0 | 160000 |
+
+Wrote fill-edges.png: one row per shape; columns are tolerance [0, 64, 128, 192] plain, then the same blended.
+

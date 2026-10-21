@@ -1,0 +1,136 @@
+--- warm-up:
+  Pixmap: Some((1280, 800)), display list 59500 segments
+  Frame intervals: n=118 mean=16.99ms p50=16.67ms p95=16.76ms max=34.85ms
+  Draw segments: n=118 mean=3.80ms p50=3.65ms p95=4.83ms max=7.14ms
+  Convert + new image: n=118 mean=0.50ms p50=0.43ms p95=1.25ms max=3.03ms
+  Paint calls: n=118 mean=0.46ms p50=0.37ms p95=0.58ms max=3.44ms
+  Memory: RSS 133 MiB, GPU buffers 80 MiB, leaked images 0
+--- static 2x: 20k segments, then nothing changes:
+  Pixmap: Some((2560, 1600)), display list 20000 segments
+  Frame intervals: n=145 mean=16.67ms p50=16.66ms p95=16.76ms max=17.91ms
+  Draw segments: n=1 mean=265.67ms p50=265.67ms p95=265.67ms max=265.67ms
+  Convert + new image: n=1 mean=10.24ms p50=10.24ms p95=10.24ms max=10.24ms
+  Paint calls: n=146 mean=0.06ms p50=0.00ms p95=0.01ms max=8.69ms
+  Re-rendered 20000 segments at (2560, 1600) in 277.3ms
+  Memory: RSS 153 MiB, GPU buffers 144 MiB, leaked images 0
+--- full upload 1x, tiny-skia, 500 segments a frame:
+  Pixmap: Some((1280, 800)), display list 150000 segments
+  Frame intervals: n=299 mean=16.67ms p50=16.67ms p95=16.77ms max=16.84ms
+  Draw segments: n=299 mean=4.61ms p50=4.58ms p95=6.00ms max=7.96ms
+  Convert + new image: n=300 mean=0.47ms p50=0.43ms p95=0.51ms max=8.68ms
+  Paint calls: n=300 mean=0.42ms p50=0.39ms p95=0.50ms max=5.29ms
+  Re-rendered 0 segments at (1280, 800) in 0.0ms
+  Memory: RSS 137 MiB, GPU buffers 144 MiB, leaked images 0
+--- full upload 2x, tiny-skia, 20 segments a frame:
+  Pixmap: Some((2560, 1600)), display list 5960 segments
+  Frame intervals: n=297 mean=16.72ms p50=16.66ms p95=16.79ms max=33.20ms
+  Draw segments: n=297 mean=0.36ms p50=0.31ms p95=0.66ms max=0.92ms
+  Convert + new image: n=298 mean=1.61ms p50=1.50ms p95=2.11ms max=10.97ms
+  Paint calls: n=298 mean=1.51ms p50=1.44ms p95=1.79ms max=9.25ms
+  Re-rendered 0 segments at (2560, 1600) in 0.0ms
+  Memory: RSS 184 MiB, GPU buffers 160 MiB, leaked images 0
+--- full upload 2x, tiny-skia, 500 segments a frame:
+  Pixmap: Some((2560, 1600)), display list 88500 segments
+  Frame intervals: n=176 mean=28.41ms p50=33.29ms p95=33.45ms max=33.52ms
+  Draw segments: n=176 mean=7.60ms p50=7.20ms p95=9.66ms max=15.08ms
+  Convert + new image: n=177 mean=1.51ms p50=1.39ms p95=2.10ms max=4.62ms
+  Paint calls: n=177 mean=1.54ms p50=1.43ms p95=2.05ms max=5.80ms
+  Memory: RSS 184 MiB, GPU buffers 160 MiB, leaked images 0
+Screenshot screenshot-1-full.png: Ok(true)
+--- full upload 2x, vello_cpu, 500 segments a frame:
+  Pixmap: Some((2560, 1600)), display list 140500 segments
+  Frame intervals: n=280 mean=17.86ms p50=16.67ms p95=33.24ms max=33.48ms
+  Draw segments: n=280 mean=3.12ms p50=2.97ms p95=4.71ms max=9.70ms
+  Convert + new image: n=281 mean=1.68ms p50=1.51ms p95=2.63ms max=4.37ms
+  Paint calls: n=281 mean=1.58ms p50=1.48ms p95=2.10ms max=3.09ms
+  Memory: RSS 186 MiB, GPU buffers 160 MiB, leaked images 0
+--- full upload 2x, vello_cpu, 2000 segments a frame:
+  Pixmap: Some((2560, 1600)), display list 528000 segments
+  Frame intervals: n=263 mean=19.01ms p50=16.68ms p95=33.36ms max=33.41ms
+  Draw segments: n=263 mean=4.14ms p50=3.95ms p95=5.57ms max=7.59ms
+  Convert + new image: n=264 mean=1.66ms p50=1.48ms p95=2.51ms max=8.86ms
+  Paint calls: n=264 mean=1.58ms p50=1.47ms p95=2.15ms max=4.12ms
+  Memory: RSS 217 MiB, GPU buffers 160 MiB, leaked images 0
+--- tiles 2x, vello_cpu, 500 segments a frame:
+  Pixmap: Some((2560, 1600)), display list 150000 segments
+  Frame intervals: n=299 mean=16.72ms p50=16.67ms p95=16.76ms max=33.32ms
+  Draw segments: n=299 mean=2.53ms p50=2.32ms p95=3.61ms max=5.54ms
+  Convert + new image: n=300 mean=1.36ms p50=1.35ms p95=1.81ms max=4.54ms
+  Paint calls: n=300 mean=0.86ms p50=0.85ms p95=1.19ms max=1.96ms
+  Memory: RSS 217 MiB, GPU buffers 152 MiB, leaked images 0
+--- tiles 1x, tiny-skia, 500 segments a frame:
+  Pixmap: Some((1280, 800)), display list 150500 segments
+  Frame intervals: n=300 mean=16.67ms p50=16.67ms p95=16.73ms max=16.85ms
+  Draw segments: n=300 mean=4.40ms p50=4.25ms p95=6.26ms max=6.89ms
+  Convert + new image: n=301 mean=0.43ms p50=0.43ms p95=0.55ms max=0.73ms
+  Paint calls: n=301 mean=0.29ms p50=0.29ms p95=0.39ms max=0.47ms
+  Re-rendered 0 segments at (1280, 800) in 0.0ms
+  Memory: RSS 217 MiB, GPU buffers 152 MiB, leaked images 0
+Screenshot screenshot-2-tiles.png: Ok(true)
+--- vector 2x, tiny-skia, 20 segments a frame, flatten every 30 frames:
+  Pixmap: Some((2560, 1600)), display list 5740 segments
+  Frame intervals: n=286 mean=17.42ms p50=16.67ms p95=16.79ms max=49.98ms
+  Draw segments: n=9 mean=18.28ms p50=20.94ms p95=28.45ms max=28.45ms
+  Convert + new image: n=10 mean=1.52ms p50=1.52ms p95=2.11ms max=2.11ms
+  Paint calls: n=287 mean=0.23ms p50=0.17ms p95=0.45ms max=2.07ms
+  Flattened 9 times
+  Re-rendered 0 segments at (2560, 1600) in 0.0ms
+  Memory: RSS 217 MiB, GPU buffers 153 MiB, leaked images 0
+--- resize every second 2x, vello_cpu, 500 segments a frame:
+  Pixmap: Some((2000, 1280)), display list 183500 segments
+  Frame intervals: n=366 mean=19.12ms p50=16.67ms p95=33.22ms max=167.22ms
+  Draw segments: n=366 mean=3.01ms p50=2.75ms p95=5.00ms max=7.73ms
+  Convert + new image: n=367 mean=1.44ms p50=1.08ms p95=3.14ms max=10.11ms
+  Paint calls: n=367 mean=1.24ms p50=0.98ms p95=1.90ms max=9.56ms
+  Re-rendered 1000 segments at (2000, 1280) in 2.6ms
+  Re-rendered 31000 segments at (2560, 1600) in 24.5ms
+  Re-rendered 58500 segments at (2000, 1280) in 54.7ms
+  Re-rendered 86500 segments at (2560, 1600) in 73.9ms
+  Re-rendered 110000 segments at (2000, 1280) in 113.7ms
+  Re-rendered 136500 segments at (2560, 1600) in 121.9ms
+  Re-rendered 161000 segments at (2000, 1280) in 139.8ms
+  Memory: RSS 377 MiB, GPU buffers 111 MiB, leaked images 0
+--- resize every second 2x, tiny-skia, 500 segments a frame:
+  Pixmap: Some((2560, 1600)), display list 69000 segments
+  Frame intervals: n=137 mean=53.29ms p50=16.72ms p95=50.56ms max=1179.38ms
+  Draw segments: n=137 mean=6.70ms p50=6.59ms p95=8.72ms max=11.15ms
+  Convert + new image: n=138 mean=1.26ms p50=1.06ms p95=1.63ms max=9.20ms
+  Paint calls: n=138 mean=1.25ms p50=1.08ms p95=1.58ms max=8.86ms
+  Re-rendered 500 segments at (2560, 1600) in 6.7ms
+  Re-rendered 20500 segments at (2000, 1280) in 211.9ms
+  Re-rendered 44000 segments at (2560, 1600) in 556.7ms
+  Re-rendered 53000 segments at (2000, 1280) in 538.2ms
+  Re-rendered 66500 segments at (2560, 1600) in 1134.1ms
+  Re-rendered 67500 segments at (2000, 1280) in 935.8ms
+  Re-rendered 68500 segments at (2560, 1600) in 864.8ms
+  Memory: RSS 399 MiB, GPU buffers 121 MiB, leaked images 0
+--- full upload 1x without drop_image:
+  Pixmap: Some((1280, 800)), display list 56000 segments
+  Frame intervals: n=111 mean=18.02ms p50=16.67ms p95=33.33ms max=33.40ms
+  Draw segments: n=111 mean=4.55ms p50=4.37ms p95=5.83ms max=6.67ms
+  Convert + new image: n=112 mean=0.46ms p50=0.42ms p95=0.70ms max=1.76ms
+  Paint calls: n=112 mean=2.18ms p50=2.35ms p95=3.01ms max=3.37ms
+  Re-rendered 0 segments at (1280, 800) in 0.0ms
+  Memory: RSS 778 MiB, GPU buffers 714 MiB, leaked images 112
+--- after dropping the leaked images:
+  Pixmap: Some((1280, 800)), display list 59500 segments
+  Frame intervals: n=118 mean=16.67ms p50=16.66ms p95=16.73ms max=16.83ms
+  Draw segments: n=118 mean=4.43ms p50=4.01ms p95=6.17ms max=7.45ms
+  Convert + new image: n=119 mean=0.79ms p50=0.44ms p95=0.55ms max=40.85ms
+  Paint calls: n=119 mean=0.36ms p50=0.34ms p95=0.46ms max=0.94ms
+  Memory: RSS 368 MiB, GPU buffers 169 MiB, leaked images 0
+--- blend: tiny-skia above, gpui paths below:
+  Pixmap: Some((1280, 800)), display list 0 segments
+  Frame intervals: n=120 mean=16.67ms p50=16.67ms p95=16.79ms max=16.91ms
+  Draw segments: no samples
+  Convert + new image: n=1 mean=0.44ms p50=0.44ms p95=0.44ms max=0.44ms
+  Paint calls: n=121 mean=0.05ms p50=0.03ms p95=0.06ms max=2.10ms
+  Memory: RSS 368 MiB, GPU buffers 170 MiB, leaked images 0
+Screenshot screenshot-3-blend.png: Ok(true)
+--- finished:
+  Pixmap: Some((1280, 800)), display list 0 segments
+  Frame intervals: n=60 mean=16.67ms p50=16.67ms p95=16.78ms max=16.99ms
+  Draw segments: no samples
+  Convert + new image: n=1 mean=0.41ms p50=0.41ms p95=0.41ms max=0.41ms
+  Paint calls: n=61 mean=0.01ms p50=0.00ms p95=0.00ms max=0.32ms
+  Memory: RSS 368 MiB, GPU buffers 170 MiB, leaked images 0

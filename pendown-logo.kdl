@@ -2070,7 +2070,7 @@ logo {
 
         - a palette number, as above;
         - an RGB list [r g b], with each value from 0 to 255, not a percentage;
-        - an RGBA list [r g b a], where a is the opacity from 0 (invisible) to 255 (solid);
+        - an RGBA list [r g b a], where a is the opacity from 0 (invisible) to 255 (solid). Each move is drawn separately, so a see-through line is darker at the points where two moves meet;
         - one of the 148 CSS colour names, in any case, such as "red or "cornflowerblue;
         - a hex word: "#ff8800, the short form "#f80, or with opacity "#ff880080 or "#f808.
 

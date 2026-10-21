@@ -1,0 +1,119 @@
+--- 10 s:
+  Pixmap: Some((2560, 1600)), display list 263000 segments
+  Frame intervals: n=525 mean=19.07ms p50=16.68ms p95=33.32ms max=59.67ms
+  Draw segments: n=525 mean=3.25ms p50=3.14ms p95=4.63ms max=8.24ms
+  Convert + new image: n=525 mean=2.38ms p50=2.29ms p95=3.67ms max=14.11ms
+  Paint calls: n=525 mean=1.95ms p50=1.64ms p95=3.05ms max=12.11ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 20 s:
+  Pixmap: Some((2560, 1600)), display list 281500 segments
+  Frame intervals: n=562 mean=17.79ms p50=16.68ms p95=33.23ms max=33.41ms
+  Draw segments: n=562 mean=3.05ms p50=2.89ms p95=4.45ms max=7.75ms
+  Convert + new image: n=563 mean=2.11ms p50=1.80ms p95=3.35ms max=4.26ms
+  Paint calls: n=563 mean=1.79ms p50=1.52ms p95=2.89ms max=4.87ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 30 s:
+  Pixmap: Some((2560, 1600)), display list 273500 segments
+  Frame intervals: n=546 mean=18.31ms p50=16.68ms p95=33.30ms max=33.51ms
+  Draw segments: n=546 mean=3.11ms p50=2.82ms p95=4.85ms max=13.87ms
+  Convert + new image: n=547 mean=2.18ms p50=1.94ms p95=3.57ms max=4.51ms
+  Paint calls: n=547 mean=2.04ms p50=1.88ms p95=3.17ms max=4.90ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 40 s:
+  Pixmap: Some((2560, 1600)), display list 263000 segments
+  Frame intervals: n=525 mean=19.05ms p50=16.68ms p95=33.32ms max=33.40ms
+  Draw segments: n=525 mean=3.16ms p50=2.96ms p95=4.75ms max=6.92ms
+  Convert + new image: n=526 mean=2.25ms p50=1.97ms p95=3.92ms max=10.07ms
+  Paint calls: n=526 mean=2.27ms p50=2.26ms p95=3.40ms max=8.94ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 50 s:
+  Pixmap: Some((2560, 1600)), display list 276000 segments
+  Frame intervals: n=551 mean=18.18ms p50=16.68ms p95=33.29ms max=33.54ms
+  Draw segments: n=551 mean=3.04ms p50=2.79ms p95=4.50ms max=7.88ms
+  Convert + new image: n=552 mean=1.93ms p50=1.64ms p95=3.70ms max=5.23ms
+  Paint calls: n=552 mean=2.16ms p50=2.09ms p95=3.13ms max=5.10ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 60 s:
+  Pixmap: Some((2560, 1600)), display list 269000 segments
+  Frame intervals: n=537 mean=18.62ms p50=16.68ms p95=33.32ms max=33.45ms
+  Draw segments: n=537 mean=3.06ms p50=2.90ms p95=4.57ms max=6.55ms
+  Convert + new image: n=538 mean=1.92ms p50=1.55ms p95=4.37ms max=5.09ms
+  Paint calls: n=538 mean=2.08ms p50=1.83ms p95=3.01ms max=5.39ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 70 s:
+  Pixmap: Some((2560, 1600)), display list 270500 segments
+  Frame intervals: n=540 mean=18.55ms p50=16.68ms p95=33.29ms max=33.42ms
+  Draw segments: n=540 mean=2.99ms p50=2.72ms p95=4.66ms max=6.94ms
+  Convert + new image: n=541 mean=1.91ms p50=1.48ms p95=4.52ms max=5.43ms
+  Paint calls: n=541 mean=1.98ms p50=1.75ms p95=2.98ms max=5.18ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 80 s:
+  Pixmap: Some((2560, 1600)), display list 264000 segments
+  Frame intervals: n=527 mean=18.97ms p50=16.68ms p95=33.32ms max=33.45ms
+  Draw segments: n=527 mean=3.02ms p50=2.75ms p95=4.91ms max=13.19ms
+  Convert + new image: n=528 mean=1.87ms p50=1.47ms p95=4.13ms max=5.34ms
+  Paint calls: n=528 mean=1.95ms p50=1.69ms p95=3.18ms max=5.03ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 90 s:
+  Pixmap: Some((2560, 1600)), display list 267500 segments
+  Frame intervals: n=534 mean=18.73ms p50=16.68ms p95=33.30ms max=33.43ms
+  Draw segments: n=534 mean=3.01ms p50=2.79ms p95=4.65ms max=8.22ms
+  Convert + new image: n=535 mean=1.86ms p50=1.48ms p95=3.77ms max=6.00ms
+  Paint calls: n=535 mean=1.92ms p50=1.66ms p95=3.15ms max=5.20ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 100 s:
+  Pixmap: Some((2560, 1600)), display list 296000 segments
+  Frame intervals: n=591 mean=16.92ms p50=16.67ms p95=16.80ms max=33.34ms
+  Draw segments: n=591 mean=2.67ms p50=2.38ms p95=3.96ms max=6.49ms
+  Convert + new image: n=592 mean=1.53ms p50=1.34ms p95=2.79ms max=3.23ms
+  Paint calls: n=592 mean=1.58ms p50=1.47ms p95=2.26ms max=4.47ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 110 s:
+  Pixmap: Some((2560, 1600)), display list 295000 segments
+  Frame intervals: n=589 mean=16.98ms p50=16.67ms p95=16.80ms max=33.35ms
+  Draw segments: n=589 mean=2.75ms p50=2.45ms p95=4.22ms max=7.36ms
+  Convert + new image: n=590 mean=1.48ms p50=1.33ms p95=2.35ms max=3.88ms
+  Paint calls: n=590 mean=1.61ms p50=1.46ms p95=2.55ms max=4.35ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 120 s:
+  Pixmap: Some((2560, 1600)), display list 299000 segments
+  Frame intervals: n=597 mean=16.75ms p50=16.67ms p95=16.79ms max=33.28ms
+  Draw segments: n=597 mean=2.66ms p50=2.39ms p95=4.02ms max=5.68ms
+  Convert + new image: n=598 mean=1.48ms p50=1.31ms p95=2.48ms max=3.10ms
+  Paint calls: n=598 mean=1.52ms p50=1.45ms p95=2.02ms max=3.46ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 130 s:
+  Pixmap: Some((2560, 1600)), display list 290500 segments
+  Frame intervals: n=580 mean=17.24ms p50=16.67ms p95=16.82ms max=33.34ms
+  Draw segments: n=580 mean=2.86ms p50=2.55ms p95=4.50ms max=6.60ms
+  Convert + new image: n=581 mean=1.56ms p50=1.38ms p95=2.57ms max=3.64ms
+  Paint calls: n=581 mean=1.62ms p50=1.48ms p95=2.28ms max=4.47ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 140 s:
+  Pixmap: Some((2560, 1600)), display list 292000 segments
+  Frame intervals: n=583 mean=17.12ms p50=16.67ms p95=16.81ms max=33.34ms
+  Draw segments: n=583 mean=2.74ms p50=2.42ms p95=4.29ms max=7.75ms
+  Convert + new image: n=584 mean=1.49ms p50=1.29ms p95=2.55ms max=4.10ms
+  Paint calls: n=584 mean=1.52ms p50=1.42ms p95=2.06ms max=3.61ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 150 s:
+  Pixmap: Some((2560, 1600)), display list 294000 segments
+  Frame intervals: n=587 mean=17.03ms p50=16.67ms p95=16.80ms max=33.33ms
+  Draw segments: n=587 mean=2.78ms p50=2.43ms p95=4.32ms max=6.25ms
+  Convert + new image: n=588 mean=1.44ms p50=1.31ms p95=2.29ms max=3.28ms
+  Paint calls: n=588 mean=1.52ms p50=1.41ms p95=2.05ms max=3.13ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 160 s:
+  Pixmap: Some((2560, 1600)), display list 284500 segments
+  Frame intervals: n=568 mean=17.58ms p50=16.67ms p95=33.17ms max=33.36ms
+  Draw segments: n=568 mean=3.12ms p50=2.85ms p95=4.84ms max=8.59ms
+  Convert + new image: n=569 mean=1.56ms p50=1.46ms p95=2.35ms max=4.91ms
+  Paint calls: n=569 mean=1.62ms p50=1.57ms p95=2.34ms max=3.64ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0
+--- 170 s:
+  Pixmap: Some((2560, 1600)), display list 297500 segments
+  Frame intervals: n=594 mean=16.81ms p50=16.67ms p95=16.79ms max=33.30ms
+  Draw segments: n=594 mean=2.66ms p50=2.38ms p95=3.89ms max=5.70ms
+  Convert + new image: n=595 mean=1.43ms p50=1.32ms p95=2.31ms max=3.86ms
+  Paint calls: n=595 mean=1.45ms p50=1.40ms p95=1.72ms max=2.86ms
+  Memory: RSS 178 MiB, GPU buffers 140 MiB, leaked images 0

@@ -1,0 +1,3 @@
+# Spikes share one target directory so they share compiled dependencies.
+[build]
+target-dir = "target"

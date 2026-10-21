@@ -341,7 +341,7 @@ fn shapes_sweep_round_and_pen_up_shapes_take_no_time() {
         }
     }
     // 314 steps round at 100 a second.
-    assert!((frames as f64 - 3.14 / FRAME.as_secs_f64()).abs() <= 3.0, "{frames} frames");
+    assert!((frames as f64 - std::f64::consts::PI / FRAME.as_secs_f64()).abs() <= 3.0, "{frames} frames");
     let (mut animator, _run) = start("PU CIRCLE 50 SQUARE 80", Speed::Animated(100.0));
     let mut frames = 0;
     while !animator.finished() && frames < 1000 {

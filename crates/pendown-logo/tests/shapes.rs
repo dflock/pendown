@@ -5,7 +5,10 @@ mod common;
 use common::*;
 use pendown_logo::Event;
 
-fn arcs(r: &Run) -> Vec<((f64, f64), f64, f64, f64, bool)> {
+/// An arc: centre, radius, start heading, angle, and whether the pen was down.
+type ArcEvent = ((f64, f64), f64, f64, f64, bool);
+
+fn arcs(r: &Run) -> Vec<ArcEvent> {
     r.events
         .iter()
         .filter_map(|e| match e {
@@ -39,7 +42,7 @@ fn arc_edge_cases() {
     assert_eq!(run("ARC 90 0").turns(), [(0.0, 90.0)], "no radius: just the turn");
     assert!(run("ARC 0 100").events.is_empty(), "no angle: nothing");
     let r = run("PU ARC 90 100 SHOW POS");
-    assert_eq!(arcs(&r)[0].4, false, "the pen is up, but the turtle still walks");
+    assert!(!arcs(&r)[0].4, "the pen is up, but the turtle still walks");
     assert_eq!(r.printed(), "[100 100]\n");
     assert_eq!(error("ARC 90 -5"), "ARC doesn't like -5 as input");
 }

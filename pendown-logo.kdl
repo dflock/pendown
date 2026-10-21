@@ -1867,6 +1867,7 @@ logo {
         eg "FENCE"
         desc "tells the turtle to enter fence mode: From now on, if the turtle is asked to move past the boundary of the graphics window, it will move as far as it can and then stop at the edge with an \"out of bounds\" error message. Compare WRAP and WINDOW."
         see "wrap"
+        differs "A move that would cross the fence is drawn up to the edge, and stops there with an error. That includes SETPOS, SETXY and the rest, which in UCBLogo give the error without moving at all."
         supported #true
         obsolete #false
         phase 1

@@ -76,6 +76,10 @@ pub static PRIMS: &[Prim] = &[
     Prim { names: &["shownp", "shown?"], arity: NONE, imp: Imp::F(shownp) },
     Prim { names: &["clean"], arity: NONE, imp: Imp::F(clean) },
     Prim { names: &["clearscreen", "cs"], arity: NONE, imp: Imp::F(clearscreen) },
+    Prim { names: &["wrap"], arity: NONE, imp: Imp::F(wrap) },
+    Prim { names: &["window"], arity: NONE, imp: Imp::F(window) },
+    Prim { names: &["fence"], arity: NONE, imp: Imp::F(fence) },
+    Prim { names: &["turtlemode"], arity: NONE, imp: Imp::F(turtlemode) },
     // Pen and background.
     Prim { names: &["penup", "pu"], arity: Arity::fixed(0), imp: Imp::F(penup) },
     Prim { names: &["pendown", "pd"], arity: Arity::fixed(0), imp: Imp::F(pendown) },

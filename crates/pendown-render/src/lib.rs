@@ -124,6 +124,16 @@ impl Drawing {
         self.pending.extend_from_slice(segments);
     }
 
+    /// Sets the turtle area's size in turtle steps, to match the
+    /// interpreter's (`Interpreter::set_area`). It's fitted to the buffer
+    /// without stretching, so only the larger of the two matters here.
+    pub fn set_area(&mut self, width: f64, height: f64) {
+        self.area = width.max(height);
+        let (w, h) = (self.width, self.height);
+        self.width = 0;
+        self.resize(w, h);
+    }
+
     /// Device pixels per turtle step.
     pub fn scale(&self) -> f64 {
         self.width.min(self.height) as f64 / self.area

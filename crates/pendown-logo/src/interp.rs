@@ -15,6 +15,7 @@ use smallvec::SmallVec;
 use crate::{
     error::{CallSite, Error, RunError},
     event::{Event, EventSink, Pen, Point, SyncPoint},
+    geometry::{Area, TurtleMode},
     names::{Names, Sym},
     parse::{self, Arity, Block, Call, Cx, Expr, Instr, Target},
     prims::{self, Args, Imp, PRIMS},
@@ -116,6 +117,7 @@ pub struct Turtle {
     pub heading: f64,
     pub pen: Pen,
     pub shown: bool,
+    pub mode: TurtleMode,
 }
 
 impl Default for Turtle {
@@ -125,6 +127,7 @@ impl Default for Turtle {
             heading: 0.0,
             pen: Pen { down: true, color: [255, 255, 255, 255], size: 1.0 },
             shown: true,
+            mode: TurtleMode::Wrap,
         }
     }
 }
@@ -150,6 +153,8 @@ pub struct Interpreter {
     frames: Vec<Frame>,
     pub(crate) repcounts: Vec<i64>,
     pub(crate) turtle: Turtle,
+    /// The turtle area, which Run doesn't change.
+    pub(crate) area: Area,
     sink: Box<dyn EventSink>,
     control: Arc<Control>,
     last_line: Option<(SourceId, u32)>,
@@ -191,6 +196,7 @@ impl Interpreter {
             frames: Vec::new(),
             repcounts: Vec::new(),
             turtle: Turtle::default(),
+            area: Area::default(),
             sink,
             control,
             last_line: None,
@@ -221,6 +227,16 @@ impl Interpreter {
     pub fn run_console(&mut self, text: &str) -> Result<(), RunError> {
         self.console_entries += 1;
         self.run_source(text, SourceId::Console(self.console_entries))
+    }
+
+    /// Sets the turtle area's size in turtle steps, centred on 0, 0. The
+    /// default is 1000 × 1000 (ADR 0003).
+    pub fn set_area(&mut self, width: f64, height: f64) {
+        self.area = Area { half_width: width / 2.0, half_height: height / 2.0 };
+    }
+
+    pub fn area(&self) -> Area {
+        self.area
     }
 
     /// Where a procedure is defined, if it is.

@@ -12,6 +12,7 @@
 
 mod error;
 mod event;
+mod geometry;
 mod interp;
 mod names;
 mod number;
@@ -22,6 +23,7 @@ mod span;
 mod value;
 
 pub use error::{CallSite, Error, RunError};
+pub use geometry::{Area, TurtleMode};
 pub use event::{BatchSender, Event, EventSink, Halted, Pen, Point, SyncPoint};
 pub use interp::{Control, Interpreter, Limits, STACK_MARGIN, Stats};
 pub use number::{format_number, parse_number};

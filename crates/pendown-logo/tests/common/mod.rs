@@ -17,6 +17,9 @@ impl EventSink for Shared {
     }
 }
 
+/// A move: where from, where to, and whether the pen was down.
+pub type Move = ((f64, f64), (f64, f64), bool);
+
 pub struct Run {
     pub result: Result<(), RunError>,
     pub events: Vec<Event>,
@@ -28,7 +31,7 @@ impl Run {
     }
 
     /// The moves, as ((from), (to), pen down).
-    pub fn moves(&self) -> Vec<((f64, f64), (f64, f64), bool)> {
+    pub fn moves(&self) -> Vec<Move> {
         self.events
             .iter()
             .filter_map(|e| match e {

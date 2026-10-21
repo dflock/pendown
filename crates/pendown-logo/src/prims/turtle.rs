@@ -7,7 +7,8 @@ use std::rc::Rc;
 
 use super::Args;
 use crate::{
-    event::{Event, Point},
+    event::{Event, Pen, Point},
+    geometry::TurtleMode,
     interp::{Flow, Interpreter},
     number::sin_cos_degrees,
     value::{List, Value},
@@ -15,19 +16,26 @@ use crate::{
 
 type Out = Result<Option<Value>, Flow>;
 
-/// Moves the turtle in a straight line to `to`, drawing if the pen is down.
-pub(super) fn move_to(it: &mut Interpreter, to: Point) -> Out {
-    let from = it.turtle.pos;
-    it.turtle.pos = to;
+/// Moves the turtle in a straight line to `to`, drawing if the pen is
+/// down. In `WRAP` mode the move is split where it crosses an edge, and in
+/// `FENCE` mode it stops at the edge with an error.
+pub(super) fn move_to(it: &mut Interpreter, a: &Args, to: Point) -> Out {
+    let path = it.area.line(it.turtle.pos, to, it.turtle.mode);
     let pen = it.turtle.pen;
-    it.emit(Event::Move { from, to, pen })?;
+    for (from, to) in path.pieces {
+        it.emit(Event::Move { from, to, pen })?;
+    }
+    it.turtle.pos = path.end;
+    if path.fenced {
+        return Err(a.error("The turtle can't go past the edge in FENCE mode. Use WRAP or WINDOW to let it.".into()));
+    }
     Ok(None)
 }
 
-fn walk(it: &mut Interpreter, distance: f64) -> Out {
+fn walk(it: &mut Interpreter, a: &Args, distance: f64) -> Out {
     let (sin, cos) = sin_cos_degrees(it.turtle.heading);
     let from = it.turtle.pos;
-    move_to(it, Point { x: from.x + distance * sin, y: from.y + distance * cos })
+    move_to(it, a, Point { x: from.x + distance * sin, y: from.y + distance * cos })
 }
 
 /// Turns the turtle by `by` degrees, clockwise if positive. The event
@@ -52,11 +60,11 @@ fn turn_to(it: &mut Interpreter, heading: f64) -> Out {
 }
 
 pub(super) fn forward(it: &mut Interpreter, a: &Args) -> Out {
-    walk(it, a.num(0)?)
+    walk(it, a, a.num(0)?)
 }
 
 pub(super) fn back(it: &mut Interpreter, a: &Args) -> Out {
-    walk(it, -a.num(0)?)
+    walk(it, a, -a.num(0)?)
 }
 
 pub(super) fn right(it: &mut Interpreter, a: &Args) -> Out {
@@ -69,22 +77,22 @@ pub(super) fn left(it: &mut Interpreter, a: &Args) -> Out {
 
 pub(super) fn setpos(it: &mut Interpreter, a: &Args) -> Out {
     let to = a.point(0)?;
-    move_to(it, to)
+    move_to(it, a, to)
 }
 
 pub(super) fn setxy(it: &mut Interpreter, a: &Args) -> Out {
     let to = Point { x: a.num(0)?, y: a.num(1)? };
-    move_to(it, to)
+    move_to(it, a, to)
 }
 
 pub(super) fn setx(it: &mut Interpreter, a: &Args) -> Out {
     let to = Point { x: a.num(0)?, y: it.turtle.pos.y };
-    move_to(it, to)
+    move_to(it, a, to)
 }
 
 pub(super) fn sety(it: &mut Interpreter, a: &Args) -> Out {
     let to = Point { x: it.turtle.pos.x, y: a.num(0)? };
-    move_to(it, to)
+    move_to(it, a, to)
 }
 
 pub(super) fn setheading(it: &mut Interpreter, a: &Args) -> Out {
@@ -92,8 +100,8 @@ pub(super) fn setheading(it: &mut Interpreter, a: &Args) -> Out {
 }
 
 /// `HOME` is a move like any other, so it draws when the pen is down.
-pub(super) fn home(it: &mut Interpreter, _: &Args) -> Out {
-    move_to(it, Point { x: 0.0, y: 0.0 })?;
+pub(super) fn home(it: &mut Interpreter, a: &Args) -> Out {
+    move_to(it, a, Point { x: 0.0, y: 0.0 })?;
     turn_to(it, 0.0)
 }
 
@@ -162,8 +170,44 @@ pub(super) fn clearscreen(it: &mut Interpreter, a: &Args) -> Out {
     clean(it, a)?;
     let down = it.turtle.pen.down;
     it.turtle.pen.down = false;
-    let r = move_to(it, Point { x: 0.0, y: 0.0 });
+    // Home is always inside the area, so this never wraps or fences.
+    let r = move_to(it, a, Point { x: 0.0, y: 0.0 });
     it.turtle.pen.down = down;
     r?;
     turn_to(it, 0.0)
+}
+
+/// `WRAP` and `FENCE` first bring a turtle that's outside the area back in,
+/// wrapping its position, as UCBLogo does. The jump isn't drawn.
+fn set_mode(it: &mut Interpreter, mode: TurtleMode) -> Out {
+    if mode != TurtleMode::Window && !it.area.contains(it.turtle.pos) {
+        let from = it.turtle.pos;
+        let to = it.area.wrap_point(from);
+        it.turtle.pos = to;
+        let pen = Pen { down: false, ..it.turtle.pen };
+        it.emit(Event::Move { from, to, pen })?;
+    }
+    it.turtle.mode = mode;
+    Ok(None)
+}
+
+pub(super) fn wrap(it: &mut Interpreter, _: &Args) -> Out {
+    set_mode(it, TurtleMode::Wrap)
+}
+
+pub(super) fn window(it: &mut Interpreter, _: &Args) -> Out {
+    set_mode(it, TurtleMode::Window)
+}
+
+pub(super) fn fence(it: &mut Interpreter, _: &Args) -> Out {
+    set_mode(it, TurtleMode::Fence)
+}
+
+pub(super) fn turtlemode(it: &mut Interpreter, _: &Args) -> Out {
+    let name = match it.turtle.mode {
+        TurtleMode::Wrap => "WRAP",
+        TurtleMode::Window => "WINDOW",
+        TurtleMode::Fence => "FENCE",
+    };
+    Ok(Some(Value::word(name)))
 }

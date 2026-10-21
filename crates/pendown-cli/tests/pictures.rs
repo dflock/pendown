@@ -100,3 +100,9 @@ SETPOS [-400 400]
 ";
     check("setxy-home-clean", program, 300, 300);
 }
+
+#[test]
+fn wrapping_spiral() {
+    // Starts near the right edge, so the spiral wraps round on itself.
+    check("wrapping-spiral", "PU SETXY 350 0 PD\nREPEAT 120 [FD REPCOUNT * 6 RT 61]", 300, 300);
+}

@@ -87,7 +87,7 @@ fn highlight_is_on_the_move_while_the_turtle_moves() {
 /// middle of a move.
 #[test]
 fn speed_changes_mid_move() {
-    let (mut animator, _run) = start("FD 1000", Speed::Animated(100.0));
+    let (mut animator, _run) = start("WINDOW FD 1000", Speed::Animated(100.0));
     let dt = Duration::from_millis(100);
     let mut ys = Vec::new();
     for i in 0..10 {
@@ -266,7 +266,8 @@ fn stop_while_waiting_at_a_held_line() {
 /// Question 2, without the drawing: Instant gets through a big fractal.
 #[test]
 fn instant_plays_a_big_fractal() {
-    let src = "TO TREE :size :depth
+    let src = "WINDOW
+TO TREE :size :depth
   IF :depth = 0 [STOP]
   FD :size
   LT 30 TREE :size * 0.7 :depth - 1

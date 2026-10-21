@@ -1,6 +1,6 @@
 # Turtle modes: `WRAP`, `WINDOW`, `FENCE`
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 05
 
@@ -26,3 +26,19 @@ Blocked by: 05
 - A `pendown-cli` picture test shows a wrapping spiral.
 
 ## Comments
+
+### 2026-10-21: done
+
+- **The geometry** is `src/geometry.rs`: `Area` and `TurtleMode`, and `Area::line`, which splits a straight move for the mode. It's pure and has 11 tests:
+  - wrapping once, several times, diagonally, through a corner, and along an edge;
+  - a huge move;
+  - `FENCE`, `WINDOW`, wrapping a point back in, and other area sizes.
+- **The commands:** `WRAP`, `WINDOW`, `FENCE` and `TURTLEMODE`. `WRAP` is the default, and Run resets it.
+- **Every move goes through `move_to`:** `FD`, `BK`, `SETPOS`, `SETXY`, `SETX`, `SETY` and `HOME`.
+- **Decisions:**
+  - **`FENCE`** draws up to the edge, then stops with an error. That includes `SETPOS`, which in UCBLogo gives the error without moving, and the kdl's `FENCE` entry now has a `differs` note saying so.
+  - **Switching to `WRAP` or `FENCE`** with the turtle outside the area wraps its position back in, as UCBLogo does. The jump is a pen-up move, so it's never drawn.
+  - **A move that wraps more than 10,000 times** stops drawing there, and jumps to where it would end (`MAX_WRAPS`).
+- **The area** is configurable with `Interpreter::set_area`, plus `Drawing::set_area` to match. Both default to 1000 × 1000.
+- **For issue 08:** `Area::line` handles straight lines only. Arcs can wrap by being split into short chords first.
+- **Tests:** `tests/modes.rs` (7 tests), and a `wrapping-spiral` picture. Two animator tests now start with `WINDOW`, since they move past the edge.

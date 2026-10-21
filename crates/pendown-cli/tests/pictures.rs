@@ -46,12 +46,12 @@ fn check_output(name: &str, program: &str, width: u32, height: u32) -> String {
     printed
 }
 
-/// The programs in `examples/phase-1/`, which between them use every phase-1
-/// command (checked by `pendown-logo`'s `tests/kdl.rs`). Each one's picture
-/// and printed output are saved, as `example-NAME.png` and `.txt`.
-#[test]
-fn phase_1_examples() {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/phase-1");
+/// The programs in `examples/phase-N/`, which between them use every
+/// command of that phase (checked by `pendown-logo`'s `tests/kdl.rs`). Each
+/// one's picture and printed output are saved, as `example-NAME.png` and
+/// `.txt` for phase 1, and `phase-N-NAME` after that.
+fn examples(phase: u32) {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("../../examples/phase-{phase}"));
     // Only the programs: the folder may hold pictures of them too.
     let mut programs: Vec<_> = std::fs::read_dir(&dir)
         .unwrap()
@@ -61,7 +61,8 @@ fn phase_1_examples() {
     programs.sort();
     assert!(programs.len() >= 4);
     for path in programs {
-        let name = format!("example-{}", path.file_stem().unwrap().to_string_lossy());
+        let stem = path.file_stem().unwrap().to_string_lossy();
+        let name = if phase == 1 { format!("example-{stem}") } else { format!("phase-{phase}-{stem}") };
         let program = std::fs::read_to_string(&path).unwrap();
         let printed = check_output(&name, &program, 400, 400);
         let expected_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/pictures").join(format!("{name}.txt"));
@@ -72,6 +73,16 @@ fn phase_1_examples() {
         let expected = std::fs::read_to_string(&expected_path).unwrap();
         assert_eq!(printed, expected, "{name} printed");
     }
+}
+
+#[test]
+fn phase_1_examples() {
+    examples(1);
+}
+
+#[test]
+fn phase_2_examples() {
+    examples(2);
 }
 
 #[test]

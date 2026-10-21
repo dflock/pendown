@@ -1,0 +1,66 @@
+; Control: loops, CASE and COND, running lists, and catching errors.
+
+PRINT (LIST "Pendown :LOGOVERSION)
+
+; A square spiral with WHILE.
+MAKE "side 10
+SETPC "lightgreen
+WHILE [:side < 400] [FD :side RT 90 MAKE "side :side + 15]
+
+; UNTIL, DO.WHILE and DO.UNTIL.
+MAKE "n 0
+UNTIL [:n = 3] [MAKE "n :n + 1]
+DO.WHILE [MAKE "n :n - 1] [:n > 0]
+DO.UNTIL [MAKE "n :n + 2] [:n >= 6]
+PRINT :n
+
+TO KIND :x
+  OUTPUT COND [
+    [[NUMBERP :x] "number]
+    [[LISTP :x] "list]
+    [ELSE "word]
+  ]
+END
+
+TO SHAPE :name
+  CASE :name [
+    [[triangle] REPEAT 3 [FD 60 RT 120]]
+    [[square box] REPEAT 4 [FD 60 RT 90]]
+    [ELSE CIRCLE 30]
+  ]
+END
+
+FOREACH [5 [a] hello] [PRINT KIND ?]
+SETPC "pink
+PU SETXY -300 300 SETHEADING 0 PD SHAPE "triangle
+PU SETXY -150 300 PD SHAPE "box
+PU SETXY 0 330 PD SHAPE "other
+
+; Running lists of instructions.
+RUN [PRINT "run]
+SHOW RUNRESULT [3 * 4]
+IGNORE RUNRESULT [PENUP]
+NAME 7 "lucky
+GLOBAL "later
+PRINT :lucky
+
+; Catching a THROW, and an error.
+TO POSITION :list :wanted
+  FOREACH :list [IF ? = :wanted [(THROW "found #)]]
+  OUTPUT 0
+END
+PRINT CATCH "found [POSITION [a b c] "b]
+CATCH "error [FD "far]
+SHOW ERROR
+
+; Special variables.
+MAKE "caseignoredp "false
+PRINT "a = "A
+MAKE "caseignoredp "true
+MAKE "printwidthlimit 3
+SHOW [1 2 3 4 5]
+MAKE "printdepthlimit 1
+SHOW [1 [2 [3]]]
+MAKE "fullprintp "true
+SHOW (LIST "a ")
+MAKE "erract [PRINT "unused]

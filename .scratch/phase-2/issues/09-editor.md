@@ -1,6 +1,6 @@
 # The editor: colours and checks for the new syntax
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 01, 04, 06
 
@@ -14,3 +14,7 @@ Blocked by: 01, 04, 06
 Each command has tests of its behaviour and its errors in `pendown-logo`, or the GUI and CLI tests cover it.
 
 ## Comments
+
+### 2026-10-21: done
+
+`syntax.rs` colours `{`, `}@0` and the slots, and checks the lists and templates of `RUN`, `FOR`, the `WHILE` loops, `CATCH` and the template commands.

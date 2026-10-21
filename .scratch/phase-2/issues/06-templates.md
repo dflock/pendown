@@ -1,6 +1,6 @@
 # Templates and the higher-order commands
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 04
 
@@ -15,3 +15,7 @@ Blocked by: 04
 Each command has tests of its behaviour and its errors in `pendown-logo`, or the GUI and CLI tests cover it.
 
 ## Comments
+
+### 2026-10-21: done
+
+In `prims/templates.rs`. A template is prepared once per call, and `?REST` is only worked out when it's used. `?2` parses as `(? 2)`. Tests: `tests/templates.rs`.

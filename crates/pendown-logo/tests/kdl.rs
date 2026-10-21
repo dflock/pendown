@@ -95,14 +95,13 @@ fn the_interpreter_implements_exactly_the_phase_1_and_2_commands() {
     assert!(extra.is_empty(), "commands the interpreter has that aren't phase 1 or 2 in the kdl: {extra:?}");
 }
 
-/// The example programs in `examples/phase-1/` use every phase-1 command at
-/// least once, under any of its names. `pendown-cli`'s picture tests run
-/// them.
-#[test]
-fn the_examples_use_every_phase_1_command() {
+/// The example programs in `examples/phase-N/` use every phase N command
+/// at least once, under any of its names, and every special variable. Each
+/// phase's examples are run by `pendown-cli`'s picture tests.
+fn examples_use_every_command(phase_number: i128) {
     use pendown_logo::syntax::{Kind, highlight};
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/phase-1");
-    let mut used = BTreeSet::new();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../examples/phase-{phase_number}"));
+    let (mut used, mut variables) = (BTreeSet::new(), BTreeSet::new());
     for entry in std::fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();
         if path.extension().is_none_or(|e| e != "logo") {
@@ -110,8 +109,15 @@ fn the_examples_use_every_phase_1_command() {
         }
         let text = std::fs::read_to_string(path).unwrap();
         for (range, kind) in highlight(&text) {
-            if matches!(kind, Kind::Command | Kind::Keyword) {
-                used.insert(text[range].to_lowercase());
+            let word = text[range].to_lowercase();
+            match kind {
+                Kind::Command | Kind::Keyword => {
+                    used.insert(word);
+                }
+                Kind::Variable | Kind::Quoted => {
+                    variables.insert(word[1..].to_string());
+                }
+                _ => {}
             }
         }
     }
@@ -119,9 +125,22 @@ fn the_examples_use_every_phase_1_command() {
     commands(document().nodes(), &mut all);
     let unused: Vec<_> = all
         .iter()
-        .filter(|n| value(n, "phase").and_then(|v| v.as_integer()) == Some(1))
-        .filter(|n| !names(n).iter().any(|name| used.contains(name)))
+        .filter(|n| phase(n) == Some(phase_number))
+        .filter(|n| {
+            let names = names(n);
+            if is_variable(n) { !names.iter().any(|name| variables.contains(name)) } else { !names.iter().any(|name| used.contains(name)) }
+        })
         .map(|n| n.name().value().to_string())
         .collect();
-    assert!(unused.is_empty(), "phase 1 commands no example uses: {unused:?}");
+    assert!(unused.is_empty(), "phase {phase_number} commands no example uses: {unused:?}");
+}
+
+#[test]
+fn the_examples_use_every_phase_1_command() {
+    examples_use_every_command(1);
+}
+
+#[test]
+fn the_examples_use_every_phase_2_command() {
+    examples_use_every_command(2);
 }

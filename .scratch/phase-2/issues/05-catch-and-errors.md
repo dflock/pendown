@@ -1,6 +1,6 @@
 # CATCH, THROW, ERROR and ERRACT
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 04
 
@@ -17,3 +17,7 @@ Blocked by: 04
 Each command has tests of its behaviour and its errors in `pendown-logo`, or the GUI and CLI tests cover it.
 
 ## Comments
+
+### 2026-10-21: done
+
+`Flow::Throw` is the new exit. `ERROR`'s code is always 0, and its line is a line number (ADR 0021). `ERRACT` runs at the innermost procedure, or at the top level, before the error carries on. Tests: `tests/catch.rs`.

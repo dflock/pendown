@@ -1,6 +1,6 @@
 # The rest of words and lists
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 01
 
@@ -17,3 +17,7 @@ Blocked by: 01
 Each command has tests of its behaviour and its errors in `pendown-logo`, or the GUI and CLI tests cover it.
 
 ## Comments
+
+### 2026-10-21: done
+
+In `prims/data.rs`. `POP` and `DEQUEUE` share code, since both take from the front. Tests: `tests/words.rs`.

@@ -1,6 +1,6 @@
 # The palette and filled shapes
 
-Status: ready-for-agent
+Status: done
 Type: task
 
 ## What
@@ -15,3 +15,7 @@ Type: task
 Each command has tests of its behaviour and its errors in `pendown-logo`, or the GUI and CLI tests cover it.
 
 ## Comments
+
+### 2026-10-21: done
+
+The palette lives in the interpreter and is reset on Run. Shapes carry their fill through `Mark` to `pendown-render`, which fills, then outlines if the pen is down. The animator sweeps a pen-up filled shape for the time of its outline. Tests: `tests/pen.rs`, the renderer's `shapes_can_be_filled`, the `filled-shapes` picture, and an animator test.

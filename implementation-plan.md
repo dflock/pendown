@@ -21,6 +21,8 @@ The file has the manual's description of every command, so the GUI's reference/h
 
 ### Phase 1: Turtle drawing (90 commands)
 
+Done: see `.scratch/phase-1/`.
+
 The smallest Logo that is fun to draw with:
 
 - **Turtle and pen:** all movement and position commands, `ARC` (our version, see "Dialect and extensions"), `HOME`, show/hide turtle, `CLEAN`/`CLEARSCREEN`, `WRAP`/`WINDOW`/`FENCE`, and pen up/down, colour, size and background.
@@ -38,6 +40,8 @@ In the GUI and runtime, phase 1 includes:
 - **The CLI** rendering the event stream to a file.
 
 ### Phase 2: Complete core language and filled shapes (76 commands)
+
+Done: see `.scratch/phase-2/` and ADR 0021.
 
 - **Data:** the rest of the word, list and array commands, multi-dimensional arrays, `PUSH`/`POP`/`QUEUE`/`DEQUEUE`, type and membership predicates, `ASCII`/`CHAR`, `LOWERCASE`/`UPPERCASE`.
 - **Control:** `RUN`/`RUNRESULT`, `FOR`, `WHILE`/`UNTIL`/`DO.WHILE`/`DO.UNTIL`, `CASE`/`COND`, `CATCH`/`THROW`/`ERROR`/`ERRACT`, `IGNORE`.

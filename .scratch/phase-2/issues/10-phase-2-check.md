@@ -1,6 +1,6 @@
 # Phase 2 check
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09
 
@@ -15,3 +15,7 @@ Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09
 Each command has tests of its behaviour and its errors in `pendown-logo`, or the GUI and CLI tests cover it.
 
 ## Comments
+
+### 2026-10-21: done
+
+The kdl test checks phases 1 and 2 and the special variables. `examples/phase-2/` has four programs that use every phase 2 command, and they're picture tests (`phase-2-*.png` and `.txt`). The scripted session has 37 checks, including filled shapes and `CATCH`. ADR 0021 records the decisions, and `pendown-logo.kdl` has `differs` notes for them.

@@ -1,6 +1,6 @@
 # RUN, the loops, CASE and COND
 
-Status: ready-for-agent
+Status: done
 Type: task
 
 ## What
@@ -16,3 +16,7 @@ Type: task
 Each command has tests of its behaviour and its errors in `pendown-logo`, or the GUI and CLI tests cover it.
 
 ## Comments
+
+### 2026-10-21: done
+
+In `prims/control.rs`, using new evaluator helpers: `run_maybe` (as `RUN` does), `run_commands` and `with_locals`. Every loop now checks Stop and the instruction limit on each pass, which also fixes phase 1's `FOREVER []`, which couldn't be stopped. Tests: `tests/control.rs`.

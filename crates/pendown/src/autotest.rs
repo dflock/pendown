@@ -104,6 +104,13 @@ enum Step {
     Quit,
 }
 
+const CATCHING: &str = "CATCH \"error [FD \"x]
+SHOW ERROR
+TO CHECK :n
+IF :n < 0 [(THROW \"error [CHECK needs a positive number])]
+END
+CHECK -1";
+
 fn script() -> Vec<Step> {
     use Step::*;
     let ms = Duration::from_millis;
@@ -227,6 +234,17 @@ fn script() -> Vec<Step> {
         Run("FD 10\nRT", Speed::Instant),
         WaitFinished,
         CheckConsole("Line 2: Not enough inputs to RT"),
+        Say("Phase 2: filled shapes, FOR and a template, animated"),
+        Run("FOR [i 3 1] [SETFC ITEM :i [red orange gold] CIRCLE :i * 50]\nPRINT MAP [? * 2] [1 2 3]", Speed::Animated(2560.0)),
+        WaitFinished,
+        CheckDrawn(3),
+        CheckConsole("2 4 6"),
+        Screenshot("filled"),
+        Say("Phase 2: CATCH \"ERROR, and an error made by THROW"),
+        Run(CATCHING, Speed::Instant),
+        WaitFinished,
+        CheckConsole("[0 FD doesn't like x as input [] 1]"),
+        CheckConsole("Line 6: CHECK needs a positive number"),
         Quit,
     ]
 }

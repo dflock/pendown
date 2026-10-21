@@ -1,0 +1,32 @@
+; Templates and arithmetic: a rose, drawn from a list of points.
+
+TO ROSE.POINT :t
+  ; r = 400 cos 3t, with t in radians
+  LOCALMAKE "r 400 * RADCOS 3 * :t
+  OUTPUT LIST :r * RADCOS :t :r * RADSIN :t
+END
+
+MAKE "angles RSEQ 0 3.14159265358979 181
+MAKE "points MAP "ROSE.POINT :angles
+SETPC "violet
+PU SETPOS FIRST :points PD
+FOREACH BF :points [SETPOS ?]
+
+; Templates in their four forms.
+SHOW MAP [? * ?] ISEQ 1 5
+SHOW MAP [[x] :x + 1] [1 2 3]
+SHOW MAP [[x] [OUTPUT :x * 10]] [1 2 3]
+SHOW FILTER [? > 2] ISEQ 1 5
+SHOW FIND [EMPTYP ?] [a [] b]
+SHOW MAP.SE [LIST ? ?] [a b]
+PRINT REDUCE "SUM ISEQ 1 10
+PRINT APPLY "WORD [a b c]
+PRINT (INVOKE [?1 * ?2] 6 7)
+
+; Arithmetic.
+PRINT FORM EXP 1 10 4
+PRINT LOG10 1000
+PRINT FORM LN 10 0 3
+PRINT FORM RADARCTAN 1 0 5
+RERANDOM
+PRINT RANDOM 100

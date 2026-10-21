@@ -1,6 +1,6 @@
 # Arrays
 
-Status: ready-for-agent
+Status: done
 Type: task
 
 ## What
@@ -17,3 +17,7 @@ Type: task
 Each command has tests of its behaviour and its errors in `pendown-logo`, or the GUI and CLI tests cover it.
 
 ## Comments
+
+### 2026-10-21: done
+
+`Value::Array` and the reader's `{a b c}@0` are in `value.rs` and `reader.rs`, and the array commands in `prims/data.rs`. Tests: `tests/arrays.rs`.

@@ -476,6 +476,7 @@ logo {
       ascii {
         eg "ASCII char"
         desc "outputs the integer (between 0 and 255) that represents the input character in the ASCII code. Interprets control characters as representing vbarred punctuation, and returns the character code for the corresponding punctuation character without vertical bars. (Compare RAWASCII.)"
+        differs "Outputs the character's Unicode code point, which is its ASCII code for ASCII characters."
         supported #true
         obsolete #false
         phase 2
@@ -491,6 +492,7 @@ logo {
         eg "CHAR int"
         desc "outputs the character represented in the ASCII code by the input, which must be an integer between 0 and 255."
         see "ascii"
+        differs "Takes any Unicode code point, not just ASCII codes."
         supported #true
         obsolete #false
         phase 2
@@ -1515,6 +1517,7 @@ logo {
 
         to allow finding out the exact result of floating point operations. The precise format needed may be machine-dependent.
         """
+        differs "(FORM num -1 format), with a printf format, isn't supported."
         supported #true
         obsolete #false
         phase 2
@@ -2113,7 +2116,7 @@ logo {
       setpalette {
         eg "SETPALETTE colornumber rgblist"
         desc "sets the actual color corresponding to a given number, if allowed by the hardware and operating system. Colornumber must be an integer greater than or equal to 8. (Logo tries to keep the first 8 colors constant.) The second input is a list of three nonnegative numbers less than 100 specifying the percent saturation of red, green, and blue in the desired color."
-        differs "The second input can be any of our colour forms except a palette number: see SETPENCOLOR. RGB values are from 0 to 255, not percentages."
+        differs "The second input can be any of our colour forms except a palette number: see SETPENCOLOR. RGB values are from 0 to 255, not percentages. Colour numbers 8 to 15 can be changed, and Run puts them back."
         supported #true
         obsolete #false
         phase 2
@@ -2493,6 +2496,7 @@ logo {
         (GLOBAL varname1 varname2 ...)
         """
         desc "command. Accepts as inputs one or more words, or a list of words. A global variable is created for each of these words, with that word as its name. The only reason this is necessary is that you might want to use the \"setter\" notation SETXYZ for a variable XYZ that does not already have a value; GLOBAL \"XYZ makes that legal. Note: If there is currently a local variable of the same name, this command does *not* make Logo use the global value instead of the local one."
+        differs "Pendown has no setter notation (SETXYZ), and MAKE creates global variables anyway, so GLOBAL only checks its inputs."
         supported #true
         obsolete #false
         phase 2
@@ -3260,7 +3264,7 @@ logo {
 
         The abbreviation # can be used for REPCOUNT unless the REPEAT is inside the template input to a higher order procedure such as FOREACH, in which case # has a different meaning.
         """
-        differs "Outside REPEAT and FOREVER, REPCOUNT is an error rather than outputting -1, so a mistake shows up straight away."
+        differs "Outside REPEAT and FOREVER, REPCOUNT is an error rather than outputting -1, so a mistake shows up straight away. Inside FOREACH, MAP and the other template commands, it's the position of the member in the slot, like #."
         supported #true
         obsolete #false
         phase 1
@@ -3343,6 +3347,7 @@ logo {
         If the tag is the word ERROR, then any error condition that arises during the running of the instructionlist has the effect of THROW "ERROR instead of printing an error message and returning to toplevel. The CATCH does not output if an error is caught. Also, during the running of the instructionlist, the variable ERRACT is temporarily unbound. (If there is an error while ERRACT has a value, that value is taken as an instructionlist to be run after printing the error message. Typically the value of ERRACT, if any, is the list [PAUSE].)
         """
         see "error" "erract" "pause"
+        differs "Stop, from the toolbar, is never caught, even by CATCH \"ERROR."
         supported #true
         obsolete #false
         phase 2
@@ -3361,6 +3366,7 @@ logo {
 
         THROW "SYSTEM immediately leaves Logo, returning to the operating system, without printing the usual parting message and without deleting any editor temporary file written by EDIT.
         """
+        differs "If no CATCH has the tag, it's an error: \"Can't find a CATCH for TAG\". THROW \"SYSTEM isn't special, since Pendown is a window rather than a terminal session."
         supported #true
         obsolete #false
         phase 2
@@ -3368,6 +3374,7 @@ logo {
       error {
         eg "ERROR"
         desc "outputs a list describing the error just caught, if any. If there was not an error caught since the last use of ERROR, the empty list will be output. The error list contains four members: an integer code corresponding to the type of error, the text of the error message (as a single word including spaces), the name of the procedure in which the error occurred, and the instruction line on which the error occurred."
+        differs "The error code, the first member, is always 0: Pendown's errors have messages rather than numbers. The last member is the number of the line the error happened on, or [] if there isn't one."
         supported #true
         obsolete #false
         phase 2
@@ -3962,6 +3969,7 @@ logo {
       eg "ERRACT  (variable)"
       desc "an instructionlist that will be run in the event of an error. Typically has the value [PAUSE] to allow interactive debugging."
       see "pause"
+      differs "There's no PAUSE, so ERRACT is for printing what went wrong: when an error isn't caught, the list runs where the error happened, so it can see the local variables there. Then the error stops the program as usual."
       supported #true
       obsolete #false
       phase 2
@@ -3969,6 +3977,7 @@ logo {
     fullprintp {
       eg "FULLPRINTP  (variable)"
       desc "if TRUE, then words that were created using backslash or vertical bar (to include characters that would otherwise not be treated as part of a word) are printed with the backslashes or vertical bars shown, so that the printed result could be re-read by Logo to produce the same value. If FULLPRINTP is TRUE then the empty word (however it was created) prints as ||. (Otherwise it prints as nothing at all.)"
+      differs "Pendown doesn't support backslashes or vertical bars in words yet, so FULLPRINTP only makes the empty word print as ||."
       supported #true
       obsolete #false
       phase 2
@@ -4056,6 +4065,7 @@ logo {
     logoversion {
       eg "LOGOVERSION  (variable)"
       desc "a real number indicating the Logo version number, e.g., 5.5"
+      differs "Pendown's version, such as 0.1, not UCBLogo's."
       supported #true
       obsolete #false
       phase 2

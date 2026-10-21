@@ -9,6 +9,7 @@ Pendown speaks [UCBLogo](https://people.eecs.berkeley.edu/~bh/logo.html), the mo
 - **Colours your way:** palette numbers, `[r g b]` lists from 0 to 255, CSS names like `"cornflowerblue`, and hex like `"#ff8800`, with transparency.
 - **Shapes:** `CIRCLE`, `ELLIPSE`, `SQUARE` and `RECTANGLE`, outlined and filled.
 - **An `ARC` that does what you'd expect:** the turtle walks along it.
+- **The whole core language:** words, lists and arrays, `FOR` and `WHILE`, `MAP`, `FILTER` and `FOREACH` with templates, and `CATCH` and `THROW`.
 - **Help built in:** every command is documented in the app, with examples you can run.
 - **A tutorial,** where Kame the turtle teaches you Logo one step at a time.
 
@@ -48,7 +49,7 @@ cargo run --release -p pendown
 
 Run the tests with `cargo test`. Debug builds work too, but drawing is much faster in release.
 
-`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, stepping, stopping, the console, files and errors. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
+`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, stepping, stopping, the console, files, errors and filled shapes. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
 
 Type a program in the editor and press **Run**. Use the speed slider to choose how fast the turtle draws. Try the console too: after a run, it knows every procedure your program defined, so you can type `FLOWER 80` and watch.
 
@@ -73,6 +74,6 @@ The crates are in `crates/`. `spikes/` holds the experiments made before phase 1
 
 ## Learn more
 
-- `examples/phase-1/` has programs that between them use every command Pendown supports so far.
+- `examples/phase-1/` and `examples/phase-2/` have programs that between them use every command Pendown supports so far.
 - `pendown-logo.kdl` lists every Logo command, which ones Pendown supports, and how ours differ from UCBLogo.
 - `docs/adr/` records the design decisions and why we made them.

@@ -1,6 +1,6 @@
 # Arithmetic
 
-Status: ready-for-agent
+Status: done
 Type: task
 
 ## What
@@ -13,3 +13,7 @@ Type: task
 Each command has tests of its behaviour and its errors in `pendown-logo`, or the GUI and CLI tests cover it.
 
 ## Comments
+
+### 2026-10-21: done
+
+In `prims/arithmetic.rs`. `ISEQ`, `RSEQ`, `ARRAY` and `MDARRAY` refuse to make more than 10 million members. Tests: in `tests/arithmetic.rs`.

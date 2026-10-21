@@ -1,0 +1,30 @@
+; Filled shapes and the palette: a flower of filled petals on a pond.
+
+SETBG "midnightblue
+SETPALETTE 8 "#3a7d44
+SETPALETTE 9 [250 200 60 220]
+SHOW PALETTE 9
+
+; The pond, filled with the pen up, so it has no outline.
+PU SETFC 8 CIRCLE 420 PD
+PRINT FILLCOLOR
+
+TO PETALS :n :size
+  FOR [i 1 :n] [
+    SETFC (LIST 255 100 + :i * 10 150 180)
+    SETHEADING :i * 360 / :n
+    PU FD :size PD
+    ELLIPSE :size / 3 :size
+    PU BK :size PD
+  ]
+END
+
+SETPC "white
+PETALS 12 200
+SETHEADING 0
+SETFC 9 CIRCLE 80
+PRINT FC
+
+; A frame, with filling turned off again.
+SETFILLCOLOR "none
+SQUARE 900

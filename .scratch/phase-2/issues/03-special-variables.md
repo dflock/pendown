@@ -1,6 +1,6 @@
 # Special variables, NAME and GLOBAL
 
-Status: ready-for-agent
+Status: done
 Type: task
 
 ## What
@@ -17,3 +17,7 @@ Type: task
 Each command has tests of its behaviour and its errors in `pendown-logo`, or the GUI and CLI tests cover it.
 
 ## Comments
+
+### 2026-10-21: done
+
+The special variables are interned once (`Specials` in `interp.rs`) and set afresh on every Run. `EQUALP` and the other comparisons read `CASEIGNOREDP`, and `PRINT`, `TYPE` and `SHOW` read the print limits through `Value::print_styled`. Tests: `tests/specials.rs`.

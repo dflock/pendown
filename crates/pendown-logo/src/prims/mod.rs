@@ -3,6 +3,7 @@
 //! them.
 
 mod arithmetic;
+mod data;
 mod pen;
 mod shapes;
 mod turtle;
@@ -10,6 +11,7 @@ mod turtle;
 use std::{collections::HashMap, rc::Rc, sync::OnceLock};
 
 use arithmetic::*;
+use data::*;
 use pen::*;
 use shapes::*;
 use turtle::*;
@@ -113,7 +115,17 @@ pub static PRIMS: &[Prim] = &[
     Prim { names: &["print", "pr"], arity: some(0, 1, None), imp: Imp::F(print) },
     Prim { names: &["type"], arity: some(0, 1, None), imp: Imp::F(type_) },
     Prim { names: &["show"], arity: some(0, 1, None), imp: Imp::F(show) },
+    // Words and lists.
     Prim { names: &["word"], arity: some(0, 2, None), imp: Imp::F(word) },
+    Prim { names: &["list"], arity: some(0, 2, None), imp: Imp::F(list_) },
+    Prim { names: &["sentence", "se"], arity: some(0, 2, None), imp: Imp::F(sentence) },
+    Prim { names: &["first"], arity: ONE, imp: Imp::F(first) },
+    Prim { names: &["last"], arity: ONE, imp: Imp::F(last) },
+    Prim { names: &["butfirst", "bf"], arity: ONE, imp: Imp::F(butfirst) },
+    Prim { names: &["butlast", "bl"], arity: ONE, imp: Imp::F(butlast) },
+    Prim { names: &["item"], arity: TWO, imp: Imp::F(item) },
+    Prim { names: &["count"], arity: ONE, imp: Imp::F(count) },
+    Prim { names: &["emptyp", "empty?"], arity: ONE, imp: Imp::F(emptyp) },
     Prim { names: &["sum"], arity: some(0, 2, None), imp: Imp::F(sum) },
     Prim { names: &["difference"], arity: TWO, imp: Imp::F(difference) },
     Prim { names: &["product"], arity: some(0, 2, None), imp: Imp::F(product) },
@@ -183,7 +195,11 @@ impl Args<'_> {
     }
 
     pub fn doesnt_like(&self, i: usize) -> Flow {
-        let message = format!("{} doesn't like {} as input", self.call.name.to_uppercase(), self.vals[i].show());
+        let shown = match &self.vals[i] {
+            Value::Word(w) if w.is_empty() => "the empty word".to_string(),
+            v => v.show(),
+        };
+        let message = format!("{} doesn't like {shown} as input", self.call.name.to_uppercase());
         Flow::Error(Box::new(Error::new(message, Some(self.call.args[i].span()))))
     }
 

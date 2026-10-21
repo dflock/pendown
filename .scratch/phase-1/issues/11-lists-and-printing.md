@@ -1,6 +1,6 @@
 # Lists, words and printing
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 01
 
@@ -21,3 +21,16 @@ Blocked by: 01
 `pendown-logo` has tests for each command on lists, words and numbers, and for the errors, including printing nested lists.
 
 ## Comments
+
+### 2026-10-21: done
+
+- **The commands,** in `prims/data.rs`:
+  - `LIST` and `SENTENCE`/`SE`, with their variable-input forms;
+  - `FIRST`, `LAST`, `BUTFIRST`/`BF`, `BUTLAST`/`BL` and `ITEM`;
+  - `COUNT` and `EMPTYP`/`EMPTY?`.
+- **Words:** the selectors work on words letter by letter, counting Unicode characters, and numbers are words, so `FIRST 345` is `3` and `(BF 345) + 1` is `46`.
+- **Printing:** `PRINT`, `TYPE` and `SHOW` are unchanged from spike 03. `PRINT` drops a list's outer brackets, `SHOW` keeps them, and `TYPE` adds no spaces or newline.
+- **Errors:**
+  - An empty input or an `ITEM` index out of range is "X doesn't like ... as input", using the name as typed.
+  - An empty word now reads as "the empty word" in every such message.
+- **Tests:** `tests/lists.rs` (6 tests): constructors, selectors on lists, words and numbers, printing nested lists, `POS` and `SETPOS` with lists, and errors.

@@ -52,7 +52,12 @@ fn check_output(name: &str, program: &str, width: u32, height: u32) -> String {
 #[test]
 fn phase_1_examples() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/phase-1");
-    let mut programs: Vec<_> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().path()).collect();
+    // Only the programs: the folder may hold pictures of them too.
+    let mut programs: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|e| e == "logo"))
+        .collect();
     programs.sort();
     assert!(programs.len() >= 4);
     for path in programs {

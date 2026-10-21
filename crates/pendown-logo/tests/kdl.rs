@@ -86,7 +86,11 @@ fn the_examples_use_every_phase_1_command() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/phase-1");
     let mut used = BTreeSet::new();
     for entry in std::fs::read_dir(dir).unwrap() {
-        let text = std::fs::read_to_string(entry.unwrap().path()).unwrap();
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|e| e != "logo") {
+            continue;
+        }
+        let text = std::fs::read_to_string(path).unwrap();
         for (range, kind) in highlight(&text) {
             if matches!(kind, Kind::Command | Kind::Keyword) {
                 used.insert(text[range].to_lowercase());

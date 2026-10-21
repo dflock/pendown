@@ -1,0 +1,16 @@
+TO BOX :size
+  REPEAT 4 [
+    FD :size
+    RT 90
+  ]
+END
+
+TO FLOWER :size
+  REPEAT 12 [
+    BOX :size
+    RT 30
+  ]
+END
+
+SETPC 6
+FLOWER 250

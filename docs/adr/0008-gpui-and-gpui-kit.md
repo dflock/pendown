@@ -1,7 +1,7 @@
 # 8. Build the GUI with GPUI and gpui-kit, drawing the turtle on a raw canvas
 
 Status: Accepted
-Date: 2026-10-17 (recorded later, from commit 8104814 and `plan-1.md`). Updated 2026-10-20 for gpui-kit 0.8.0.
+Date: 2026-10-17 (recorded later, from commit 8104814 and `implementation-plan.md`). Updated 2026-10-20 for gpui-kit 0.8.0.
 
 ## Context
 

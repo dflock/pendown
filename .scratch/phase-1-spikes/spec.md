@@ -1,6 +1,6 @@
 # Phase 1 spikes
 
-Time-boxed experiments to take the biggest risks out of phase 1 before building it for real. See `plan-1.md` for the overall design, and `docs/adr/` for decisions already made.
+Time-boxed experiments to take the biggest risks out of phase 1 before building it for real. See `implementation-plan.md` for the overall design, and `docs/adr/` for decisions already made.
 
 Each spike answers specific questions and ends with a short write-up under `## Comments` in its issue: what worked, what didn't, numbers measured, and anything that should change the plan or an ADR. Spike code is throwaway unless the issue says otherwise.
 

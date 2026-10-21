@@ -1,7 +1,7 @@
 # 11. Turtle speed is a GUI concern: interpreter thread, bounded channel, animator
 
 Status: Accepted
-Date: 2026-10-17 (recorded later, from commit 8104814 and `plan-1.md`)
+Date: 2026-10-17 (recorded later, from commit 8104814 and `implementation-plan.md`)
 
 ## Context
 
@@ -22,4 +22,4 @@ On modern hardware Logo draws everything instantly. A headline feature of the pl
 ## Consequences
 
 - Pause, Step and the running-instruction highlight build on this (ADR 0012).
-- Open questions in `plan-1.md`: the speed units and the channel size. Spike 04 answers both.
+- Open questions in `implementation-plan.md`: the speed units and the channel size. Spike 04 answers both.

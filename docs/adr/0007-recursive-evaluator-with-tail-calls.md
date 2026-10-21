@@ -7,14 +7,14 @@ Date: 2026-10-18
 
 Recursion is idiomatic Logo, and often endless: `TO SPIRAL :n FD :n RT 90 SPIRAL :n + 1 END` never stops. UCBLogo eliminates tail calls, so programs like this run in constant memory. Without that, any interpreter runs out of stack however large it is. In Rust, a stack overflow aborts the whole process and can't be caught.
 
-The evaluator also has to support dynamic scope (kept from UCBLogo, see `plan-1.md`), Stop, Pause and Step, and the higher-order commands in phase 2 (`MAP`, `FOREACH`, `APPLY`).
+The evaluator also has to support dynamic scope (kept from UCBLogo, see `implementation-plan.md`), Stop, Pause and Step, and the higher-order commands in phase 2 (`MAP`, `FOREACH`, `APPLY`).
 
 ## Decision
 
 **An ordinary recursive tree-walking evaluator** in Rust, running on the interpreter thread with a large stack (`std::thread::Builder::stack_size`).
 
 - `STOP`, `OUTPUT`, `THROW` and errors travel back up as `Err` or return values. Stop from the GUI is a separate kind of error that `CATCH` never handles.
-- Pausing and stepping work by blocking the thread on the channel, as `plan-1.md` describes, so the evaluator doesn't need to save its state.
+- Pausing and stepping work by blocking the thread on the channel, as `implementation-plan.md` describes, so the evaluator doesn't need to save its state.
 - Phase 2's higher-order commands simply call back into the evaluator.
 
 **Tail calls are eliminated by trampolining.**

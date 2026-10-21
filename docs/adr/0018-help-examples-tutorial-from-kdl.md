@@ -21,4 +21,4 @@ These are phase 3, after phase 2, so they cover the complete core language once 
 
 - Writing `help` text and examples is real work: about 175 commands in phases 1 and 2.
 - The documentation and the interpreter can't drift apart without a test failing.
-- Open questions in `plan-1.md`: the markup format, the tutorial file format, where examples run, and whether to show pictures of example output.
+- Open questions in `implementation-plan.md`: the markup format, the tutorial file format, where examples run, and whether to show pictures of example output.

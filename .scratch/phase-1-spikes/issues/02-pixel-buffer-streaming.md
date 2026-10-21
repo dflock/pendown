@@ -166,4 +166,4 @@ These are averages per segment from the offline benchmark. Segments are random-w
 
 ### 2026-10-21: closed
 
-Both decisions accepted: vello_cpu is the rasterizer, and translucent pens keep their beaded joints. ADR 0010 now records vello_cpu and the upload rules, and ADR 0003 the re-render cost. The joints are noted in `SETPENCOLOR` in `pendown-logo.kdl`, in `plan-1.md` and in ADR 0015. `refs/vello` is checked out at `sparse-strips-v0.3.0`, the commit vello_cpu 0.3.0 was published from.
+Both decisions accepted: vello_cpu is the rasterizer, and translucent pens keep their beaded joints. ADR 0010 now records vello_cpu and the upload rules, and ADR 0003 the re-render cost. The joints are noted in `SETPENCOLOR` in `pendown-logo.kdl`, in `implementation-plan.md` and in ADR 0015. `refs/vello` is checked out at `sparse-strips-v0.3.0`, the commit vello_cpu 0.3.0 was published from.

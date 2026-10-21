@@ -7,7 +7,7 @@ Date: 2026-10-18
 
 Logo can't be parsed on its own: how `FOO 1 2` groups depends on how many inputs `FOO` takes, and user procedures can be defined further down the file than where they're called. The minus sign is also ambiguous: `FD -5`, `:a - 5` and `:a -5` all look alike.
 
-We also need source spans on every instruction, for highlighting the running instruction and stepping (see `plan-1.md`), and for errors (ADR 0005).
+We also need source spans on every instruction, for highlighting the running instruction and stepping (see `implementation-plan.md`), and for errors (ADR 0005).
 
 ## Decision
 

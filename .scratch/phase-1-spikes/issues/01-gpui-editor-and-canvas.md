@@ -30,7 +30,7 @@ A small app with a gpui-kit layout: the editor on one side and a `gpui::canvas` 
 
 ## Done when
 
-The questions are answered in a comment below, with any numbers measured, and any changes needed to `plan-1.md` noted.
+The questions are answered in a comment below, with any numbers measured, and any changes needed to `implementation-plan.md` noted.
 
 ## Comments
 
@@ -116,7 +116,7 @@ Not found, so we'd build them ourselves:
 
 ### 2026-10-20: closed
 
-Hover popover checked by hand and works. Wayland is out of scope for now. The suggested changes are made in ADR 0008, `README.md` and `plan-1.md`.
+Hover popover checked by hand and works. Wayland is out of scope for now. The suggested changes are made in ADR 0008, `README.md` and `implementation-plan.md`.
 
 ### 2026-10-20: rechecked on gpui-kit 0.8.0
 

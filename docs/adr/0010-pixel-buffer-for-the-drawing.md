@@ -1,7 +1,7 @@
 # 10. Keep the finished drawing in a pixel buffer, drawn with vello_cpu
 
 Status: Accepted
-Date: 2026-10-17 (recorded later, from commit 8104814 and `plan-1.md`). Updated 2026-10-21 after spike 02.
+Date: 2026-10-17 (recorded later, from commit 8104814 and `implementation-plan.md`). Updated 2026-10-21 after spike 02.
 
 ## Context
 

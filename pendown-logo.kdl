@@ -6,12 +6,12 @@
 //   2  Complete core language and richer drawing: the rest of words, lists and arrays,
 //      loops, CATCH / THROW, MAP / FILTER / FOREACH and friends, fills, labels,
 //      pen modes and the palette.
-//   3  Help panel, examples and tutorial: no new commands (see plan-1.md).
+//   3  Help panel, examples and tutorial: no new commands (see implementation-plan.md).
 //   4  Interactive programs: mouse, keyboard and console input, BUTTONACT / KEYACT.
 //   5  Advanced and niche: objects, macros, property lists, file I/O, SHELL, bitwise
 //      operations, introspection / metaprogramming and obscure library procedures.
 //   #null  Obsolete: not planned (see obsolete_reason).
-// Our changes to UCBLogo (see "Dialect and extensions" in plan-1.md):
+// Our changes to UCBLogo (see "Dialect and extensions" in implementation-plan.md):
 //   extension #true  A command that isn't in the manual; `source` says where the idea came from.
 //   differs "..."    How our version behaves differently from the manual's `desc`.
 logo {
@@ -2910,7 +2910,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see plan-1.md)."
+        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see implementation-plan.md)."
       }
       untrace {
         eg "UNTRACE contentslist"
@@ -2918,7 +2918,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see plan-1.md)."
+        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see implementation-plan.md)."
       }
       tracedp {
         eg """
@@ -2929,7 +2929,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see plan-1.md)."
+        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see implementation-plan.md)."
       }
       step {
         eg "STEP contentslist"
@@ -2938,7 +2938,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see plan-1.md)."
+        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see implementation-plan.md)."
       }
       unstep {
         eg "UNSTEP contentslist"
@@ -2946,7 +2946,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see plan-1.md)."
+        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see implementation-plan.md)."
       }
       steppedp {
         eg """
@@ -2957,7 +2957,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see plan-1.md)."
+        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see implementation-plan.md)."
       }
       edit {
         eg """

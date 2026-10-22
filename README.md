@@ -2,7 +2,7 @@
 
 **A Logo playground for learning to code, where you can watch the turtle think.**
 
-Most Logos draw everything instantly. Pendown lets you slow the turtle right down and watch it draw, with the instruction it's carrying out highlighted in your code as it goes. Pause it, step through a line at a time, speed it up again, or stop it. You can always see which bit of code made which bit of the picture.
+Most Logos draw everything instantly. Pendown lets you slow the turtle right down and watch it draw, with the instruction it's carrying out highlighted in your code as it goes. Pause it, step through a line at a time, speed it up again, or stop it. You can always see which bit of code made which bit of the picture. Beside the console, two panels show what the highlighted instruction sees: the counter of every loop running, and the value of every variable, in each procedure of the call chain. A value flashes when it changes.
 
 Pendown speaks [UCBLogo](https://people.eecs.berkeley.edu/~bh/logo.html), the most widely used Logo, with a few modern touches:
 
@@ -49,9 +49,11 @@ cargo run --release -p pendown
 
 Run the tests with `cargo test`. Debug builds work too, but drawing is much faster in release.
 
-`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, stepping, stopping, the console, files, errors, filled shapes, and how often the window redraws. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
+`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, stepping, stopping, the console, files, errors, filled shapes, how often the window redraws, and the counters and variables panels. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
 
 Type a program in the editor and press **Run**. Use the speed slider to choose how fast the turtle draws. Try the console too: after a run, it knows every procedure your program defined, so you can type `FLOWER 80` and watch.
+
+While a program runs, the **Repeat counters** panel shows every `REPEAT`, `FOREVER`, `FOR` and `FOREACH` running, outermost first, such as `REPEAT 3 of 12`, and marks the one `REPCOUNT` would give. The **Variables** panel shows the globals, then each procedure in the call chain with its inputs and locals; a variable hidden by a later one with the same name is greyed out. At animated speeds, and when paused or stepping, they show exactly what the highlighted instruction sees. At Instant they keep up as best they can.
 
 ### The CLI
 

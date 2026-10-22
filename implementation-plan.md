@@ -80,6 +80,8 @@ While a program runs, Pendown keeps one CPU core fully busy, even at slow speeds
 
 ### Phase 4: Watching a program run (no new commands)
 
+Done: see `.scratch/phase-4/` and ADR 0022. The interpreter sends the panels' contents in the event stream, just before the instruction that sees them, so they keep in step with the highlight however far ahead the interpreter is.
+
 Two panels that update as the turtle goes, in step with the highlighted instruction. A value flashes when it changes.
 
 - **Repeat counters:** the counter of every `REPEAT` and `FOREVER` running, outermost first, such as `REPEAT 3 of 36 › REPEAT 2 of 4`. The innermost one is what `REPCOUNT` outputs. Phase 2's `FOR` adds its own counter.

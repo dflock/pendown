@@ -135,7 +135,7 @@ impl ToolbarPane {
         f: impl Fn(&mut App, &mut Window, &mut Context<App>) + 'static,
     ) -> Button {
         let app = self.app.clone();
-        Button::new(id).small().icon(icon).label(label).on_click(move |_, window, cx| {
+        Button::new(id).flex_none().small().icon(icon).label(label).on_click(move |_, window, cx| {
             app.update(cx, |this, cx| f(this, window, cx)).ok();
         })
     }
@@ -147,14 +147,17 @@ impl Render for ToolbarPane {
         h_flex()
             .gap_2()
             .size_full()
+            .overflow_hidden()
             .child(self.button("new", IconName::FilePlus, "New", |this, window, cx| this.then(After::NewFile, window, cx)).ghost())
             .child(self.button("open", IconName::FolderOpen, "Open", |this, window, cx| this.then(After::OpenFile, window, cx)).ghost())
             .child(self.button("save", IconName::Save, "Save", |this, window, cx| this.save(After::Nothing, window, cx)).ghost())
             .child(self.button("export", IconName::ImageDown, "Export PNG", |this, window, cx| this.export(window, cx)).ghost())
-            .child(div().w(px(12.)))
+            .child(div().flex_none().w(px(12.)))
             .child(self.button("run", IconName::Play, "Run", |this, _, cx| this.start(DEFAULT_CHANNEL, cx)).primary())
             .child(
                 self.button("pause", if paused { IconName::Play } else { IconName::Pause }, if paused { "Resume" } else { "Pause" }, |this, _, cx| this.toggle_pause(cx))
+                    // As wide as Resume, so the swap doesn't move what's after it.
+                    .w(px(88.))
                     .disabled(!running),
             )
             .child(self.button("step", IconName::StepForward, "Step", |this, _, cx| this.step(false, cx)).disabled(!paused))
@@ -162,9 +165,12 @@ impl Render for ToolbarPane {
                 self.button("step-instruction", IconName::Footprints, "Step instruction", |this, _, cx| this.step(true, cx)).disabled(!paused),
             )
             .child(self.button("stop", IconName::Square, "Stop", |this, _, cx| this.stop(cx)).danger().disabled(!running))
-            .child(div().w(px(16.)))
-            .child(div().w(px(160.)).child(Slider::new(&self.slider)))
-            .child(div().w(px(10.)))
-            .child(div().text_sm().w(px(180.)).child(describe(speed)))
+            // Nothing shrinks, so the slider keeps its place and size as
+            // the speed's description changes length.
+            .child(div().flex_none().w(px(2.)))
+            .child(div().flex_none().w(px(160.)).child(Slider::new(&self.slider)))
+            // Room for the knob, which overhangs the end of the track.
+            .child(div().flex_none().w(px(6.)))
+            .child(div().flex_none().w(px(150.)).text_sm().whitespace_nowrap().child(describe(speed)))
     }
 }

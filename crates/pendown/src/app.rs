@@ -90,7 +90,7 @@ const AUTOTEST_EVERY: Duration = Duration::from_millis(5);
 /// The toolbar's height, which its cached view needs, and the width of the
 /// status beside it.
 const TOOLBAR_HEIGHT: f32 = 41.0;
-const STATUS_WIDTH: f32 = 300.0;
+const STATUS_WIDTH: f32 = 220.0;
 
 /// The console area's height, with the counters and variables beside the
 /// console.
@@ -770,6 +770,7 @@ impl App {
                         div()
                             .flex_none()
                             .w(px(STATUS_WIDTH))
+                            .truncate()
                             .text_sm()
                             .text_color(theme.muted_foreground)
                             .child(self.status()),

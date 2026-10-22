@@ -26,6 +26,7 @@ use pendown::{
     console::{ConsoleInput, Submit, defines},
     document::Document,
     errors,
+    metrics::{Snapshot, WindowMetrics},
     run::{Channel, DEFAULT_CHANNEL, Job, Run, Session},
     speed::{INSTANT_LEVEL, describe, level_speed, speed_level},
 };
@@ -138,6 +139,9 @@ pub struct App {
     pub(crate) frame_intervals: Samples,
     pub(crate) events: usize,
     pub(crate) autotest: Option<Autotest>,
+    pub(crate) metrics: Rc<WindowMetrics>,
+    /// The numbers when the current job started, for its summary.
+    run_start: Option<Snapshot>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -179,6 +183,7 @@ impl App {
                 }
             }),
         ];
+        let metrics = Rc::new(WindowMetrics::default());
         let app = cx.entity().downgrade();
         window.on_window_should_close(cx, move |window, cx| {
             app.update(cx, |this, cx| this.should_close(window, cx)).unwrap_or(true)
@@ -188,7 +193,7 @@ impl App {
             highlight,
             speed_slider,
             speed,
-            canvas: Rc::new(RefCell::new(Canvas::new())),
+            canvas: Rc::new(RefCell::new(Canvas::new(metrics.clone()))),
             animator: None,
             run: None,
             run_text: String::new(),
@@ -211,6 +216,8 @@ impl App {
             frame_intervals: Samples::default(),
             events: 0,
             autotest: Autotest::from_env(),
+            metrics,
+            run_start: None,
             _subscriptions: subscriptions,
         }
     }
@@ -267,7 +274,26 @@ impl App {
         self.last_frame = None;
         self.frame_intervals = Samples::default();
         self.events = 0;
+        self.run_start = pendown_logo::metrics::enabled().then(|| self.snapshot());
         cx.notify();
+    }
+
+    /// Every metric now (ADR 0020).
+    pub(crate) fn snapshot(&self) -> Snapshot {
+        let canvas = self.canvas.borrow();
+        Snapshot::take(
+            &self.metrics,
+            &canvas.drawing.metrics,
+            self.animator.as_ref().map(|a| &a.metrics),
+            self.run.as_ref().map(|r| &r.control.metrics),
+        )
+    }
+
+    /// Prints the summary of the job that just ended on stderr.
+    fn report(&mut self) {
+        if let Some(start) = self.run_start.take() {
+            eprintln!("{}", self.snapshot().since(&start).summary());
+        }
     }
 
     pub(crate) fn stop(&mut self, cx: &mut Context<Self>) {
@@ -277,6 +303,7 @@ impl App {
             animator.stop();
             self.stop_at = Some(Instant::now());
             self.print("Stopped.");
+            self.report();
         }
         cx.notify();
     }
@@ -476,6 +503,7 @@ impl App {
         let animator = self.animator.as_ref().expect("checked above");
         if animator.finished() && self.finished_at.is_none() && !animator.stopped {
             self.finished_at = Some(now);
+            self.report();
             let defining = self.defining.take();
             match self.run.as_ref().and_then(|r| r.result()) {
                 Some(Err(RunError::Parse(errors))) => self.show_errors(errors, cx),
@@ -519,6 +547,16 @@ impl App {
 
 impl Render for App {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let metrics = self.metrics.clone();
+        let started = metrics.renders.start();
+        let element = self.render_window(window, cx);
+        metrics.renders.stop(started);
+        element
+    }
+}
+
+impl App {
+    fn render_window(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         if !std::mem::replace(&mut self.checked, true) {
             self.check_program(cx);
         }

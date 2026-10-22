@@ -1,10 +1,11 @@
 //! The canvas (ADR 0010): `pendown-render`'s pixel buffer shown as tiles,
 //! with the move in progress and the turtle painted as paths each frame.
 
-use std::{sync::Arc, time::Duration};
+use std::{rc::Rc, sync::Arc, time::Duration};
 
 use gpui_kit::*;
 use pendown_logo::{Pen, Point};
+use pendown::metrics::WindowMetrics;
 use pendown_render::{Drawing, pen_width};
 
 pub struct Canvas {
@@ -12,6 +13,7 @@ pub struct Canvas {
     tiles: Vec<Option<Arc<RenderImage>>>,
     /// How long the last re-render after a resize took, and of how much.
     pub rerender: Option<(usize, Duration)>,
+    metrics: Rc<WindowMetrics>,
 }
 
 /// What changes each frame, painted on top of the buffer.
@@ -24,11 +26,16 @@ pub struct Overlay {
 }
 
 impl Canvas {
-    pub fn new() -> Canvas {
-        Canvas { drawing: Drawing::new(), tiles: Vec::new(), rerender: None }
+    pub fn new(metrics: Rc<WindowMetrics>) -> Canvas {
+        Canvas { drawing: Drawing::new(), tiles: Vec::new(), rerender: None, metrics }
     }
 
     pub fn paint(&mut self, bounds: Bounds<Pixels>, window: &mut Window, overlay: Overlay) {
+        let metrics = self.metrics.clone();
+        metrics.canvas.time(|| self.paint_timed(bounds, window, overlay));
+    }
+
+    fn paint_timed(&mut self, bounds: Bounds<Pixels>, window: &mut Window, overlay: Overlay) {
         let per_device = window.scale_factor();
         let width = (bounds.size.width.as_f32() * per_device).round() as u32;
         let height = (bounds.size.height.as_f32() * per_device).round() as u32;
@@ -45,6 +52,7 @@ impl Canvas {
             }
         }
         self.drawing.draw_pending();
+        let uploading = self.metrics.upload.start();
         for tile in self.drawing.take_dirty_tiles() {
             let bytes = self.drawing.tile_bgra(tile);
             let buffer = image::RgbaImage::from_raw(tile.width, tile.height, bytes).expect("buffer matches size");
@@ -55,6 +63,7 @@ impl Canvas {
                 window.drop_image(old).ok();
             }
         }
+        self.metrics.upload.stop(uploading);
 
         let logical = |device: f64| px(device as f32 / per_device);
         for (tile, image) in self.drawing.tiles().zip(&self.tiles) {

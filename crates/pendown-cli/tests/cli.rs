@@ -16,8 +16,18 @@ struct Run {
     stderr: String,
 }
 
+/// Runs the CLI with metrics off, so stderr has only what the program says.
 fn cli(dir: &PathBuf, args: &[&str]) -> Run {
-    let out = Command::new(env!("CARGO_BIN_EXE_pendown-cli")).args(args).current_dir(dir).output().unwrap();
+    cli_with(dir, args, "0")
+}
+
+fn cli_with(dir: &PathBuf, args: &[&str], metrics: &str) -> Run {
+    let out = Command::new(env!("CARGO_BIN_EXE_pendown-cli"))
+        .args(args)
+        .current_dir(dir)
+        .env("PENDOWN_METRICS", metrics)
+        .output()
+        .unwrap();
     Run {
         status: out.status.code().unwrap_or(-1),
         stdout: String::from_utf8(out.stdout).unwrap(),
@@ -110,4 +120,16 @@ fn a_seed_makes_random_repeatable() {
     let b = cli(&d, &["r.logo", "--seed", "7"]);
     assert_eq!(a.status, 0);
     assert_eq!(a.stdout, b.stdout);
+}
+
+#[test]
+fn metrics_print_a_summary_on_stderr() {
+    let d = dir("metrics");
+    std::fs::write(d.join("square.logo"), "REPEAT 4 [FD 100 RT 90]").unwrap();
+    let r = cli_with(&d, &["square.logo"], "1");
+    // REPEAT, its 4 passes, and 4 each of FD and RT.
+    assert_eq!((r.status, r.stdout.as_str()), (0, ""));
+    assert!(r.stderr.starts_with("run ") && r.stderr.contains(": 13 instructions at "), "{}", r.stderr);
+    assert!(r.stderr.contains("4 marks drawn in") && r.stderr.contains("; CPU main "), "{}", r.stderr);
+    assert_eq!(cli_with(&d, &["square.logo"], "0").stderr, "");
 }

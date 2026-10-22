@@ -47,6 +47,9 @@ fn main() -> ExitCode {
     let (width, height) = args.size;
     let output = render(&source, Options { width, height, limit: args.limit, seed: args.seed });
     print!("{}", output.printed);
+    if let Some(summary) = &output.summary {
+        eprintln!("{summary}");
+    }
 
     let save = || match std::fs::write(&output_path, &output.png) {
         Ok(()) => true,

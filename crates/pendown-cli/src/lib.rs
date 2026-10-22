@@ -7,9 +7,13 @@ use std::{
     rc::Rc,
     sync::Arc,
     thread,
+    time::Instant,
 };
 
-use pendown_logo::{Error, Event, EventSink, Halted, Interpreter, Limits, RunError};
+use pendown_logo::{
+    Error, Event, EventSink, Halted, Interpreter, Limits, RunError,
+    metrics::{self, ThreadCpu},
+};
 use pendown_render::{Drawing, Mark, Segment};
 
 /// The interpreter's stack (ADR 0007).
@@ -36,6 +40,9 @@ pub struct Output {
     /// Everything the program printed.
     pub printed: String,
     pub result: Result<(), RunError>,
+    /// A one-line summary of where the time went, when metrics are on
+    /// (ADR 0020).
+    pub summary: Option<String>,
 }
 
 /// Turns events into lines, arcs and shapes in the drawing. The CLI has no
@@ -107,6 +114,7 @@ pub fn render(source: &str, options: Options) -> Output {
         .name("interpreter".into())
         .stack_size(STACK)
         .spawn(move || {
+            let (started, cpu) = (Instant::now(), ThreadCpu::now());
             let drawing = Rc::new(RefCell::new(Drawing::new()));
             drawing.borrow_mut().resize(options.width, options.height);
             let printed = Rc::new(RefCell::new(String::new()));
@@ -120,10 +128,25 @@ pub fn render(source: &str, options: Options) -> Output {
             };
             it.set_seed(options.seed);
             let result = it.run_program(&source);
+            let instructions = it.stats.instructions;
             drop(it);
-            let png = drawing.borrow().png();
+            let drawing = drawing.borrow();
+            let png = drawing.png();
             let printed = printed.borrow().clone();
-            Output { png, printed, result }
+            let summary = metrics::enabled().then(|| {
+                let wall = started.elapsed();
+                let m = &drawing.metrics;
+                format!(
+                    "run {:.2} s: {instructions} instructions at {:.1} M/s, {} marks drawn in {:.0} ms, PNG in {:.0} ms; CPU {}",
+                    wall.as_secs_f64(),
+                    instructions as f64 / wall.as_secs_f64().max(1e-9) / 1e6,
+                    m.marks.get(),
+                    m.drawing.total().as_secs_f64() * 1e3,
+                    m.png.total().as_secs_f64() * 1e3,
+                    ThreadCpu::now().since(&cpu).percentages(wall, "main"),
+                )
+            });
+            Output { png, printed, result, summary }
         })
         .expect("can start the interpreter thread")
         .join()

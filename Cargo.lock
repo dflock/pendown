@@ -4687,6 +4687,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pendown-perf"
+version = "0.1.0"
+dependencies = [
+ "pendown",
+ "pendown-logo",
+ "pendown-render",
+ "serde_json",
+]
+
+[[package]]
 name = "pendown-render"
 version = "0.1.0"
 dependencies = [

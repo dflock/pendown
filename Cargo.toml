@@ -13,11 +13,13 @@ publish = false
 [workspace.dependencies]
 pendown-logo = { path = "crates/pendown-logo" }
 pendown-render = { path = "crates/pendown-render" }
+pendown = { path = "crates/pendown" }
 # `tree-sitter` gives real theme highlight and diagnostic colours (ADR 0008).
 gpui-kit = { version = "=0.8.0", features = ["tree-sitter"] }
 clap = { version = "4", features = ["derive"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 kdl = "6"
+serde_json = "1"
 smallvec = "1"
 vello_cpu = { version = "0.3", features = ["multithreading"] }
 

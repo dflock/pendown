@@ -93,16 +93,68 @@ Two panels that update as the turtle goes, in step with the highlighted instruct
 
 Two of the headline features. They come after phase 2 so they cover the complete core language, and so the commands they document have settled down.
 
+The UI design is on a canvas of mockups: https://claude.ai/artifact/Pcqcncf1iK6d3gnTQpyohp (private to the owner unless shared).
+
+- **The side panel:** on the right of the window, beside the canvas, the height of the editor and canvas, with tabs for Help and Tutorial. It's resizable like the other panes, and the console strip below is unchanged. A **Help** button in the toolbar shows and hides it. **F1** opens it on Help for the word under the editor's cursor. The plan first put it next to the editor, but there it would separate the editor from the canvas, which show the code and what it draws.
 - **Help panel:** a reference panel generated from `pendown-logo.kdl`.
   - The GUI embeds the file at build time (`include_str!`) and parses it with the `kdl` crate (version 6, as used by the validator).
-  - Browse by chapter and section, search by name and alias, and show help for the command under the editor's cursor.
-  - It lists the commands the interpreter implements. Obsolete commands can be shown on request, with their `obsolete_reason`.
+  - **The top of the panel:** Back and Forward through the pages visited, a Contents button, and a search box.
+  - **Following the cursor:** while the search box is empty, the panel shows help for the command under the editor's cursor, aliases included, so `FD` shows FORWARD. A strip says what it's following ("Following the cursor: FD, line 3"), with **Pin** to keep the page open while you type elsewhere.
+  - **A command's page:**
+    - where it sits, as links (Graphics › Turtle motion), its name and aliases, and the usage from `eg`;
+    - our description;
+    - the examples, each with its picture;
+    - "See also": the other commands in the same section.
+  - **Contents:** the manual's chapters and sections, in the kdl's order, with how many commands each holds. Chapters and sections with no implemented commands are left out, such as Objects. Commands that are our extensions (`extension #true`), such as `ARC`, get a small "Pendown" tag.
+  - **Search:**
+    - It matches names and aliases by prefix, with the matched part highlighted.
+    - Each result shows the first sentence of its description and its section.
+    - ↑ and ↓ choose a result, and Enter opens it.
+  - **What it lists:** only the commands the interpreter implements. A **Show obsolete commands** checkbox at the bottom adds the obsolete ones, greyed out in their own group, each with its reason.
+  - **Syntax:** the first entry in the contents, for what isn't a command in the manual:
+    - `TO … END`, `:name`, `"word`, `[...]` lists, `{...}` arrays, `(...)`, `;` comments and the infix operators;
+    - each gets a page, so following the cursor works on them too.
+    - They need new entries in the kdl, say a `syntax` chapter outside `logo`, since the manual describes them in its Introduction (chapter 1), which `pendown-logo.kdl` leaves out.
 - **Our own descriptions:** each command's `desc` is the manual's text, which describes UCBLogo: it mentions wxWidgets, percentage RGB values, `SETSCRUNCH` and so on. Add a `help` node to each supported command with our own description, written for our dialect, with the `differs` notes folded in. `desc` stays as the manual's reference for whoever implements the command. Writing them is real work: about 165 commands in phases 1 and 2.
-- **Errors for obsolete commands:** use `obsolete_reason` in the error when someone runs an obsolete command, for example "EDIT isn't supported: use the editor", not just "I don't know how to EDIT". This is cheap and could be done earlier.
+- **Markup:** the `help` text and the tutorial use a small subset of markdown:
+  - paragraphs, `code` spans, bold, italics, lists and fenced code blocks;
+  - `[FORWARD]`, which is a link to that command's page.
+  - A test checks that every link names a command or syntax entry.
+- **Errors for obsolete commands:** use `obsolete_reason` in the error when someone runs an obsolete command, for example "EDIT isn't in Pendown: it opens an external text editor, and Pendown has its own", not just "I don't know how to EDIT". This is cheap and could be done earlier.
+  - **Reword the reasons:** they're written as notes to us, such as "Opens an external text editor. The GUI has its own editor." Rewrite each so that it reads well after "X isn't in Pendown: ", and say "Pendown", not "the GUI". There are about 100.
+- **Help links in errors:** an error in the console that names a command, including the ones for obsolete commands, ends with a "Help on FORWARD" link. The link opens the panel on that command's page, through its alias if the error used one. It needs the command an error is about to travel with the error, next to its span (ADR 0005).
 - **Examples:** add one or more `example` nodes to each supported command. Each holds a short runnable program, with an optional title. This is different from `eg`, which only shows how to call the command. In the help panel, each example has **Run** and **Copy to editor** buttons.
+  - **Pictures:** each example shows a small picture of what it draws. They are the PNGs the example tests already compare against, made smaller and embedded in the GUI.
+  - **Run:** the example runs on the main canvas, at the current speed, with the usual animation, Step and counters.
+    - The highlight is on the example's own code, in the help panel, and its Run button becomes Stop.
+    - The status says "Running the example …", and a banner on the canvas says where the drawing came from.
+    - The editor's text is never touched.
+    - When the example ends, or **Back to my drawing** is pressed, the user's own drawing comes back. The window keeps the user's display list while the example runs.
+  - **Copy to editor:** adds the example to the end of the editor's text. Undo takes it back out.
 - **Examples are tests:** a test runs every example through the interpreter and the CLI renderer and compares the result with a saved PNG. That keeps the documentation and the interpreter in agreement. Examples that use `RANDOM` need a fixed seed, so their output is repeatable.
-- **Tutorial:** a sequence of lessons, each with text and code, featuring Kame the turtle (ADR 0019). The code loads into the editor and runs from there. The lessons follow the phase 1 commands: moving and turning, `REPEAT`, procedures, inputs and variables, recursion, then colours and shapes.
-- **GUI:** a side panel next to the editor, with tabs for Help and Tutorial.
+- **Tutorial:** a sequence of lessons, each with text and code, featuring Kame the turtle (ADR 0019).
+  - The lessons follow the phase 1 commands, six in all:
+    1. moving and turning;
+    2. `REPEAT`;
+    3. procedures ("Teaching Kame new words");
+    4. inputs and variables;
+    5. recursion;
+    6. colours and shapes.
+  - **Its files:** a folder of markdown files, one for each lesson, such as `tutorial/02-repeat.md`, embedded at build time. Code blocks are fenced as `logo`. Markdown is easier to write and review for long text than strings in a `tutorial.kdl`. The examples test also runs every code block in the tutorial.
+  - **The tab:**
+    - a lesson picker and a progress bar;
+    - the lesson's text;
+    - "Try this" boxes;
+    - Previous and Next buttons, named after the lessons they go to.
+  - **Code blocks:** each has **Load into editor** and **Run**. Run works like an example's. Load into editor replaces the editor's text, and asks first if there are unsaved changes, as New does.
+- **Icons on the toolbar buttons:** New, Open, Save, Export PNG, Run, Pause/Resume, Step, Step instruction, Stop and the new Help button get an icon next to their label. The labels stay, since they help beginners.
+  - The icons are Lucide's, which gpui-kit ships (`gpui_kit::assets::IconName`):
+    - Run uses `play`, Pause uses `pause`, and Resume uses `play`;
+    - Step uses `step-forward`, and Step instruction uses `footprints`;
+    - Stop uses `square`, and Help uses `book-open`;
+    - New uses `file-plus`, Open uses `folder-open`, Save uses `save`, and Export PNG uses `image-down`.
+  - The ones that aren't in gpui-kit's default set are added through the app's own `AssetSource`, with `icon_assets!`. That costs a few KiB, not the whole catalogue.
+  - Done, ahead of the rest of the phase, except for the Help button, which comes with the panel.
 - **A tree-sitter grammar for Logo,** published on its own, with a Zed extension that uses it. The editor's colours come from `pendown-logo`'s own tokens (ADR 0008), so there's no grammar yet. This comes after phase 2, which adds the last new syntax, `{...}` arrays.
   - **Its own repository,** say `tree-sitter-logo`, since Zed extensions fetch grammars by git URL and commit. It has `grammar.js`, the generated parser, `queries/highlights.scm`, and tests.
   - **What it can parse:** tree-sitter can't know a procedure's arity, so it can't group an instruction with its inputs as our parser does (ADR 0001). It parses tokens and structure: words, numbers, `"words`, `:variables`, operators, `[...]` lists, `(...)`, `{...}` arrays, comments, and `TO … END` definitions, both one-line and multi-line. That's enough for colours, brackets, outlines and folding.
@@ -110,12 +162,12 @@ Two of the headline features. They come after phase 2 so they cover the complete
   - **The Zed extension:** `extension.toml`, `languages/logo/config.toml` (the `.logo` suffix, `;` comments, brackets) and the queries.
   - **Open question:** should Pendown's own editor switch to the grammar, through gpui-kit's tree-sitter support? Our highlighter knows which procedures the program defines, which a grammar can't, so it probably stays.
 
-Open questions:
+Decided (these were open questions):
 
-- **Markup:** what format the `help` text and tutorial text use, for example a small subset of markdown with code spans and links between commands.
-- **Tutorial format:** a `tutorial.kdl` alongside `pendown-logo.kdl`, or a folder of markdown files?
-- **Where examples run:** on the main canvas (replacing the user's drawing), or on a small canvas in the help panel?
-- **Pictures:** show a pre-rendered picture of each example's output in the help panel? The snapshot tests already produce them.
+- **Markup:** a small subset of markdown, with `[NAME]` links between commands.
+- **Tutorial format:** a folder of markdown files, not a `tutorial.kdl`.
+- **Where examples run:** on the main canvas, with the user's drawing put back afterwards. A second canvas in the panel would need its own animation and controls, while the main canvas already has them.
+- **Pictures:** yes, made from the PNGs the example tests already compare against.
 
 ### Phase 6: Interactive programs (14 commands)
 

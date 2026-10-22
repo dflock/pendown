@@ -72,8 +72,8 @@ impl Snapshot {
             drawing: drawing.drawing.total(),
             tiles: drawing.tiles.get(),
             instructions: interpreter.map_or(0, |i| i.instructions.get()),
-            lockstep: interpreter.map_or(Duration::ZERO, |i| i.lockstep.total()),
-            channel: interpreter.map_or(Duration::ZERO, |i| i.channel.total()),
+            lockstep: interpreter.map_or(Duration::ZERO, |i| i.lockstep.total_now()),
+            channel: interpreter.map_or(Duration::ZERO, |i| i.channel.total_now()),
         }
     }
 

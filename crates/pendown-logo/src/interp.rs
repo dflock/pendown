@@ -169,9 +169,6 @@ pub struct Control {
     pub metrics: InterpreterMetrics,
 }
 
-/// How often, in instructions, the count is published.
-const PUBLISH_EVERY: u64 = 4096;
-
 /// The special variables (issue 03): ordinary variables that change how
 /// Pendown behaves, interned once.
 struct Specials {
@@ -562,9 +559,7 @@ impl Interpreter {
             return Err(Flow::Halt);
         }
         self.stats.instructions += 1;
-        if self.stats.instructions.is_multiple_of(PUBLISH_EVERY) {
-            self.publish_instructions();
-        }
+        self.publish_instructions();
         if let Some(max) = self.limits.max_instructions
             && self.stats.instructions > max
         {

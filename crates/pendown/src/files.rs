@@ -8,7 +8,7 @@ use pendown::document::{Document, last_folder, remember_folder};
 
 use crate::app::App;
 
-actions!(pendown, [NewFile, OpenFile, SaveFile, SaveFileAs, ExportPicture, RunProgram]);
+actions!(pendown, [NewFile, OpenFile, SaveFile, SaveFileAs, ExportPicture, RunProgram, ToggleMetrics]);
 
 /// The usual shortcuts: Ctrl on Linux and Windows, Cmd on macOS.
 pub fn bind_keys(cx: &mut gpui_kit::App) {
@@ -19,6 +19,8 @@ pub fn bind_keys(cx: &mut gpui_kit::App) {
         KeyBinding::new("secondary-shift-s", SaveFileAs, None),
         KeyBinding::new("secondary-e", ExportPicture, None),
         KeyBinding::new("secondary-enter", RunProgram, None),
+        // The metrics overlay (ADR 0020).
+        KeyBinding::new("f12", ToggleMetrics, None),
     ]);
 }
 

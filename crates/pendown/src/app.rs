@@ -35,7 +35,7 @@ use pendown_logo::{RunError, SourceId};
 use crate::{
     autotest::Autotest,
     canvas::{Canvas, Overlay},
-    files::{After, ExportPicture, NewFile, OpenFile, RunProgram, SaveFile, SaveFileAs},
+    files::{After, ExportPicture, NewFile, OpenFile, RunProgram, SaveFile, SaveFileAs, ToggleMetrics},
     highlighter::LogoHighlighter,
 };
 
@@ -69,6 +69,17 @@ fn position(text: &str, offset: usize) -> Position {
     let line_start = before.rfind('\n').map_or(0, |i| i + 1);
     Position::new(line, before[line_start..].encode_utf16().count() as u32)
 }
+
+/// The live numbers shown over the canvas: each line covers about the last
+/// `OVERLAY_EVERY`.
+pub(crate) struct MetricsOverlay {
+    since: Snapshot,
+    pub(crate) lines: Vec<String>,
+    /// Keeps the overlay refreshing while there are no frames.
+    _refresh: Task<()>,
+}
+
+const OVERLAY_EVERY: Duration = Duration::from_millis(500);
 
 /// Instant mode draws at most about this much a frame, so the window stays
 /// responsive (ADR 0011).
@@ -142,6 +153,8 @@ pub struct App {
     pub(crate) metrics: Rc<WindowMetrics>,
     /// The numbers when the current job started, for its summary.
     run_start: Option<Snapshot>,
+    /// The metrics overlay, when it's shown (F12).
+    pub(crate) overlay: Option<MetricsOverlay>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -218,6 +231,7 @@ impl App {
             autotest: Autotest::from_env(),
             metrics,
             run_start: None,
+            overlay: None,
             _subscriptions: subscriptions,
         }
     }
@@ -287,6 +301,36 @@ impl App {
             self.animator.as_ref().map(|a| &a.metrics),
             self.run.as_ref().map(|r| &r.control.metrics),
         )
+    }
+
+    /// F12: shows or hides the metrics overlay, turning metrics on if they
+    /// were off.
+    pub(crate) fn toggle_metrics(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.overlay.take().is_none() {
+            pendown_logo::metrics::set_enabled(true);
+            let refresh = cx.spawn_in(window, async move |this, cx| {
+                loop {
+                    cx.background_executor().timer(OVERLAY_EVERY).await;
+                    if this.update(cx, |_, cx| cx.notify()).is_err() {
+                        break;
+                    }
+                }
+            });
+            self.overlay = Some(MetricsOverlay { since: self.snapshot(), lines: vec!["Measuring…".into()], _refresh: refresh });
+        }
+        cx.notify();
+    }
+
+    /// Brings the overlay's numbers up to date, every `OVERLAY_EVERY`.
+    fn update_overlay(&mut self) {
+        let Some(since) = self.overlay.as_ref().map(|o| o.since) else { return };
+        if since.at.elapsed() < OVERLAY_EVERY {
+            return;
+        }
+        let now = self.snapshot();
+        let overlay = self.overlay.as_mut().expect("checked above");
+        overlay.lines = now.since(&since).lines();
+        overlay.since = now;
     }
 
     /// Prints the summary of the job that just ended on stderr.
@@ -561,6 +605,7 @@ impl App {
             self.check_program(cx);
         }
         self.tick(window, cx);
+        self.update_overlay();
         self.drive_autotest(window, cx);
         self.flush_console(window, cx);
         self.update_title(window, cx);
@@ -657,6 +702,7 @@ impl App {
             .on_action(cx.listener(|this, _: &SaveFileAs, window, cx| this.save_as(After::Nothing, window, cx)))
             .on_action(cx.listener(|this, _: &ExportPicture, window, cx| this.export(window, cx)))
             .on_action(cx.listener(|this, _: &RunProgram, _, cx| this.start(DEFAULT_CHANNEL, cx)))
+            .on_action(cx.listener(|this, _: &ToggleMetrics, window, cx| this.toggle_metrics(window, cx)))
             .bg(theme.background)
             .text_color(theme.foreground)
             .child(toolbar)
@@ -673,13 +719,35 @@ impl App {
                                     .text_size(theme.mono_font_size),
                             ),
                         )
-                        .child(resizable_panel().child(
-                            gpui_kit::canvas(
-                                move |bounds, _, _| bounds,
-                                move |_, bounds, window, _| canvas.borrow_mut().paint(bounds, window, overlay.clone()),
-                            )
-                            .size_full(),
-                        )),
+                        .child(
+                            resizable_panel().child(
+                                div()
+                                    .relative()
+                                    .size_full()
+                                    .child(
+                                        gpui_kit::canvas(
+                                            move |bounds, _, _| bounds,
+                                            move |_, bounds, window, _| canvas.borrow_mut().paint(bounds, window, overlay.clone()),
+                                        )
+                                        .size_full(),
+                                    )
+                                    .when_some(self.overlay.as_ref(), |panel, metrics| {
+                                        panel.child(
+                                            v_flex()
+                                                .absolute()
+                                                .top_2()
+                                                .left_2()
+                                                .p_2()
+                                                .rounded_md()
+                                                .bg(hsla(0.0, 0.0, 0.0, 0.7))
+                                                .text_color(hsla(0.0, 0.0, 1.0, 0.9))
+                                                .font_family(theme.mono_font_family.clone())
+                                                .text_xs()
+                                                .children(metrics.lines.iter().map(|line| div().child(line.clone()))),
+                                        )
+                                    }),
+                            ),
+                        ),
                 ),
             )
             .child(

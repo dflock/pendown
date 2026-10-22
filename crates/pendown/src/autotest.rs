@@ -101,6 +101,10 @@ enum Step {
     CheckExported(&'static str),
     /// The editor shows exactly these diagnostics.
     CheckDiagnostics(&'static [&'static str]),
+    /// Press F12.
+    ToggleMetrics,
+    /// The metrics overlay is shown, with numbers in it, or isn't.
+    CheckOverlay(bool),
     Quit,
 }
 
@@ -245,6 +249,15 @@ fn script() -> Vec<Step> {
         WaitFinished,
         CheckConsole("[0 FD doesn't like x as input [] 1]"),
         CheckConsole("Line 6: CHECK needs a positive number"),
+        Say("Phase 3: the metrics overlay"),
+        ToggleMetrics,
+        Run("REPEAT 36 [REPEAT 4 [FD 200 RT 90] RT 10]", level_speed(10)),
+        Wait(ms(1200)),
+        CheckOverlay(true),
+        Screenshot("metrics"),
+        Stop,
+        ToggleMetrics,
+        CheckOverlay(false),
         Quit,
     ]
 }
@@ -457,6 +470,15 @@ impl App {
                 Step::CheckConsole(expected) => {
                     let found = self.console.iter().any(|l| l.as_ref() == expected);
                     self.check(found, format!("the console shows {expected:?}"));
+                }
+                Step::ToggleMetrics => self.toggle_metrics(window, cx),
+                Step::CheckOverlay(shown) => {
+                    let lines = self.overlay.as_ref().map(|o| o.lines.clone());
+                    let ok = match &lines {
+                        Some(lines) => shown && lines.first().is_some_and(|l| l.contains(" renders/s, UI CPU ")),
+                        None => !shown,
+                    };
+                    self.check(ok, format!("the overlay shows {lines:?}"));
                 }
                 Step::Quit => {
                     let auto = self.autotest.as_ref().unwrap();

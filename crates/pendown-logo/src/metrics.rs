@@ -9,7 +9,10 @@
 //! [`InterpreterMetrics`], which live in its [`Control`](crate::Control).
 
 use std::{
-    sync::atomic::{AtomicU8, AtomicU64, Ordering},
+    sync::{
+        OnceLock,
+        atomic::{AtomicU8, AtomicU64, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -68,23 +71,46 @@ impl Counter {
     }
 }
 
+/// What `Timer` measures its open timings from.
+fn epoch() -> Instant {
+    static EPOCH: OnceLock<Instant> = OnceLock::new();
+    *EPOCH.get_or_init(Instant::now)
+}
+
 /// Total time spent on something, and how many times.
 #[derive(Debug, Default)]
 pub struct Timer {
     nanos: AtomicU64,
     count: AtomicU64,
+    /// When the timing in progress started, in nanoseconds after `epoch()`,
+    /// plus one; 0 if there's none. For `total_now`.
+    open: AtomicU64,
 }
 
 impl Timer {
     /// The time now, if metrics are on, to pass to `stop` later.
     pub fn start(&self) -> Option<Instant> {
-        enabled().then(Instant::now)
+        let now = enabled().then(Instant::now)?;
+        self.open.store(now.duration_since(epoch()).as_nanos() as u64 + 1, Ordering::Relaxed);
+        Some(now)
     }
 
     pub fn stop(&self, started: Option<Instant>) {
         if let Some(started) = started {
+            self.open.store(0, Ordering::Relaxed);
             self.record(started.elapsed());
         }
+    }
+
+    /// The total including any timing still in progress, so a wait that
+    /// lasts seconds shows while it happens. It only makes sense for
+    /// something done one at a time, such as the interpreter's waits.
+    pub fn total_now(&self) -> Duration {
+        let open = match self.open.load(Ordering::Relaxed) {
+            0 => Duration::ZERO,
+            since => (epoch() + Duration::from_nanos(since - 1)).elapsed(),
+        };
+        self.total() + open
     }
 
     pub fn record(&self, d: Duration) {
@@ -119,8 +145,8 @@ impl Timer {
 /// What the interpreter measures (ADR 0020), for the front end to read.
 #[derive(Debug, Default)]
 pub struct InterpreterMetrics {
-    /// Instructions run in this job, published every few thousand and at
-    /// the end, so a program that draws nothing still shows a rate.
+    /// Instructions run in this job, published as they run, so a program
+    /// that draws nothing still shows a rate.
     pub instructions: Counter,
     /// The whole job, from parsing to the last event sent.
     pub running: Timer,
@@ -234,6 +260,15 @@ mod tests {
         assert_eq!((timer.total(), timer.count(), timer.mean()), (Duration::from_millis(6), 2, Duration::from_millis(3)));
         assert_eq!(timer.time(|| 7), 7);
         assert_eq!(timer.count(), 3);
+
+        // A timing in progress counts in `total_now`, but not in `total`.
+        let wait = Timer::default();
+        let started = wait.start();
+        std::thread::sleep(Duration::from_millis(5));
+        assert_eq!(wait.total(), Duration::ZERO);
+        assert!(wait.total_now() >= Duration::from_millis(5));
+        wait.stop(started);
+        assert_eq!(wait.total_now(), wait.total());
     }
 
     #[test]

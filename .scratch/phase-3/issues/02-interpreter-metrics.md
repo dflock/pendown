@@ -16,4 +16,4 @@ Tests show the counts for a fixed program, and waits measured when the receiver 
 
 ### 2026-10-22: done
 
-`InterpreterMetrics` in `metrics.rs`, held by `Control`: instructions (published every 4,096 and at the end of a job), running, lockstep and channel timers. `BatchSender::measured` records the channel waits; the GUI's session uses it. Tests: `tests/metrics.rs`.
+`InterpreterMetrics` in `metrics.rs`, held by `Control`: instructions (published as it runs), running, lockstep and channel timers. `BatchSender::measured` records the channel waits; the GUI's session uses it. Tests: `tests/metrics.rs`.

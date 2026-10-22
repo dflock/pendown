@@ -25,6 +25,7 @@ mod reader;
 mod span;
 pub mod syntax;
 mod value;
+pub mod watch;
 
 pub use colour::{NAMES as COLOUR_NAMES, PALETTE, Rgba};
 pub use error::{CallSite, Error, RunError};
@@ -34,6 +35,7 @@ pub use interp::{Control, Interpreter, Limits, STACK_MARGIN, Stats};
 pub use number::{format_number, parse_number};
 pub use span::{SourceId, Span};
 pub use value::Value;
+pub use watch::Watch;
 
 /// Every built-in command's names, the first being the one the manual uses
 /// first, for checking against `pendown-logo.kdl`.

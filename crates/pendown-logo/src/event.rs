@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{interp::Control, span::Span};
+use crate::{interp::Control, span::Span, watch::Watch};
 
 /// A point in turtle coordinates: y points up, and the turtle starts at 0, 0.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -60,6 +60,10 @@ pub enum Event {
     /// In lockstep, one follows each `Instruction` that starts a line, so
     /// the program can't run a line before the animator gets to it.
     Sync(SyncPoint),
+    /// What the counters and variables panels show, sent when it changes
+    /// (ADR 0022): just before the `Instruction` that sees it, and at the
+    /// end of a run.
+    Watch(Arc<Watch>),
 }
 
 /// The reply half of a `Sync`. Replying lets the interpreter go on; dropping

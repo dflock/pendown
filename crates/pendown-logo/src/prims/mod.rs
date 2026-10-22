@@ -351,8 +351,8 @@ fn speed(it: &mut Interpreter, _: &Args) -> Result<Option<Value>, Flow> {
 }
 
 fn repcount(it: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    match it.repcounts.last() {
-        Some(&n) => Ok(Some(Value::Num(n as f64))),
+    match it.repcount() {
+        Some(n) => Ok(Some(Value::Num(n as f64))),
         None => Err(a.error("REPCOUNT can only be used inside REPEAT or FOREVER".into())),
     }
 }

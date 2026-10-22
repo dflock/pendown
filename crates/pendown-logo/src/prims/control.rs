@@ -148,16 +148,23 @@ pub(super) fn for_(it: &mut Interpreter, a: &Args) -> Out {
     let limit = number(it, 2)?;
     let step = if control.items.len() == 4 { number(it, 3)? } else if limit >= start { 1.0 } else { -1.0 };
     let sym = it.define(&name);
-    it.with_locals(&[sym], vec![Value::Num(start)], a.call.span, |it| {
-        let mut current = start;
-        while sign(current - limit) != sign(step) {
-            it.tick(a.call.span)?;
-            it.vars[sym as usize] = Some(Value::Num(current));
-            it.run_commands(&body, a.call.span)?;
-            let now = it.vars[sym as usize].as_ref().and_then(Value::as_num).unwrap_or(current);
-            current = now + step;
-        }
-        Ok(None)
+    // How many passes there will be, unless the body changes the variable.
+    let passes = (step != 0.0).then(|| ((limit - start) / step).floor().max(-1.0) as i64 + 1);
+    it.with_locals(&[sym], vec![Value::Num(start)], &a.call.name, a.call.span, |it| {
+        it.counting(&a.call.name, passes, false, |it| {
+            let mut current = start;
+            let mut pass = 0;
+            while sign(current - limit) != sign(step) {
+                it.tick(a.call.span)?;
+                pass += 1;
+                it.set_count(pass);
+                it.vars[sym as usize] = Some(Value::Num(current));
+                it.run_commands(&body, a.call.span)?;
+                let now = it.vars[sym as usize].as_ref().and_then(Value::as_num).unwrap_or(current);
+                current = now + step;
+            }
+            Ok(None)
+        })
     })
 }
 

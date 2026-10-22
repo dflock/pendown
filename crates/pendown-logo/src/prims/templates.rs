@@ -110,7 +110,7 @@ fn apply(it: &mut Interpreter, t: &Template, values: Vec<Value>, data: &Rc<Vec<D
         Template::Lambda { inputs, body } => {
             check_inputs(a, values.len(), inputs.len(), Some(inputs.len()), "the template")?;
             let body = body.clone();
-            it.with_locals(inputs, values, a.call.span, |it| it.run_block_maybe(&body))
+            it.with_locals(inputs, values, &a.call.name, a.call.span, |it| it.run_block_maybe(&body))
         }
         Template::Text(proc) => {
             check_inputs(a, values.len(), proc.inputs.len(), Some(proc.inputs.len()), "the template")?;
@@ -135,18 +135,19 @@ fn for_each_member(
         return Err(a.error(format!("{}'s data inputs must be the same length", a.call.name.to_uppercase())));
     }
     let data = Rc::new(data);
-    for i in 0..len {
-        let values: Vec<Value> = data.iter().map(|d| d.members[i].clone()).collect();
-        let first = values[0].clone();
-        it.tick(a.call.span)?;
-        it.repcounts.push(i as i64 + 1);
-        let result = apply(it, &t, values, &data, i, a);
-        it.repcounts.pop();
-        if !each(it, result?, &first)? {
-            break;
+    it.counting(&a.call.name, Some(len as i64), true, |it| {
+        for i in 0..len {
+            let values: Vec<Value> = data.iter().map(|d| d.members[i].clone()).collect();
+            let first = values[0].clone();
+            it.tick(a.call.span)?;
+            it.set_count(i as i64 + 1);
+            let result = apply(it, &t, values, &data, i, a);
+            if !each(it, result?, &first)? {
+                break;
+            }
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 /// What a template output, which it must have.

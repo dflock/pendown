@@ -16,6 +16,7 @@ use crate::{
     error::{CallSite, Error, RunError},
     colour::{PALETTE, Rgba},
     event::{Event, EventSink, Pen, Point, SyncPoint},
+    watch::{self, Scope, ScopeKind, Variable, Watch},
     metrics::InterpreterMetrics,
     geometry::{Area, TurtleMode},
     random::Random,
@@ -77,9 +78,10 @@ enum Ret {
 /// pushing one, so the frame's size is bounded by the number of names.
 ///
 /// Lambda templates and `FOR` push frames with no procedure, for their
-/// local variables.
+/// local variables, labelled with the command.
 struct Frame {
     proc: Option<Rc<Proc>>,
+    label: Option<Rc<str>>,
     call_span: Span,
     saved: SmallVec<[(Sym, Option<Value>); 4]>,
 }
@@ -166,6 +168,9 @@ pub struct Control {
     /// GUI keeps it up to date; 0 means there's no slider, as in the CLI,
     /// and `SPEED` outputs 11.
     pub speed: AtomicU8,
+    /// The front end wants a `Watch` at the next instruction. Lockstep sends
+    /// one whenever it changes; at Instant the GUI sets this each frame.
+    pub watch: AtomicBool,
     pub metrics: InterpreterMetrics,
 }
 
@@ -190,6 +195,15 @@ fn logo_version() -> f64 {
     format!("{major}.{minor}").parse().unwrap_or(0.0)
 }
 
+/// A `REPEAT`, `FOREVER`, `FOR` or template running: which pass it's on,
+/// out of how many if that's known. `FOR`'s doesn't count for `REPCOUNT`.
+pub(crate) struct Counter {
+    pub(crate) name: Rc<str>,
+    pub(crate) count: i64,
+    pub(crate) of: Option<i64>,
+    pub(crate) repcount: bool,
+}
+
 /// The slot fillers of the explicit-slot template running: `?1` is
 /// `values[0]`. `(?REST 1)` is what comes after member `index` of the first
 /// data input, worked out only if it's used.
@@ -211,7 +225,9 @@ pub struct Interpreter {
     pub(crate) vars: Vec<Option<Value>>,
     procs: Vec<Option<Rc<Proc>>>,
     frames: Vec<Frame>,
-    pub(crate) repcounts: Vec<i64>,
+    /// The loops and templates running, outermost first, for `REPCOUNT`
+    /// and the counters panel.
+    pub(crate) counters: Vec<Counter>,
     pub(crate) turtle: Turtle,
     /// `RANDOM`'s generator, seeded afresh on each Run unless `seed` is set.
     pub(crate) random: Random,
@@ -233,6 +249,8 @@ pub struct Interpreter {
     pub stats: Stats,
     /// `stats.instructions` when the current job began.
     job_start: u64,
+    /// The last `Watch` sent, so an unchanged one isn't sent again.
+    last_watch: Option<Arc<Watch>>,
 }
 
 /// The address of something on the stack, for measuring how much is used.
@@ -286,7 +304,7 @@ impl Interpreter {
             vars: Vec::new(),
             procs: Vec::new(),
             frames: Vec::new(),
-            repcounts: Vec::new(),
+            counters: Vec::new(),
             turtle: Turtle::default(),
             area: Area::default(),
             background: (PALETTE[0], Value::Num(0.0)),
@@ -303,6 +321,7 @@ impl Interpreter {
             limits: Limits::default(),
             stats: Stats::default(),
             job_start: 0,
+            last_watch: None,
         };
         it.grow();
         it.set_specials();
@@ -342,6 +361,7 @@ impl Interpreter {
             depth: limit(self.specials.printdepthlimit),
             width: limit(self.specials.printwidthlimit),
             full: self.special(self.specials.fullprintp).and_then(Value::as_bool) == Some(true),
+            length: None,
         }
     }
 
@@ -391,7 +411,7 @@ impl Interpreter {
         self.slots.clear();
         self.caught = None;
         self.catching_errors = 0;
-        self.repcounts.clear();
+        self.counters.clear();
         self.turtle = Turtle::default();
         self.background = (PALETTE[0], Value::Num(0.0));
         self.palette = PALETTE;
@@ -451,7 +471,14 @@ impl Interpreter {
     fn run_source(&mut self, text: &str, source: SourceId) -> Result<(), RunError> {
         let started = self.control.metrics.running.start();
         self.job_start = self.stats.instructions;
+        // Each job has its own front end, which hasn't seen any `Watch` yet.
+        self.last_watch = None;
         let result = self.run_source_unflushed(text, source);
+        // What the run left, for the variables panel. If Stop was pressed,
+        // nothing is listening.
+        if self.limits.instruction_events && !matches!(result, Err(RunError::Halted)) {
+            let _ = self.send_watch();
+        }
         let result = match self.sink.flush() {
             Ok(()) => result,
             Err(_) => Err(RunError::Halted),
@@ -552,6 +579,101 @@ impl Interpreter {
         self.sink.send(event).map_err(|_| Flow::Halt)
     }
 
+    /// Sends a `Watch` for the panels, unless nothing has changed since the
+    /// last one.
+    fn send_watch(&mut self) -> Result<(), Flow> {
+        let watch = self.watch();
+        if self.last_watch.as_deref() == Some(&watch) {
+            return Ok(());
+        }
+        let watch = Arc::new(watch);
+        self.last_watch = Some(watch.clone());
+        self.emit(Event::Watch(watch))
+    }
+
+    /// The counters running and the variables the running instruction can
+    /// see. With shallow binding, `vars` holds what's visible; each frame
+    /// saved the values its own variables hid, so a frame's variables have
+    /// the values saved by the next frame up that has the same name.
+    pub fn watch(&self) -> Watch {
+        let style = Style { depth: Some(4), width: Some(20), full: true, length: Some(watch::VALUE_LIMIT) };
+        let show = |v: &Option<Value>| {
+            v.as_ref().map(|v| {
+                let mut text = v.show_styled(style);
+                if text.len() > watch::VALUE_LIMIT {
+                    let end = (0..=watch::VALUE_LIMIT).rev().find(|&i| text.is_char_boundary(i)).unwrap_or(0);
+                    text.truncate(end);
+                    text.push_str("...");
+                }
+                text
+            })
+        };
+        let counters = self
+            .counters
+            .iter()
+            .enumerate()
+            .map(|(i, c)| watch::Counter {
+                name: c.name.to_uppercase(),
+                count: c.count,
+                of: c.of,
+                repcount: c.repcount && !self.counters[i + 1..].iter().any(|later| later.repcount),
+            })
+            .collect();
+
+        // From the innermost frame out: the value each name has in the scope
+        // below the ones seen so far.
+        let mut below: Vec<(Sym, &Option<Value>)> = Vec::new();
+        let mut scopes = Vec::with_capacity(self.frames.len() + 1);
+        for frame in self.frames.iter().rev() {
+            let variables = frame
+                .saved
+                .iter()
+                .map(|(sym, old)| {
+                    let above = below.iter().rposition(|(s, _)| s == sym);
+                    let value = match above {
+                        Some(i) => below.remove(i).1,
+                        None => &self.vars[*sym as usize],
+                    };
+                    below.push((*sym, old));
+                    Variable { name: self.names.spelling(*sym).to_string(), value: show(value), hidden: above.is_some() }
+                })
+                .collect();
+            let (kind, name) = match (&frame.proc, &frame.label) {
+                (Some(proc), _) => (ScopeKind::Procedure, proc.name.to_string()),
+                (None, label) => (ScopeKind::Loop, label.as_deref().unwrap_or("").to_uppercase()),
+            };
+            scopes.push(Scope { kind, name, variables });
+        }
+
+        let mut globals: Vec<Variable> = (0..self.vars.len() as Sym)
+            .filter_map(|sym| {
+                let hidden = below.iter().rposition(|(s, _)| *s == sym);
+                let value = match hidden {
+                    Some(i) => below[i].1,
+                    None => &self.vars[sym as usize],
+                };
+                let value = value.as_ref()?;
+                if self.is_default_special(sym, value) {
+                    return None;
+                }
+                Some(Variable { name: self.names.spelling(sym).to_string(), value: show(&Some(value.clone())), hidden: hidden.is_some() })
+            })
+            .collect();
+        globals.sort_by_cached_key(|v| v.name.to_lowercase());
+        scopes.push(Scope { kind: ScopeKind::Globals, name: String::new(), variables: globals });
+        scopes.reverse();
+        Watch { counters, scopes }
+    }
+
+    /// A special variable still at its starting value, which the panel
+    /// doesn't show.
+    fn is_default_special(&self, sym: Sym, value: &Value) -> bool {
+        if sym == self.specials.logoversion {
+            return true;
+        }
+        sym == self.specials.caseignoredp && value.as_bool() == Some(true)
+    }
+
     /// Checks the cancel flag and the limit on instructions. Loops do this
     /// on every pass, so even `FOREVER []` can be stopped.
     pub(crate) fn tick(&mut self, span: Span) -> Result<(), Flow> {
@@ -569,18 +691,24 @@ impl Interpreter {
         Ok(())
     }
 
-    /// Checks the cancel flag and sends the `Instruction` event. In
-    /// lockstep, waits for the front end before starting a line.
+    /// Checks the cancel flag and sends the `Instruction` event, after a
+    /// `Watch` of what the instruction sees if that's wanted. In lockstep,
+    /// waits for the front end before starting a line.
     fn begin(&mut self, span: Span) -> Result<(), Flow> {
         self.tick(span)?;
         if self.limits.instruction_events {
             let line = Some((span.source, span.line));
             let starts_line = self.last_line != line;
             self.last_line = line;
+            let lockstep = self.control.lockstep.load(Ordering::Relaxed);
+            if lockstep || self.control.watch.load(Ordering::Relaxed) {
+                self.control.watch.store(false, Ordering::Relaxed);
+                self.send_watch()?;
+            }
             self.emit(Event::Instruction { span, starts_line })?;
             if starts_line {
                 self.control.lines_started.fetch_add(1, Ordering::Relaxed);
-                if self.control.lockstep.load(Ordering::Relaxed) {
+                if lockstep {
                     self.sync()?;
                 }
             }
@@ -663,26 +791,26 @@ impl Interpreter {
                 }
                 let list = self.eval_list(call, 1)?;
                 let block = self.list_block(&list, call.span)?;
-                for i in 1..=count {
-                    self.tick(call.span)?;
-                    self.repcounts.push(i);
-                    let r = self.run_block(&block, false);
-                    self.repcounts.pop();
-                    r?;
-                }
-                Ok(None)
+                self.counting(&call.name, Some(count), true, |it| {
+                    for i in 1..=count {
+                        it.tick(call.span)?;
+                        it.set_count(i);
+                        it.run_block(&block, false)?;
+                    }
+                    Ok(None)
+                })
             }
             Imp::Forever => {
                 let list = self.eval_list(call, 0)?;
                 let block = self.list_block(&list, call.span)?;
-                for i in 1.. {
-                    self.tick(call.span)?;
-                    self.repcounts.push(i);
-                    let r = self.run_block(&block, false);
-                    self.repcounts.pop();
-                    r?;
-                }
-                unreachable!("FOREVER only ends with an error, STOP or a halt")
+                self.counting(&call.name, None, true, |it| {
+                    for i in 1.. {
+                        it.tick(call.span)?;
+                        it.set_count(i);
+                        it.run_block(&block, false)?;
+                    }
+                    unreachable!("FOREVER only ends with an error, STOP or a halt")
+                })
             }
             Imp::Stop => Err(Flow::Stop(call.span)),
             Imp::Output => {
@@ -811,6 +939,7 @@ impl Interpreter {
         &mut self,
         syms: &[Sym],
         values: Vec<Value>,
+        label: &Rc<str>,
         span: Span,
         f: impl FnOnce(&mut Interpreter) -> Result<T, Flow>,
     ) -> Result<T, Flow> {
@@ -818,13 +947,39 @@ impl Interpreter {
         for (&sym, v) in syms.iter().zip(values) {
             saved.push((sym, self.vars[sym as usize].replace(v)));
         }
-        self.frames.push(Frame { proc: None, call_span: span, saved });
+        self.frames.push(Frame { proc: None, label: Some(label.clone()), call_span: span, saved });
         let result = f(self);
         let frame = self.frames.pop().expect("pushed above");
         for (sym, old) in frame.saved.into_iter().rev() {
             self.vars[sym as usize] = old;
         }
         result
+    }
+
+    /// Runs `f` with a counter for the loop or template `name`, which
+    /// `set_count` moves on. `repcount` says whether `REPCOUNT` sees it.
+    pub(crate) fn counting<T>(
+        &mut self,
+        name: &Rc<str>,
+        of: Option<i64>,
+        repcount: bool,
+        f: impl FnOnce(&mut Interpreter) -> Result<T, Flow>,
+    ) -> Result<T, Flow> {
+        self.counters.push(Counter { name: name.clone(), count: 0, of, repcount });
+        let result = f(self);
+        self.counters.pop();
+        result
+    }
+
+    /// The innermost counter's pass.
+    pub(crate) fn set_count(&mut self, count: i64) {
+        self.counters.last_mut().expect("inside counting").count = count;
+    }
+
+    /// What `REPCOUNT` outputs: the innermost `REPEAT`, `FOREVER` or
+    /// template's pass.
+    pub(crate) fn repcount(&self) -> Option<i64> {
+        self.counters.iter().rev().find(|c| c.repcount).map(|c| c.count)
     }
 
     /// What a template's name stands for, if it's a procedure: for `APPLY
@@ -1000,7 +1155,7 @@ impl Interpreter {
         for (&sym, v) in proc.inputs.iter().zip(args) {
             saved.push((sym, self.vars[sym as usize].replace(v)));
         }
-        self.frames.push(Frame { proc: Some(proc.clone()), call_span: span, saved });
+        self.frames.push(Frame { proc: Some(proc.clone()), label: None, call_span: span, saved });
 
         let mut current = proc;
         // Set once any tail call was written as an instruction, after which

@@ -13,7 +13,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use pendown_logo::{Control, Event, Pen, Point, Span, SyncPoint};
+use pendown_logo::{Control, Event, Pen, Point, Span, SyncPoint, Watch};
 use pendown_logo::arc_point;
 use pendown_render::{Mark, Segment};
 
@@ -89,6 +89,8 @@ pub struct Frame {
     pub background: Option<[u8; 4]>,
     pub printed: Vec<String>,
     pub highlight_changed: bool,
+    /// The counters and variables changed this frame: see `Animator::watch`.
+    pub watch_changed: bool,
     /// Events taken this frame.
     pub events: usize,
 }
@@ -110,6 +112,9 @@ pub struct Animator {
     /// Whether the turtle sprite is shown.
     pub shown: bool,
     pub highlight: Option<Span>,
+    /// What the counters and variables panels show: the last `Watch` the
+    /// animator has reached, which belongs with the highlight (ADR 0022).
+    pub watch: Option<Arc<Watch>>,
     /// The last instruction hasn't moved or turned the turtle yet.
     idle_instruction: bool,
     /// The last event taken was an `Instruction` that starts a line, so a
@@ -141,6 +146,7 @@ impl Animator {
             heading: 0.0,
             shown: true,
             highlight: None,
+            watch: None,
             idle_instruction: false,
             after_line_start: false,
             shown_this_step: 0,
@@ -381,6 +387,20 @@ impl Animator {
                 }
                 Event::Rect { center, size, corner, heading, pen, fill } => {
                     self.start_shape(Mark::Rect { center, size, corner, heading, pen, fill });
+                }
+                Event::Watch(watch) => {
+                    // It belongs to the next instruction, so it waits for
+                    // the dwell on one that did nothing, as that does.
+                    if self.idle_instruction && !instant && self.mode != Mode::StepInstruction {
+                        self.idle_instruction = false;
+                        self.queue.push_front(Event::Watch(watch));
+                        out.events -= 1;
+                        self.current = Some(Current::Dwell { left: self.dwell() });
+                        continue;
+                    }
+                    self.watch = Some(watch);
+                    out.watch_changed = true;
+                    continue;
                 }
                 Event::Print(text) => out.printed.push(text),
                 Event::ShowTurtle => self.shown = true,

@@ -172,6 +172,64 @@ fn step_instruction_goes_inside_a_line() {
     assert_eq!(order, ["REPEAT 2 [FD 10 RT 90]", "FD 10", "RT 90", "FD 10", "RT 90", "PRINT \"done", "PRINT \"done"]);
 }
 
+/// The panels' contents, in short: the counters, then the variables.
+fn watched(animator: &Animator) -> String {
+    let Some(w) = &animator.watch else { return String::new() };
+    let mut parts: Vec<String> = w.counters.iter().map(|c| format!("{} {}", c.name, c.count)).collect();
+    for scope in &w.scopes {
+        for v in &scope.variables {
+            parts.push(format!("{}={}", v.name, v.value.as_deref().unwrap_or("-")));
+        }
+    }
+    parts.join(" ")
+}
+
+/// Phase 4 issue 03: stepping shows what each instruction sees, as it's
+/// highlighted.
+#[test]
+fn the_panels_keep_in_step_with_the_highlight() {
+    let src = "MAKE \"x 0\nREPEAT 2 [MAKE \"x :x + 5 FD 10]\nPRINT :x";
+    let (mut animator, _run) = start(src, Speed::Animated(1000.0));
+    animator.pause();
+    let mut seen = Vec::new();
+    for _ in 0..8 {
+        animator.step_instruction();
+        until_paused(&mut animator);
+        thread::sleep(Duration::from_millis(5));
+        seen.push(format!("{} | {}", highlighted(src, &animator), watched(&animator)));
+    }
+    assert_eq!(
+        seen,
+        [
+            "MAKE \"x 0 | ",
+            "REPEAT 2 [MAKE \"x :x + 5 FD 10] | x=0",
+            "MAKE \"x :x + 5 | REPEAT 1 x=0",
+            "FD 10 | REPEAT 1 x=5",
+            "MAKE \"x :x + 5 | REPEAT 2 x=5",
+            "FD 10 | REPEAT 2 x=10",
+            "PRINT :x | x=10",
+            "PRINT :x | x=10",
+        ]
+    );
+}
+
+/// At animated speeds, running freely, a value the program changes shows
+/// up with the instruction after the change.
+#[test]
+fn the_panels_follow_a_running_program() {
+    let src = "MAKE \"x 1\nFD 20\nMAKE \"x 2\nFD 20";
+    let (mut animator, _run) = start(src, Speed::Animated(200.0));
+    let mut seen: Vec<String> = Vec::new();
+    while !animator.finished() {
+        frame(&mut animator, FRAME);
+        let now = format!("{} | {}", highlighted(src, &animator), watched(&animator));
+        if seen.last() != Some(&now) {
+            seen.push(now);
+        }
+    }
+    assert_eq!(seen, ["MAKE \"x 1 | ", "FD 20 | x=1", "MAKE \"x 2 | x=1", "FD 20 | x=2"]);
+}
+
 #[test]
 fn step_line_runs_a_whole_repeat() {
     let src = "REPEAT 4 [FD 10 RT 90]\nPRINT \"done";
@@ -431,8 +489,9 @@ fn metrics_count_frames_and_events() {
     let m = &animator.metrics;
     assert!(m.frames.count() >= frames, "every frame is timed: {} of {frames}", m.frames.count());
     // REPEAT, then two each of FD and RT with their Instruction and Move or
-    // Turn, and a Sync at the start of the one line.
-    assert_eq!(m.events.get(), 10);
+    // Turn, and a Sync at the start of the one line. Four Watches: at
+    // REPEAT, at each FD as the counter moves on, and at the end.
+    assert_eq!(m.events.get(), 14);
     let interp = &run.control.metrics;
     assert_eq!(interp.lockstep.count(), 1, "one line, one Sync");
     assert_eq!(interp.instructions.get(), 7, "REPEAT, its 2 passes, and 2 each of FD and RT");

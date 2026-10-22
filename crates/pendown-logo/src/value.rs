@@ -121,7 +121,7 @@ impl Value {
                 if i > 0 {
                     out.push(' ');
                 }
-                if style.width.is_some_and(|width| i >= width) {
+                if style.width.is_some_and(|width| i >= width) || style.length.is_some_and(|length| out.len() >= length) {
                     out.push_str("...");
                     break;
                 }
@@ -166,6 +166,9 @@ pub struct Style {
     pub width: Option<usize>,
     /// The empty word prints as `||`.
     pub full: bool,
+    /// Stop with `...` once this many bytes are written, for the variables
+    /// panel. `PRINT` has no such limit.
+    pub length: Option<usize>,
 }
 
 /// `EQUALP`: numbers compare numerically, rounded to 15 significant digits,

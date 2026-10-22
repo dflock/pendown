@@ -5,13 +5,14 @@ mod autotest;
 mod canvas;
 mod files;
 mod highlighter;
+mod icons;
 mod panes;
 mod watching;
 
 use gpui_kit::*;
 
 fn main() {
-    gpui_kit::application().run(|cx| {
+    gpui_kit::application().with_assets(icons::AppAssets).run(|cx| {
         gpui_kit::init(cx);
         files::bind_keys(cx);
         // Closing the window ends the app.

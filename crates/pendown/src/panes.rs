@@ -13,7 +13,7 @@ use gpui_kit::component::{
     input::{Editor, EditorState, Input, InputState, Textarea, TextareaState},
     slider::{Slider, SliderState},
 };
-use gpui_kit::*;
+use gpui_kit::{assets::IconName, *};
 use pendown::{animator::Speed, metrics::WindowMetrics, run::DEFAULT_CHANNEL, speed::describe};
 
 use crate::{app::App, files::After};
@@ -130,11 +130,12 @@ impl ToolbarPane {
     fn button(
         &self,
         id: &'static str,
+        icon: IconName,
         label: &'static str,
         f: impl Fn(&mut App, &mut Window, &mut Context<App>) + 'static,
     ) -> Button {
         let app = self.app.clone();
-        Button::new(id).small().label(label).on_click(move |_, window, cx| {
+        Button::new(id).small().icon(icon).label(label).on_click(move |_, window, cx| {
             app.update(cx, |this, cx| f(this, window, cx)).ok();
         })
     }
@@ -146,21 +147,21 @@ impl Render for ToolbarPane {
         h_flex()
             .gap_2()
             .size_full()
-            .child(self.button("new", "New", |this, window, cx| this.then(After::NewFile, window, cx)).ghost())
-            .child(self.button("open", "Open", |this, window, cx| this.then(After::OpenFile, window, cx)).ghost())
-            .child(self.button("save", "Save", |this, window, cx| this.save(After::Nothing, window, cx)).ghost())
-            .child(self.button("export", "Export PNG", |this, window, cx| this.export(window, cx)).ghost())
+            .child(self.button("new", IconName::FilePlus, "New", |this, window, cx| this.then(After::NewFile, window, cx)).ghost())
+            .child(self.button("open", IconName::FolderOpen, "Open", |this, window, cx| this.then(After::OpenFile, window, cx)).ghost())
+            .child(self.button("save", IconName::Save, "Save", |this, window, cx| this.save(After::Nothing, window, cx)).ghost())
+            .child(self.button("export", IconName::ImageDown, "Export PNG", |this, window, cx| this.export(window, cx)).ghost())
             .child(div().w(px(12.)))
-            .child(self.button("run", "Run", |this, _, cx| this.start(DEFAULT_CHANNEL, cx)).primary())
+            .child(self.button("run", IconName::Play, "Run", |this, _, cx| this.start(DEFAULT_CHANNEL, cx)).primary())
             .child(
-                self.button("pause", if paused { "Resume" } else { "Pause" }, |this, _, cx| this.toggle_pause(cx))
+                self.button("pause", if paused { IconName::Play } else { IconName::Pause }, if paused { "Resume" } else { "Pause" }, |this, _, cx| this.toggle_pause(cx))
                     .disabled(!running),
             )
-            .child(self.button("step", "Step", |this, _, cx| this.step(false, cx)).disabled(!paused))
+            .child(self.button("step", IconName::StepForward, "Step", |this, _, cx| this.step(false, cx)).disabled(!paused))
             .child(
-                self.button("step-instruction", "Step instruction", |this, _, cx| this.step(true, cx)).disabled(!paused),
+                self.button("step-instruction", IconName::Footprints, "Step instruction", |this, _, cx| this.step(true, cx)).disabled(!paused),
             )
-            .child(self.button("stop", "Stop", |this, _, cx| this.stop(cx)).danger().disabled(!running))
+            .child(self.button("stop", IconName::Square, "Stop", |this, _, cx| this.stop(cx)).danger().disabled(!running))
             .child(div().w(px(16.)))
             .child(div().w(px(160.)).child(Slider::new(&self.slider)))
             .child(div().w(px(10.)))

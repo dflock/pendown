@@ -53,6 +53,8 @@ Done: see `.scratch/phase-2/` and ADR 0021.
 
 ### Phase 3: Performance (no new commands)
 
+Done: see `.scratch/phase-3/` and ADR 0020. The cause was the window, not the interpreter: every frame laid out and painted the whole window, and slow runs drew 60 frames a second when the picture changed far less often. A slow run now uses about a fifth of the UI time it did, and Instant is as fast as before.
+
 While a program runs, Pendown keeps one CPU core fully busy, even at slow speeds where the turtle barely moves. Rather than a one-off fix, this phase builds in measurement that stays (ADR 0020), so the cause shows up now and regressions show up later.
 
 - **A `metrics` module** in each crate that does work: counters and timings cheap enough to leave in, kept as atomics and read by whoever reports them.

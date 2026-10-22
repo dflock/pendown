@@ -49,7 +49,7 @@ cargo run --release -p pendown
 
 Run the tests with `cargo test`. Debug builds work too, but drawing is much faster in release.
 
-`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, stepping, stopping, the console, files, errors and filled shapes. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
+`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, stepping, stopping, the console, files, errors, filled shapes, and how often the window redraws. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
 
 Type a program in the editor and press **Run**. Use the speed slider to choose how fast the turtle draws. Try the console too: after a run, it knows every procedure your program defined, so you can type `FLOWER 80` and watch.
 
@@ -61,6 +61,29 @@ Type a program in the editor and press **Run**. Use the speed slider to choose h
 cargo run --release -p pendown-cli -- flower.logo --output flower.png --size 800x600
 ```
 
+### Performance
+
+Pendown measures itself all the time (ADR 0020).
+
+- **Metrics are on in debug builds and off in release.** `PENDOWN_METRICS=1` turns them on, and `PENDOWN_METRICS=0` off.
+- **When a run ends,** the app prints a summary on stderr, such as:
+
+  ```
+  run 5.0 s: 58 renders at 12/s (editor 7, console 2), UI 5.28 ms a frame (ours 0.17 ms, canvas 0.18 ms, animator 0.01 ms); ...; CPU UI 6% interpreter 0% other 1%
+  ```
+
+  It shows how often the window redrew and what each frame cost, what the interpreter did and how long it waited, and each thread's share of a CPU. The CLI prints its own.
+- **F12 shows the same numbers live,** over the canvas, in any build.
+- **`cargo test` checks budgets** that don't depend on the machine, such as how many frames a slow run takes.
+- **`perf` times fixed programs** and compares them with `perf/baseline.json`. It fails if anything is more than 20% slower. Run it before merging to main:
+
+  ```sh
+  cargo run --release -p pendown-perf             # compare with the baseline
+  cargo run --release -p pendown-perf -- --save   # a new baseline, in a commit of its own saying why
+  ```
+
+  A baseline belongs to one machine. On another, `perf` says so and doesn't fail.
+
 ## What's in the box
 
 | Crate | What it is |
@@ -69,6 +92,7 @@ cargo run --release -p pendown-cli -- flower.logo --output flower.png --size 800
 | `pendown-cli` | Runs programs from the command line and renders them to images |
 | `pendown-logo` | The Logo interpreter, as a library with no GUI code |
 | `pendown-render` | Draws the turtle's moves into a picture, for the app and the CLI |
+| `pendown-perf` | The `perf` binary: timings against a baseline |
 
 The crates are in `crates/`. `spikes/` holds the experiments made before phase 1, kept as a record; each builds on its own.
 

@@ -147,8 +147,9 @@ pub fn count(n: u64) -> String {
 impl Interval {
     /// Each render's average time, which is the average of every frame's
     /// work on the UI thread: `cpu.main` per render, and our share of it.
+    /// Zero if there were no renders.
     pub fn per_render(&self, d: Duration) -> Duration {
-        d.checked_div(self.renders.max(1) as u32).unwrap_or_default()
+        d.checked_div(self.renders as u32).unwrap_or_default()
     }
 
     /// The UI thread's CPU time for each render, the number that says
@@ -242,5 +243,7 @@ mod tests {
         assert!(summary.starts_with("run 2.0 s: 100 renders at 50/s (editor 0, console 0), UI 5.00 ms a frame (ours 0.30 ms"), "{summary}");
         assert!(summary.contains("2.0 M instructions at 1.0 M/s"), "{summary}");
         assert!(summary.ends_with("CPU UI 25% interpreter 2% other 0%"), "{summary}");
+        let none = Interval { renders: 0, ..interval };
+        assert!(none.summary().contains("UI 0.00 ms a frame"), "no renders, no frames to cost");
     }
 }

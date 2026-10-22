@@ -5,8 +5,10 @@
 //! use it.
 
 mod mark;
+pub mod metrics;
 
 pub use mark::Mark;
+pub use metrics::DrawingMetrics;
 
 use std::{
     io::Cursor,
@@ -69,6 +71,7 @@ pub struct Drawing {
     /// mode's frames.
     pub per_segment: Duration,
     pub last_draw: Duration,
+    pub metrics: DrawingMetrics,
 }
 
 fn settings(threads: u16) -> RenderSettings {
@@ -101,6 +104,7 @@ impl Drawing {
             threads,
             per_segment: Duration::from_micros(2),
             last_draw: Duration::ZERO,
+            metrics: DrawingMetrics::default(),
         }
     }
 
@@ -138,7 +142,9 @@ impl Drawing {
         self.fill_background();
         let display = std::mem::take(&mut self.display);
         let already_drawn = display.len() - self.pending.len();
+        let started = self.metrics.rerenders.start();
         self.draw(&display[..already_drawn]);
+        self.metrics.rerenders.stop(started);
         self.display = display;
     }
 
@@ -192,6 +198,7 @@ impl Drawing {
         self.draw(&display);
         self.display = display;
         self.pending.clear();
+        self.metrics.rerenders.record(started.elapsed());
         Some(started.elapsed())
     }
 
@@ -207,7 +214,13 @@ impl Drawing {
     /// Draws everything pushed since the last call.
     pub fn draw_pending(&mut self) {
         let pending = std::mem::take(&mut self.pending);
+        if pending.is_empty() {
+            return;
+        }
+        let started = self.metrics.drawing.start();
         self.draw(&pending);
+        self.metrics.drawing.stop(started);
+        self.metrics.marks.add(pending.len() as u64);
     }
 
     fn draw(&mut self, marks: &[Mark]) {
@@ -281,6 +294,7 @@ impl Drawing {
                 tiles.push(self.tile(index));
             }
         }
+        self.metrics.tiles.add(tiles.len() as u64);
         tiles
     }
 
@@ -323,9 +337,11 @@ impl Drawing {
 
     /// The drawing as a PNG file.
     pub fn png(&self) -> Vec<u8> {
+        let started = self.metrics.png.start();
         let image = image::RgbaImage::from_raw(self.width, self.height, self.rgba()).expect("buffer matches size");
         let mut out = Cursor::new(Vec::new());
         image.write_to(&mut out, image::ImageFormat::Png).expect("PNG encoding to memory can't fail");
+        self.metrics.png.stop(started);
         out.into_inner()
     }
 }
@@ -355,6 +371,29 @@ mod tests {
         assert_eq!(d.pixel(500, 500), [255, 0, 0, 255], "on the line");
         assert_eq!(d.pixel(500, 520), BACKGROUND, "off the line");
         assert_eq!(d.pixel(250, 500), BACKGROUND, "past its end");
+    }
+
+    #[test]
+    fn metrics_count_marks_tiles_and_rerenders() {
+        pendown_logo::metrics::set_enabled(true);
+        let mut d = Drawing::new();
+        d.resize(1000, 1000);
+        assert_eq!(d.take_dirty_tiles().len(), 16, "a new buffer is all new");
+        // A short line at the centre, which is at x 500, crosses from the
+        // tile ending at 511 into the next.
+        let line = |y| Segment { from: p(-10.0, y), to: p(10.0, y), pen: WHITE }.into();
+        d.push(&[line(0.0), line(1.0)]);
+        d.draw_pending();
+        assert_eq!(d.take_dirty_tiles().len(), 2);
+        // Nothing new: nothing drawn, nothing to upload.
+        d.draw_pending();
+        assert_eq!(d.take_dirty_tiles().len(), 0);
+        let m = &d.metrics;
+        assert_eq!((m.marks.get(), m.drawing.count(), m.tiles.get()), (2, 1, 18));
+        d.resize(500, 500);
+        d.set_background([0, 0, 255, 255]);
+        assert_eq!(d.metrics.rerenders.count(), 3, "two resizes and a new background");
+        assert_eq!(d.metrics.marks.get(), 2, "re-renders aren't new marks");
     }
 
     #[test]

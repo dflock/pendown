@@ -17,6 +17,8 @@ use pendown_logo::{Control, Event, Pen, Point, Span, SyncPoint};
 use pendown_logo::arc_point;
 use pendown_render::{Mark, Segment};
 
+use crate::metrics::AnimatorMetrics;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Speed {
     Instant,
@@ -117,6 +119,7 @@ pub struct Animator {
     /// The interpreter has finished, and every event has been taken.
     disconnected: bool,
     pub stopped: bool,
+    pub metrics: AnimatorMetrics,
 }
 
 impl Animator {
@@ -141,6 +144,7 @@ impl Animator {
             instructions_shown: 0,
             disconnected: false,
             stopped: false,
+            metrics: AnimatorMetrics::default(),
         };
         animator.control.speed.store(crate::speed::speed_level(speed), Ordering::Relaxed);
         animator.update_lockstep();
@@ -253,6 +257,14 @@ impl Animator {
     /// Plays one frame's worth of events. `dt` is the time since the last
     /// frame.
     pub fn frame(&mut self, dt: Duration, max_marks: usize) -> Frame {
+        let timing = self.metrics.frames.start();
+        let out = self.play(dt, max_marks);
+        self.metrics.frames.stop(timing);
+        self.metrics.events.add(out.events as u64);
+        out
+    }
+
+    fn play(&mut self, dt: Duration, max_marks: usize) -> Frame {
         let started = Instant::now();
         let mut out = Frame::default();
         let instant = self.speed == Speed::Instant;

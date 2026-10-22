@@ -417,3 +417,23 @@ fn setspeed_changes_the_speed_where_it_runs() {
     assert_eq!(changed, Some(Speed::Animated(20.0)), "level 3 is 20 steps a second");
     assert_eq!(animator.speed(), Speed::Animated(20.0));
 }
+
+#[test]
+fn metrics_count_frames_and_events() {
+    pendown_logo::metrics::set_enabled(true);
+    let src = "REPEAT 2 [FD 50 RT 90]";
+    let (mut animator, run) = start(src, Speed::Animated(100.0));
+    let mut frames = 0;
+    while !animator.finished() {
+        frame(&mut animator, FRAME);
+        frames += 1;
+    }
+    let m = &animator.metrics;
+    assert!(m.frames.count() >= frames, "every frame is timed: {} of {frames}", m.frames.count());
+    // REPEAT, then two each of FD and RT with their Instruction and Move or
+    // Turn, and a Sync at the start of the one line.
+    assert_eq!(m.events.get(), 10);
+    let interp = &run.control.metrics;
+    assert_eq!(interp.lockstep.count(), 1, "one line, one Sync");
+    assert_eq!(interp.instructions.get(), 7, "REPEAT, its 2 passes, and 2 each of FD and RT");
+}

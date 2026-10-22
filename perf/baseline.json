@@ -1,0 +1,16 @@
+{
+  "machine": "Intel(R) Core(TM) i7-6700K CPU @ 4.00GHz, 8 CPUs, linux",
+  "results_ms": {
+    "interpreter: REPEAT [FD 1 RT 1], no events": 138.56,
+    "interpreter: REPEAT [FD 1 RT 1], with Instruction events": 139.04,
+    "interpreter: REPEAT [FD 1 RT 1], batches through a channel": 196.55,
+    "interpreter: tail-recursive loop": 181.42,
+    "interpreter: FIB 25": 75.09,
+    "interpreter: MAP and FOREACH over 300,000 members": 106.58,
+    "renderer: draw the 131,070-line tree": 65.03,
+    "renderer: the tree as a 3000 × 3000 PNG": 53.83,
+    "animator: the tree at Instant": 85.13,
+    "animator: 5,000 lines in lockstep": 55.11,
+    "end to end: the tree at Instant, drawn and uploaded": 145.71
+  }
+}

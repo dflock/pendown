@@ -73,6 +73,7 @@ logo {
         """
         desc "outputs an array of size members (must be a positive integer), each of which initially is an empty list. Array members can be selected with ITEM and changed with SETITEM. The first member of the array is member number 1 unless an origin input (must be an integer) is given, in which case the first member of the array has that number as its index. (Typically 0 is used as the origin if anything.) Arrays are printed by PRINT and friends, and can be typed in, inside curly braces; indicate an origin with {a b c}@0."
         see "item" "setitem"
+        differs "Refuses to make more than 10 million members, so a typo such as ISEQ 1 1e12 is an error instead of running out of memory."
         supported #true
         obsolete #false
         phase 2
@@ -87,6 +88,7 @@ logo {
 
         Ex: (MDARRAY [3 5] 0) outputs a two-dimensional array whose members range from [0 0] to [2 4].
         """
+        differs "Refuses to make more than 10 million members, so a typo such as ISEQ 1 1e12 is an error instead of running out of memory."
         supported #true
         obsolete #false
         phase 2
@@ -1408,6 +1410,7 @@ logo {
             ? show iseq 7 3
             [7 6 5 4 3]
         """
+        differs "Refuses to make more than 10 million members, so a typo such as ISEQ 1 1e12 is an error instead of running out of memory."
         supported #true
         obsolete #false
         phase 2
@@ -1422,6 +1425,7 @@ logo {
             ? show rseq 3 5 5
             [3 3.5 4 4.5 5]
         """
+        differs "Refuses to make more than 10 million members, so a typo such as ISEQ 1 1e12 is an error instead of running out of memory."
         supported #true
         obsolete #false
         phase 2

@@ -19,6 +19,7 @@ The rest of the control commands needed a decision too: whether they're built in
   - Two arrays are `EQUALP` only if they're the same array.
   - `SETITEM` and `MDSETITEM` refuse to put an array inside itself, so printing and comparing can't loop forever.
   - The reader reads `{a b c}` and `{a b c}@0`. Arrays print in braces, even from `PRINT`.
+  - `ARRAY`, `MDARRAY`, `ISEQ` and `RSEQ` refuse to make more than 10 million members, so a typo such as `ISEQ 1 1e12` is an error instead of running out of memory.
 - **Templates come in UCBLogo's four forms:**
   - a procedure's name;
   - an explicit-slot list, using `?`, `?1` (read as `(? 1)`), `?REST` and `#`;

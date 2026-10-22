@@ -16,6 +16,7 @@ use crate::{
     error::{CallSite, Error, RunError},
     colour::{PALETTE, Rgba},
     event::{Event, EventSink, Pen, Point, SyncPoint},
+    metrics::InterpreterMetrics,
     geometry::{Area, TurtleMode},
     random::Random,
     names::{Names, Sym},
@@ -165,7 +166,11 @@ pub struct Control {
     /// GUI keeps it up to date; 0 means there's no slider, as in the CLI,
     /// and `SPEED` outputs 11.
     pub speed: AtomicU8,
+    pub metrics: InterpreterMetrics,
 }
+
+/// How often, in instructions, the count is published.
+const PUBLISH_EVERY: u64 = 4096;
 
 /// The special variables (issue 03): ordinary variables that change how
 /// Pendown behaves, interned once.
@@ -229,6 +234,8 @@ pub struct Interpreter {
     false_word: Value,
     pub limits: Limits,
     pub stats: Stats,
+    /// `stats.instructions` when the current job began.
+    job_start: u64,
 }
 
 /// The address of something on the stack, for measuring how much is used.
@@ -298,6 +305,7 @@ impl Interpreter {
             false_word: Value::word("false"),
             limits: Limits::default(),
             stats: Stats::default(),
+            job_start: 0,
         };
         it.grow();
         it.set_specials();
@@ -444,11 +452,20 @@ impl Interpreter {
     }
 
     fn run_source(&mut self, text: &str, source: SourceId) -> Result<(), RunError> {
+        let started = self.control.metrics.running.start();
+        self.job_start = self.stats.instructions;
         let result = self.run_source_unflushed(text, source);
-        match self.sink.flush() {
+        let result = match self.sink.flush() {
             Ok(()) => result,
             Err(_) => Err(RunError::Halted),
-        }
+        };
+        self.publish_instructions();
+        self.control.metrics.running.stop(started);
+        result
+    }
+
+    fn publish_instructions(&self) {
+        self.control.metrics.instructions.set(self.stats.instructions - self.job_start);
     }
 
     fn run_source_unflushed(&mut self, text: &str, source: SourceId) -> Result<(), RunError> {
@@ -545,6 +562,9 @@ impl Interpreter {
             return Err(Flow::Halt);
         }
         self.stats.instructions += 1;
+        if self.stats.instructions.is_multiple_of(PUBLISH_EVERY) {
+            self.publish_instructions();
+        }
         if let Some(max) = self.limits.max_instructions
             && self.stats.instructions > max
         {
@@ -579,7 +599,10 @@ impl Interpreter {
         let (tx, rx) = mpsc::sync_channel(1);
         self.emit(Event::Sync(SyncPoint(tx)))?;
         self.sink.flush().map_err(|_| Flow::Halt)?;
-        rx.recv().map_err(|_| Flow::Halt)?;
+        let waiting = self.control.metrics.lockstep.start();
+        let reply = rx.recv();
+        self.control.metrics.lockstep.stop(waiting);
+        reply.map_err(|_| Flow::Halt)?;
         if self.control.cancel.load(Ordering::Relaxed) {
             return Err(Flow::Halt);
         }

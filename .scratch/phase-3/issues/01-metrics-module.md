@@ -1,6 +1,6 @@
 # The metrics module
 
-Status: ready-for-agent
+Status: done
 Type: task
 
 ## What
@@ -13,3 +13,9 @@ Type: task
 ## Done when
 
 Unit tests cover the flag's parsing, counters and timers, and finding the test's own thread's CPU time.
+
+## Comments
+
+### 2026-10-22: done
+
+`pendown_logo::metrics`: `enabled()` and `set_enabled()`, `Counter`, `Timer`, `ThreadCpu` (main, interpreter, other) and `this_thread_cpu()`, all from `schedstat` in nanoseconds. Unit tests in the module.

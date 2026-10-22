@@ -1,10 +1,10 @@
 use std::{
     fmt,
-    sync::mpsc::SyncSender,
+    sync::{Arc, mpsc::SyncSender},
     time::{Duration, Instant},
 };
 
-use crate::span::Span;
+use crate::{interp::Control, span::Span};
 
 /// A point in turtle coordinates: y points up, and the turtle starts at 0, 0.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -124,11 +124,19 @@ pub struct BatchSender {
     size: usize,
     opened: Instant,
     max_wait: Duration,
+    /// Where to record time spent waiting on a full channel.
+    control: Option<Arc<Control>>,
 }
 
 impl BatchSender {
     pub fn new(tx: SyncSender<Vec<Event>>, size: usize, max_wait: Duration) -> BatchSender {
-        BatchSender { tx, batch: Vec::with_capacity(size), size, opened: Instant::now(), max_wait }
+        BatchSender { tx, batch: Vec::with_capacity(size), size, opened: Instant::now(), max_wait, control: None }
+    }
+
+    /// Records the time spent waiting on a full channel in `control`'s
+    /// metrics.
+    pub fn measured(self, control: Arc<Control>) -> BatchSender {
+        BatchSender { control: Some(control), ..self }
     }
 }
 
@@ -151,6 +159,11 @@ impl EventSink for BatchSender {
             return Ok(());
         }
         let batch = std::mem::replace(&mut self.batch, Vec::with_capacity(self.size));
-        self.tx.send(batch).map_err(|_| Halted)
+        let waiting = self.control.as_ref().and_then(|c| c.metrics.channel.start());
+        let sent = self.tx.send(batch).map_err(|_| Halted);
+        if let Some(control) = &self.control {
+            control.metrics.channel.stop(waiting);
+        }
+        sent
     }
 }

@@ -1,6 +1,6 @@
 # Interpreter metrics
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 01
 
@@ -11,3 +11,9 @@ In `Control`, which the interpreter and the GUI share: instructions run, time ru
 ## Done when
 
 Tests show the counts for a fixed program, and waits measured when the receiver is slow.
+
+## Comments
+
+### 2026-10-22: done
+
+`InterpreterMetrics` in `metrics.rs`, held by `Control`: instructions (published every 4,096 and at the end of a job), running, lockstep and channel timers. `BatchSender::measured` records the channel waits; the GUI's session uses it. Tests: `tests/metrics.rs`.

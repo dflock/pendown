@@ -15,6 +15,7 @@ mod error;
 mod event;
 mod geometry;
 mod interp;
+pub mod metrics;
 mod names;
 mod number;
 mod parse;

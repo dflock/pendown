@@ -97,7 +97,8 @@ impl Session {
                 it.limits.stack_bytes = Some(STACK);
                 // Jobs run one at a time, until the session is dropped.
                 for command in rx {
-                    let sink = BatchSender::new(command.events, command.channel.batch, command.channel.max_wait);
+                    let sink = BatchSender::new(command.events, command.channel.batch, command.channel.max_wait)
+                        .measured(command.control.clone());
                     it.set_output(Box::new(sink), command.control);
                     let result = match &command.job {
                         Job::Program(text) => it.run_program(text),

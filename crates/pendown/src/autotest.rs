@@ -13,6 +13,7 @@ use std::{
 use gpui_kit::*;
 use pendown::{
     animator::{Mode, Speed},
+    metrics::Snapshot,
     run::DEFAULT_CHANNEL,
     speed::level_speed,
 };
@@ -46,6 +47,10 @@ PU BK 450 PD
 SETPC 10
 TREE 230 16
 "#;
+
+/// At speed 3 it moves about 14 pixels a second, so it needs about that many
+/// frames a second, and prints now and then.
+const SLOW: &str = "REPEAT 8 [\n  FD 20\n  RT 45\n  PRINT REPCOUNT\n]";
 
 const ERRORS: &str = "TO BOX :n\n  FD :n RT 90\n  FD \"far\n  PRINT 1\nEND\nBOX 100";
 
@@ -101,6 +106,12 @@ enum Step {
     CheckExported(&'static str),
     /// The editor shows exactly these diagnostics.
     CheckDiagnostics(&'static [&'static str]),
+    /// Start counting renders and highlight changes.
+    MeasureRenders,
+    /// Since `MeasureRenders`: the window rendered at most this many times a
+    /// second, and at most once an animation frame; the editor only when the
+    /// highlight moved, and the console only when something was printed.
+    CheckRenders(f64),
     /// Press F12.
     ToggleMetrics,
     /// The metrics overlay is shown, with numbers in it, or isn't.
@@ -249,6 +260,13 @@ fn script() -> Vec<Step> {
         WaitFinished,
         CheckConsole("[0 FD doesn't like x as input [] 1]"),
         CheckConsole("Line 6: CHECK needs a positive number"),
+        Say("Phase 3: a slow run draws only the frames that change"),
+        Run(SLOW, level_speed(3)),
+        Wait(ms(300)),
+        MeasureRenders,
+        Wait(ms(3000)),
+        CheckRenders(25.0),
+        Stop,
         Say("Phase 3: the metrics overlay"),
         ToggleMetrics,
         Run("REPEAT 36 [REPEAT 4 [FD 200 RT 90] RT 10]", level_speed(10)),
@@ -272,6 +290,9 @@ pub struct Autotest {
     screenshots: usize,
     trace: Option<Vec<String>>,
     track: Option<Vec<(Instant, f64)>>,
+    /// The metrics, highlight changes and console lines when `MeasureRenders` ran.
+    measuring: Option<(Snapshot, u64, usize)>,
+    highlights: u64,
 }
 
 impl Autotest {
@@ -289,6 +310,8 @@ impl Autotest {
             screenshots: 0,
             trace: None,
             track: None,
+            measuring: None,
+            highlights: 0,
         })
     }
 }
@@ -320,6 +343,9 @@ impl App {
 
     /// Called whenever the highlight moves.
     pub(crate) fn on_highlight(&mut self) {
+        if let Some(auto) = &mut self.autotest {
+            auto.highlights += 1;
+        }
         let text = self.highlighted();
         if let Some(trace) = self.autotest.as_mut().and_then(|a| a.trace.as_mut()) {
             trace.push(text);
@@ -479,6 +505,32 @@ impl App {
                 Step::CheckConsole(expected) => {
                     let found = self.console.iter().any(|l| l.as_ref() == expected);
                     self.check(found, format!("the console shows {expected:?}"));
+                }
+                Step::MeasureRenders => {
+                    pendown_logo::metrics::set_enabled(true);
+                    let start = (self.snapshot(), self.autotest.as_ref().unwrap().highlights, self.console.len());
+                    self.autotest.as_mut().unwrap().measuring = Some(start);
+                }
+                Step::CheckRenders(per_second) => {
+                    let auto = self.autotest.as_mut().unwrap();
+                    let (start, highlights, lines) = auto.measuring.take().expect("MeasureRenders came first");
+                    let highlights = auto.highlights - highlights;
+                    let printed = self.console.len().saturating_sub(lines) as u64;
+                    let i = self.snapshot().since(&start);
+                    let rate = i.renders as f64 / i.wall.as_secs_f64();
+                    // A frame or two more, for the renders that start and
+                    // end the measurement.
+                    self.check(
+                        rate <= per_second && i.renders <= i.frames + 2,
+                        format!("{} renders at {rate:.0}/s, for {} animation frames", i.renders, i.frames),
+                    );
+                    self.check(
+                        i.editor_renders <= highlights + 2 && i.console_renders <= printed + 2,
+                        format!(
+                            "the editor rendered {} times for {highlights} highlight changes, the console {} times for {printed} lines",
+                            i.editor_renders, i.console_renders
+                        ),
+                    );
                 }
                 Step::ToggleMetrics => self.toggle_metrics(window, cx),
                 Step::CheckOverlay(shown) => {

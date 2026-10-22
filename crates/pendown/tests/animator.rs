@@ -473,3 +473,83 @@ fn next_change_is_when_the_picture_moves_a_pixel() {
     frame(&mut animator, FRAME);
     assert_eq!(animator.next_change(0.5, 18.0), Duration::ZERO);
 }
+
+/// Budgets (phase 3 issue 06) for what doesn't depend on the machine.
+/// Changing one is a deliberate change in its own commit, saying why.
+mod budgets {
+    use super::*;
+    use pendown::animator::MAX_FRAME_GAP;
+    use pendown_render::Drawing;
+
+    /// The canvas's scale in the scripted session's window: 690 pixels for
+    /// 1000 steps.
+    const PX_PER_STEP: f64 = 0.69;
+    const DISPLAY_FRAME: Duration = Duration::from_micros(16_667);
+
+    /// Plays `src` as the window does, a frame at a time, waiting as long as
+    /// `next_change` says. Returns the frames it took, and the tiles
+    /// uploaded on frames where nothing was drawn.
+    fn play(src: &str, speed: Speed) -> (u64, u64) {
+        let mut drawing = Drawing::new();
+        drawing.resize(690, 690);
+        drawing.take_dirty_tiles();
+        let (mut animator, _run) = start(src, speed);
+        let (mut frames, mut wasted) = (0, 0);
+        let mut dt = DISPLAY_FRAME;
+        while !animator.finished() {
+            let out = frame(&mut animator, dt);
+            frames += 1;
+            assert!(frames < 100_000, "{src} never finished");
+            drawing.push(&out.marks);
+            drawing.draw_pending();
+            let tiles = drawing.take_dirty_tiles().len() as u64;
+            if out.marks.is_empty() {
+                wasted += tiles;
+            }
+            dt = animator.next_change(PX_PER_STEP, 18.0).max(DISPLAY_FRAME);
+        }
+        (frames, wasted)
+    }
+
+    #[test]
+    fn a_slow_run_draws_a_frame_for_each_pixel_or_so() {
+        // 400 steps at 20 steps a second is 20 s, 1,200 frames at 60 a
+        // second. At 0.69 pixels a step the lines grow 14 pixels a second,
+        // so about 280 frames, and the turns about another 120.
+        let (frames, wasted) = play("REPEAT 4 [FD 100 RT 90]", Speed::Animated(20.0));
+        assert!(frames <= 450, "{frames} frames");
+        assert_eq!(wasted, 0, "tiles uploaded on frames that drew nothing");
+    }
+
+    #[test]
+    fn a_wait_takes_ten_frames_a_second() {
+        let (frames, _) = play("WAIT 120", Speed::Animated(20.0));
+        let expected = (2.0 / MAX_FRAME_GAP.as_secs_f64()) as u64;
+        assert!(frames <= expected + 5, "a 2 s WAIT took {frames} frames");
+    }
+
+    #[test]
+    fn a_fast_run_draws_every_frame() {
+        // At 2,560 steps a second each frame moves the turtle well over a
+        // pixel: 400 steps in about 10 frames.
+        let (frames, wasted) = play("REPEAT 4 [FD 100 RT 90]", Speed::Animated(2560.0));
+        assert!((10..=40).contains(&frames), "{frames} frames");
+        assert_eq!(wasted, 0);
+    }
+
+    #[test]
+    fn paused_and_finished_runs_want_no_frames() {
+        let (mut animator, _run) = start("FD 100", Speed::Animated(20.0));
+        frame(&mut animator, FRAME);
+        animator.pause();
+        assert!(!animator.wants_frames());
+        let out = animator.frame(FRAME, usize::MAX);
+        assert_eq!((out.events, out.marks.len()), (0, 0), "a paused frame takes nothing");
+        animator.resume();
+        while !animator.finished() {
+            frame(&mut animator, MAX_FRAME_GAP);
+        }
+        assert!(!animator.wants_frames());
+        assert_eq!(animator.frame(FRAME, usize::MAX).events, 0);
+    }
+}

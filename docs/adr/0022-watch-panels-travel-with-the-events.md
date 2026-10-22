@@ -18,6 +18,7 @@ The interpreter runs on its own thread, ahead of the animator by up to a channel
   - **At Instant:** before the next instruction after the animator asks, through `Control::watch`, which it does each frame. The panels then show what the interpreter sees, which may be ahead of the drawing, as pausing from Instant already is.
   - **At the end of each job,** with only the globals. After Stop nothing is listening, so the GUI drops the counters and scopes itself.
 - **The interpreter formats the values,** in short form: at most 4 lists deep, 20 members wide and 200 characters long, so a 300,000-member list costs no more than a short one.
+- **It carries the pen, fill and background colours too,** in the form they were set and as RGBA for a swatch. They aren't variables, but they change as the program runs, so `SETPC` sends a new `Watch` as `MAKE` does.
 - **It finds the scopes from the shallow binding** (ADR 0007): `vars` holds what's visible, and each frame's saved values are what its own variables hid. A tail call shares its caller's frame, so the caller's variables show in the callee's scope.
 
 ## Consequences

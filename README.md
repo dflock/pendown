@@ -53,7 +53,7 @@ Run the tests with `cargo test`. Debug builds work too, but drawing is much fast
 
 Type a program in the editor and press **Run**. Use the speed slider to choose how fast the turtle draws. Try the console too: after a run, it knows every procedure your program defined, so you can type `FLOWER 80` and watch.
 
-While a program runs, the **Repeat counters** panel shows every `REPEAT`, `FOREVER`, `FOR` and `FOREACH` running, outermost first, such as `REPEAT 3 of 12`, and marks the one `REPCOUNT` would give. The **Variables** panel shows the globals, then each procedure in the call chain with its inputs and locals; a variable hidden by a later one with the same name is greyed out. At animated speeds, and when paused or stepping, they show exactly what the highlighted instruction sees. At Instant they keep up as best they can.
+While a program runs, the **Repeat counters** panel shows every `REPEAT`, `FOREVER`, `FOR` and `FOREACH` running, outermost first, such as `REPEAT 3 of 12`, and marks the one `REPCOUNT` would give. The **Variables** panel shows the globals, then each procedure in the call chain with its inputs and locals; a variable hidden by a later one with the same name is greyed out. Below them are the pen, fill and background colours, as they were set, each with a square of the colour. At animated speeds, and when paused or stepping, they show exactly what the highlighted instruction sees. At Instant they keep up as best they can.
 
 ### The CLI
 

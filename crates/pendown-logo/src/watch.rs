@@ -11,6 +11,19 @@ pub struct Watch {
     pub counters: Vec<Counter>,
     /// The globals, then each scope of the call chain, outermost first.
     pub scopes: Vec<Scope>,
+    /// The pen, fill and background colours, which aren't variables but
+    /// change as the program runs.
+    pub colours: Vec<Colour>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Colour {
+    /// The command that outputs it: `PENCOLOR`, `FILLCOLOR` or `BACKGROUND`.
+    pub name: String,
+    /// In the form it was set, as that command outputs it.
+    pub value: String,
+    /// What it looks like, or `None` for no fill.
+    pub rgba: Option<[u8; 4]>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

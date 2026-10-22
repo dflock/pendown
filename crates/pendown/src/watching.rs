@@ -15,7 +15,7 @@ use pendown_logo::{
 };
 
 /// How long a change flashes for.
-pub const FLASH: Duration = Duration::from_millis(700);
+pub const FLASH: Duration = Duration::from_millis(800);
 
 /// What the panels show, shared by both.
 #[derive(Default)]
@@ -26,6 +26,8 @@ pub struct Watched {
     counters_changed: Vec<Option<Instant>>,
     /// The same for each scope's variables.
     variables_changed: Vec<Vec<Option<Instant>>>,
+    /// The same for the colours.
+    colours_changed: Vec<Option<Instant>>,
 }
 
 impl Watched {
@@ -72,13 +74,27 @@ impl Watched {
                 .collect(),
             None => Vec::new(),
         };
+        let colours_changed = match &watch {
+            Some(new) => new
+                .colours
+                .iter()
+                .enumerate()
+                .map(|(i, c)| match old?.colours.get(i) {
+                    Some(b) if b == c => self.colours_changed[i],
+                    _ => Some(now),
+                })
+                .collect(),
+            None => Vec::new(),
+        };
         self.watch = watch;
         self.counters_changed = counters_changed;
         self.variables_changed = variables_changed;
+        self.colours_changed = colours_changed;
     }
 
     /// After Stop: the interpreter has unwound every procedure and loop, so
-    /// only the globals are left, with the values the panel already shows.
+    /// only the globals are left, with the values the panel already shows,
+    /// and the colours.
     pub fn stopped(&mut self) {
         let Some(watch) = &self.watch else { return };
         let globals: Vec<Scope> = watch
@@ -87,7 +103,7 @@ impl Watched {
             .filter(|s| s.kind == ScopeKind::Globals)
             .map(|s| Scope { variables: s.variables.iter().map(|v| Variable { hidden: false, ..v.clone() }).collect(), ..s.clone() })
             .collect();
-        let watch = Watch { counters: Vec::new(), scopes: globals };
+        let watch = Watch { counters: Vec::new(), scopes: globals, colours: watch.colours.clone() };
         self.set(Some(Arc::new(watch)));
     }
 }
@@ -187,23 +203,25 @@ impl Render for VariablesPane {
         let watched = self.watched.read(cx);
         self.drawn = watched.watch.clone();
         let scopes = watched.watch.as_ref().map_or(&[][..], |w| &w.scopes[..]);
+        let colours = watched.watch.as_ref().map_or(&[][..], |w| &w.colours[..]);
+        let heading = |text: String| div().px_2().pt_1().text_color(theme.muted_foreground).child(text).into_any_element();
         let mut rows: Vec<AnyElement> = Vec::new();
+        let empty_list = scopes.iter().all(|s| s.variables.is_empty()) && scopes.len() <= 1;
         for (i, scope) in scopes.iter().enumerate() {
-            // The globals only get a heading when there's a call chain.
-            if scope.kind != ScopeKind::Globals || scopes.len() > 1 {
-                let heading = match scope.kind {
-                    ScopeKind::Globals => "Globals".to_string(),
-                    ScopeKind::Procedure if scope.variables.is_empty() => format!("{} (no inputs)", scope.name),
-                    _ => scope.name.clone(),
-                };
-                rows.push(div().px_2().pt_1().text_color(theme.muted_foreground).child(heading).into_any_element());
+            rows.push(heading(match scope.kind {
+                ScopeKind::Globals => "Globals".to_string(),
+                ScopeKind::Procedure if scope.variables.is_empty() => format!("{} (no inputs)", scope.name),
+                _ => scope.name.clone(),
+            }));
+            if empty_list {
+                rows.push(empty("No variables", cx).pl_4().into_any_element());
             }
             for (j, v) in scope.variables.iter().enumerate() {
                 let value = v.value.clone().unwrap_or_else(|| "no value".into());
                 let row = h_flex()
                     .px_2()
+                    .pl_4()
                     .gap_2()
-                    .when(scope.kind != ScopeKind::Globals || scopes.len() > 1, |row| row.pl_4())
                     .when(v.hidden || v.value.is_none(), |row| row.text_color(theme.muted_foreground))
                     .child(div().flex_none().max_w(px(140.)).truncate().child(v.name.clone()))
                     .child(div().flex_1().min_w_0().truncate().child(value));
@@ -211,7 +229,25 @@ impl Render for VariablesPane {
                 rows.push(flashing(row, format!("variable-{i}-{}", v.name), changed));
             }
         }
-        let empty_list = scopes.iter().all(|s| s.variables.is_empty()) && scopes.len() <= 1;
+        // After the variables, which matter more in a short panel.
+        if !colours.is_empty() {
+            rows.push(heading("Colours".into()));
+        }
+        for (i, c) in colours.iter().enumerate() {
+            // A square of the colour, outlined so white shows. No fill has
+            // none.
+            let swatch = div().flex_none().size(px(10.)).when_some(c.rgba, |swatch, [r, g, b, a]| {
+                swatch.border_1().border_color(theme.muted_foreground).bg(rgba(u32::from_be_bytes([r, g, b, a])))
+            });
+            let row = h_flex()
+                .px_2()
+                .pl_4()
+                .gap_2()
+                .child(div().flex_none().w(px(80.)).child(c.name.clone()))
+                .child(swatch)
+                .child(div().flex_1().min_w_0().truncate().child(c.value.clone()));
+            rows.push(flashing(row, format!("colour-{i}"), watched.colours_changed.get(i).copied().flatten()));
+        }
         v_flex()
             .size_full()
             .child(title("Variables", cx))
@@ -223,7 +259,7 @@ impl Render for VariablesPane {
                     .overflow_y_scroll()
                     .font_family(theme.mono_font_family.clone())
                     .text_xs()
-                    .when(empty_list, |list| list.child(empty("No variables", cx)))
+                    .when(rows.is_empty(), |list| list.child(empty("No variables", cx)))
                     .children(rows),
             )
     }

@@ -9,7 +9,8 @@ There are no new Logo commands.
 - **Repeat counters:** every `REPEAT`, `FOREVER` and `FOR` running, and the templates that number their members (`FOREACH`, `MAP` and the rest, which `#` counts), outermost first, as `REPEAT 3 of 36`. The innermost one that `REPCOUNT` would output is marked.
 - **Variables:** what the running line can see. The globals, then each procedure in the call chain, outermost first, with its inputs and locals. `FOR`'s variable and a lambda template's inputs show as scopes of their own. A variable that a later scope hides is shown dimmed. Names keep the spelling of their definition (ADR 0004).
 - **In step:** at animated speeds, and while paused or stepping, the panels show exactly what the highlighted instruction sees. At Instant they update about once a frame, and may be ahead of the drawing. When a run ends they show what it left: the globals.
-- **Flashing:** a value, or a counter, that changed since the panel last updated flashes, and fades.
+- **Colours:** below the variables, the pen, fill and background colours, as they were set, each with a square of the colour (added after the phase, at the user's request).
+- **Flashing:** a value, a colour or a counter that changed since the panel last updated flashes, and fades over 0.8 s.
 - **Layout:** the console area is split into the console, the counters and the variables, resizable, and each panel scrolls.
 - **Cost:** `perf` stays within its baseline, and the budget tests still pass.
 

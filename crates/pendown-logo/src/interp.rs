@@ -662,7 +662,13 @@ impl Interpreter {
         globals.sort_by_cached_key(|v| v.name.to_lowercase());
         scopes.push(Scope { kind: ScopeKind::Globals, name: String::new(), variables: globals });
         scopes.reverse();
-        Watch { counters, scopes }
+        let colour = |name: &str, value: &Value, rgba| watch::Colour { name: name.into(), value: value.show_styled(style), rgba };
+        let colours = vec![
+            colour("PENCOLOR", &self.turtle.pen_colour, Some(self.turtle.pen.color)),
+            colour("FILLCOLOR", &self.turtle.fill_colour, self.turtle.fill),
+            colour("BACKGROUND", &self.background.1, Some(self.background.0)),
+        ];
+        Watch { counters, scopes, colours }
     }
 
     /// A special variable still at its starting value, which the panel

@@ -131,6 +131,8 @@ enum Step {
     CheckPanelsStart(&'static str),
     /// Both panels have drawn what they should show.
     CheckPanelsDrawn,
+    /// The variables panel shows these colours, as `PENCOLOR=red ...`.
+    CheckColours(&'static str),
     /// Press F12.
     ToggleMetrics,
     /// The metrics overlay is shown, with numbers in it, or isn't.
@@ -333,6 +335,11 @@ fn script() -> Vec<Step> {
         CheckPanelsStart("n="),
         Wait(ms(100)),
         CheckPanelsDrawn,
+        Say("Phase 4: the colours, with a square of each"),
+        Run("SETPC \"orange\nSETBG [20 40 80]\nSETFC \"#40c0ff80\nCIRCLE 100", Speed::Animated(200.0)),
+        WaitFinished,
+        CheckColours("PENCOLOR=orange FILLCOLOR=#40c0ff80 BACKGROUND=[20 40 80]"),
+        Screenshot("colours"),
         Quit,
     ]
 }
@@ -605,6 +612,13 @@ impl App {
                     let counters = same(&self.counters_pane.read(cx).drawn);
                     let variables = same(&self.variables_pane.read(cx).drawn);
                     self.check(counters && variables, format!("the counters drew the latest: {counters}, the variables: {variables}"));
+                }
+                Step::CheckColours(expected) => {
+                    let watch = self.watched.read(cx).watch.clone();
+                    let shown = watch.map_or(String::new(), |w| {
+                        w.colours.iter().map(|c| format!("{}={}", c.name, c.value)).collect::<Vec<_>>().join(" ")
+                    });
+                    self.check(shown == expected, format!("the colours are {shown:?}"));
                 }
                 Step::CheckPanelsStart(expected) => {
                     let shown = self.panels(cx);

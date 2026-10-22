@@ -225,3 +225,22 @@ fn the_cli_never_pays_for_watches() {
     let r = common::run("MAKE \"x 1 REPEAT 3 [FD 1]");
     assert!(!r.events.iter().any(|e| matches!(e, Event::Watch(_))));
 }
+
+#[test]
+fn colours_are_shown_as_set_with_what_they_look_like() {
+    let events = events("SETPC \"red\nSETBG [0 0 255]\nSETFC 2\nFD 1");
+    let colours = |w: &Watch| {
+        w.colours.iter().map(|c| format!("{}={} {:?}", c.name, c.value, c.rgba)).collect::<Vec<_>>().join(" ")
+    };
+    let watches: Vec<String> = events.iter().filter_map(|e| if let Event::Watch(w) = e { Some(colours(w)) } else { None }).collect();
+    assert_eq!(
+        watches.first().unwrap(),
+        "PENCOLOR=7 Some([255, 255, 255, 255]) FILLCOLOR=none None BACKGROUND=0 Some([0, 0, 0, 255])"
+    );
+    // A new Watch after each change, though no variable changed.
+    assert_eq!(watches.len(), 4, "{watches:#?}");
+    assert_eq!(
+        watches.last().unwrap(),
+        "PENCOLOR=red Some([255, 0, 0, 255]) FILLCOLOR=2 Some([0, 255, 0, 255]) BACKGROUND=[0 0 255] Some([0, 0, 255, 255])"
+    );
+}

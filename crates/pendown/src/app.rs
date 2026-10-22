@@ -22,7 +22,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{prelude::FluentBuilder as _, *};
 use pendown::{
-    animator::{Animator, Mode, Speed},
+    animator::{Animator, MAX_FRAME_GAP, Mode, Speed},
     console::{ConsoleInput, Submit, defines},
     document::Document,
     errors,
@@ -38,6 +38,7 @@ use crate::{
     files::{After, ExportPicture, NewFile, OpenFile, RunProgram, SaveFile, SaveFileAs, ToggleMetrics},
     highlighter::LogoHighlighter,
     panes::{ConsolePane, EditorPane, ToolbarPane, ToolbarState},
+    watching::{CountersPane, VariablesPane, Watched},
 };
 
 /// The program the editor starts with.
@@ -90,6 +91,10 @@ const AUTOTEST_EVERY: Duration = Duration::from_millis(5);
 /// status beside it.
 const TOOLBAR_HEIGHT: f32 = 41.0;
 const STATUS_WIDTH: f32 = 300.0;
+
+/// The console area's height, with the counters and variables beside the
+/// console.
+const CONSOLE_HEIGHT: f32 = 190.0;
 
 /// A change due sooner than this is left to the next animation frame.
 const FRAME_SOON: Duration = Duration::from_millis(12);
@@ -154,6 +159,10 @@ pub struct App {
     editor_pane: Entity<EditorPane>,
     console_pane: Entity<ConsolePane>,
     toolbar_pane: Entity<ToolbarPane>,
+    /// What the counters and variables panels show (phase 4).
+    pub(crate) watched: Entity<Watched>,
+    pub(crate) counters_pane: Entity<CountersPane>,
+    pub(crate) variables_pane: Entity<VariablesPane>,
     console_entry: ConsoleInput,
     /// Definitions typed at the console since the last Run, which "Copy to
     /// editor" keeps.
@@ -222,6 +231,9 @@ impl App {
         let app = cx.entity().downgrade();
         let toolbar = ToolbarState { running: false, paused: false, speed };
         let toolbar_pane = cx.new(|_| ToolbarPane::new(app.clone(), speed_slider.clone(), toolbar));
+        let watched = cx.new(|_| Watched::default());
+        let counters_pane = cx.new(|_| CountersPane::new(watched.clone()));
+        let variables_pane = cx.new(|_| VariablesPane::new(watched.clone()));
         window.on_window_should_close(cx, move |window, cx| {
             app.update(cx, |this, cx| this.should_close(window, cx)).unwrap_or(true)
         });
@@ -264,6 +276,9 @@ impl App {
             editor_pane,
             console_pane,
             toolbar_pane,
+            watched,
+            counters_pane,
+            variables_pane,
             console_entry: ConsoleInput::default(),
             console_definitions: Vec::new(),
             defining: None,
@@ -313,6 +328,8 @@ impl App {
             self.print("Run cleared the procedures you defined in the console. \"Copy to editor\" keeps them.");
         }
         self.set_diagnostics(Vec::new(), cx);
+        // Run clears the variables (ADR 0006).
+        self.show_watch(cx, |watched| watched.set(None));
         self.start_job(Job::Program(text), channel, cx);
     }
 
@@ -385,15 +402,27 @@ impl App {
         self.wake = None;
         let Some(animator) = self.animator.as_ref().filter(|a| a.wants_frames()) else { return };
         let px_per_step = self.canvas.borrow().drawing.scale();
-        let gap = animator.next_change(px_per_step, TURTLE_LENGTH as f64 * window.scale_factor() as f64);
+        let mut gap = animator.next_change(px_per_step, TURTLE_LENGTH as f64 * window.scale_factor() as f64);
         if gap < FRAME_SOON {
             window.request_animation_frame();
-            return;
+            // gpui can drop an animation frame, as when it throttles a window
+            // that isn't focused, and then nothing would wake the run: so a
+            // timer too, as a fallback.
+            gap = MAX_FRAME_GAP;
         }
         self.wake = Some(cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(gap).await;
             this.update(cx, |_, cx| cx.notify()).ok();
         }));
+    }
+
+    /// Changes what the counters and variables panels show, and redraws
+    /// them. They're cached views of `Watched`, and notifying it alone
+    /// doesn't redraw them.
+    fn show_watch(&mut self, cx: &mut Context<Self>, f: impl FnOnce(&mut Watched)) {
+        self.watched.update(cx, |watched, _| f(watched));
+        self.counters_pane.update(cx, |_, cx| cx.notify());
+        self.variables_pane.update(cx, |_, cx| cx.notify());
     }
 
     /// Prints the summary of the job that just ended on stderr.
@@ -408,6 +437,7 @@ impl App {
             && !animator.finished()
         {
             animator.stop();
+            self.show_watch(cx, Watched::stopped);
             self.stop_at = Some(Instant::now());
             self.print("Stopped.");
             self.report();
@@ -591,6 +621,13 @@ impl App {
             let max_marks = (INSTANT_DRAWING.as_nanos() / per_segment.as_nanos()).clamp(500, 100_000) as usize;
             let frame = animator.frame(dt, max_marks);
             self.events += frame.events;
+            if frame.watch_changed {
+                let watch = animator.watch.clone();
+                self.show_watch(cx, |watched| watched.set(watch));
+                // The panes were notified mid-draw, so they redraw in the
+                // next frame: make sure there is one, even if paused.
+                window.request_animation_frame();
+            }
 
             let mut canvas = self.canvas.borrow_mut();
             if frame.cleaned {
@@ -778,49 +815,66 @@ impl App {
                 ),
             )
             .child(
-                v_flex()
-                    .h(px(170.))
-                    .border_t_1()
-                    .border_color(theme.border)
-                    .child(
-                        h_flex()
-                            .px_2()
-                            .py_1()
-                            .gap_2()
-                            .child(div().text_sm().text_color(theme.muted_foreground).child("Console"))
-                            .child(div().flex_1())
-                            .when(!self.console_definitions.is_empty(), |row| {
-                                row.child(
-                                    Button::new("copy-definitions")
-                                        .xsmall()
-                                        .ghost()
-                                        .label("Copy to editor")
-                                        .disabled(running)
-                                        .on_click(cx.listener(|this, _, window, cx| this.copy_definitions(window, cx))),
-                                )
-                            })
-                            .child(Button::new("clear-console").xsmall().ghost().label("Clear").on_click(cx.listener(
-                                |this, _, _, cx| {
-                                    this.console.clear();
-                                    this.console_dirty = true;
-                                    cx.notify();
-                                },
-                            ))),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_h_0()
-                            .capture_action(cx.listener(|this, _: &MoveUp, window, cx| {
-                                this.recall(true, window, cx);
-                                cx.stop_propagation();
-                            }))
-                            .capture_action(cx.listener(|this, _: &MoveDown, window, cx| {
-                                this.recall(false, window, cx);
-                                cx.stop_propagation();
-                            }))
-                            .child(self.console_pane.clone().cached(StyleRefinement::default().size_full())),
-                    ),
+                div().h(px(CONSOLE_HEIGHT)).border_t_1().border_color(theme.border).child(
+                    h_resizable("console-area")
+                        .child(resizable_panel().child(self.render_console(running, cx)))
+                        .child(
+                            resizable_panel()
+                                .size(px(220.))
+                                .child(self.counters_pane.clone().cached(StyleRefinement::default().size_full())),
+                        )
+                        .child(
+                            resizable_panel()
+                                .size(px(340.))
+                                .child(self.variables_pane.clone().cached(StyleRefinement::default().size_full())),
+                        ),
+                ),
+            )
+    }
+
+    /// The console's title, buttons, output and input.
+    fn render_console(&mut self, running: bool, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+        let theme = cx.theme().clone();
+        v_flex()
+            .size_full()
+            .child(
+                h_flex()
+                    .px_2()
+                    .py_1()
+                    .gap_2()
+                    .child(div().text_sm().text_color(theme.muted_foreground).child("Console"))
+                    .child(div().flex_1())
+                    .when(!self.console_definitions.is_empty(), |row| {
+                        row.child(
+                            Button::new("copy-definitions")
+                                .xsmall()
+                                .ghost()
+                                .label("Copy to editor")
+                                .disabled(running)
+                                .on_click(cx.listener(|this, _, window, cx| this.copy_definitions(window, cx))),
+                        )
+                    })
+                    .child(Button::new("clear-console").xsmall().ghost().label("Clear").on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.console.clear();
+                            this.console_dirty = true;
+                            cx.notify();
+                        },
+                    ))),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .capture_action(cx.listener(|this, _: &MoveUp, window, cx| {
+                        this.recall(true, window, cx);
+                        cx.stop_propagation();
+                    }))
+                    .capture_action(cx.listener(|this, _: &MoveDown, window, cx| {
+                        this.recall(false, window, cx);
+                        cx.stop_propagation();
+                    }))
+                    .child(self.console_pane.clone().cached(StyleRefinement::default().size_full())),
             )
     }
 }

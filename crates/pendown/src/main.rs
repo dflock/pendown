@@ -6,6 +6,7 @@ mod canvas;
 mod files;
 mod highlighter;
 mod panes;
+mod watching;
 
 use gpui_kit::*;
 

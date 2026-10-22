@@ -52,6 +52,16 @@ TREE 230 16
 /// frames a second, and prints now and then.
 const SLOW: &str = "REPEAT 8 [\n  FD 20\n  RT 45\n  PRINT REPCOUNT\n]";
 
+/// Phase 4: a loop in a procedure, called from a template.
+const WATCHED: &str = "TO TILE :size
+  REPEAT 4 [FD :size RT 90]
+END
+MAKE \"sizes [40 80]
+FOREACH :sizes [TILE ?]
+";
+
+const COUNTING: &str = "MAKE \"n 0\nFOREVER [MAKE \"n :n + 1]";
+
 const ERRORS: &str = "TO BOX :n\n  FD :n RT 90\n  FD \"far\n  PRINT 1\nEND\nBOX 100";
 
 /// One step of the session.
@@ -65,7 +75,9 @@ enum Step {
     WaitPaused,
     SetSpeed(Speed),
     Pause,
+    Resume,
     StepLine,
+    StepInstruction,
     Stop,
     Screenshot(&'static str),
     /// Start recording the turtle's y position at every frame.
@@ -112,6 +124,13 @@ enum Step {
     /// second, and at most once an animation frame; the editor only when the
     /// highlight moved, and the console only when something was printed.
     CheckRenders(f64),
+    /// The counters and variables panels show exactly this, in the form
+    /// `panels()` gives.
+    CheckPanels(&'static str),
+    /// They show something starting with this.
+    CheckPanelsStart(&'static str),
+    /// Both panels have drawn what they should show.
+    CheckPanelsDrawn,
     /// Press F12.
     ToggleMetrics,
     /// The metrics overlay is shown, with numbers in it, or isn't.
@@ -276,6 +295,44 @@ fn script() -> Vec<Step> {
         Stop,
         ToggleMetrics,
         CheckOverlay(false),
+        Say("Phase 4: the counters and variables keep in step with the highlight"),
+        Run(WATCHED, Speed::Animated(100.0)),
+        Pause,
+        StepInstruction,
+        WaitPaused,
+        CheckHighlight("MAKE \"sizes [40 80]"),
+        CheckPanels(""),
+        StepInstruction,
+        WaitPaused,
+        CheckPanels("sizes=[40 80]"),
+        StepInstruction,
+        WaitPaused,
+        CheckHighlight("TILE ?"),
+        CheckPanels("FOREACH 1 of 2* | sizes=[40 80]"),
+        StepInstruction,
+        WaitPaused,
+        StepInstruction,
+        WaitPaused,
+        CheckHighlight("FD :size"),
+        CheckPanels("FOREACH 1 of 2 | REPEAT 1 of 4* | sizes=[40 80] | TILE: size=40"),
+        Wait(ms(100)),
+        CheckPanelsDrawn,
+        Screenshot("panels"),
+        SetSpeed(Speed::Instant),
+        Resume,
+        WaitFinished,
+        CheckPanels("sizes=[40 80]"),
+        Say("Phase 4: at Instant the panels update as it runs, and Stop leaves the globals"),
+        Run(COUNTING, Speed::Instant),
+        Wait(ms(300)),
+        CheckPanelsStart("FOREVER "),
+        Wait(ms(100)),
+        CheckPanelsDrawn,
+        Screenshot("panels-instant"),
+        Stop,
+        CheckPanelsStart("n="),
+        Wait(ms(100)),
+        CheckPanelsDrawn,
         Quit,
     ]
 }
@@ -411,7 +468,9 @@ impl App {
                 }
                 Step::SetSpeed(speed) => self.set_speed(speed, window, cx),
                 Step::Pause => self.animator.as_mut().map_or((), |a| a.pause()),
+                Step::Resume => self.animator.as_mut().map_or((), |a| a.resume()),
                 Step::StepLine => self.animator.as_mut().map_or((), |a| a.step_line()),
+                Step::StepInstruction => self.animator.as_mut().map_or((), |a| a.step_instruction()),
                 Step::Stop => self.stop(cx),
                 Step::Screenshot(name) => self.screenshot(name),
                 Step::Track => self.autotest.as_mut().unwrap().track = Some(Vec::new()),
@@ -532,6 +591,25 @@ impl App {
                         ),
                     );
                 }
+                Step::CheckPanels(expected) => {
+                    let shown = self.panels(cx);
+                    self.check(shown == expected, format!("the panels show {shown:?}"));
+                }
+                Step::CheckPanelsDrawn => {
+                    let watch = self.watched.read(cx).watch.clone();
+                    let same = |drawn: &Option<std::sync::Arc<pendown_logo::Watch>>| match (drawn, &watch) {
+                        (Some(a), Some(b)) => std::sync::Arc::ptr_eq(a, b),
+                        (None, None) => true,
+                        _ => false,
+                    };
+                    let counters = same(&self.counters_pane.read(cx).drawn);
+                    let variables = same(&self.variables_pane.read(cx).drawn);
+                    self.check(counters && variables, format!("the counters drew the latest: {counters}, the variables: {variables}"));
+                }
+                Step::CheckPanelsStart(expected) => {
+                    let shown = self.panels(cx);
+                    self.check(shown.starts_with(expected), format!("the panels show {shown:?}"));
+                }
                 Step::ToggleMetrics => self.toggle_metrics(window, cx),
                 Step::CheckOverlay(shown) => {
                     let lines = self.overlay.as_ref().map(|o| o.lines.clone());
@@ -553,6 +631,30 @@ impl App {
                 }
             }
         }
+    }
+
+    /// What the counters and variables panels show, in short: each counter,
+    /// with `*` on the one `REPCOUNT` outputs, the globals, then each scope.
+    fn panels(&self, cx: &gpui_kit::App) -> String {
+        let Some(watch) = self.watched.read(cx).watch.clone() else { return String::new() };
+        let mut parts: Vec<String> = watch
+            .counters
+            .iter()
+            .map(|c| {
+                let of = c.of.map_or(String::new(), |of| format!(" of {of}"));
+                format!("{} {}{of}{}", c.name, c.count, if c.repcount { "*" } else { "" })
+            })
+            .collect();
+        for scope in &watch.scopes {
+            let vars: Vec<String> =
+                scope.variables.iter().map(|v| format!("{}={}", v.name, v.value.as_deref().unwrap_or("-"))).collect();
+            if !scope.name.is_empty() {
+                parts.push(format!("{}: {}", scope.name, vars.join(" ")));
+            } else if !vars.is_empty() {
+                parts.push(vars.join(" "));
+            }
+        }
+        parts.join(" | ")
     }
 
     fn check_speeds(&mut self, track: &[(Instant, f64)], at: Duration, before: f64, after: f64) {

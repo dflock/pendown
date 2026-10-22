@@ -302,6 +302,11 @@ impl Animator {
     /// Plays one frame's worth of events. `dt` is the time since the last
     /// frame.
     pub fn frame(&mut self, dt: Duration, max_marks: usize) -> Frame {
+        // At Instant there's no lockstep to send a `Watch` when it changes,
+        // so ask for one a frame (ADR 0022).
+        if self.speed == Speed::Instant && self.is_playing() {
+            self.control.watch.store(true, Ordering::Relaxed);
+        }
         let timing = self.metrics.frames.start();
         let out = self.play(dt, max_marks);
         self.metrics.frames.stop(timing);

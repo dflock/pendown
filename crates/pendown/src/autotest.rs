@@ -63,7 +63,7 @@ enum Step {
     StepLine,
     Stop,
     Screenshot(&'static str),
-    /// Start recording the turtle's y position every frame.
+    /// Start recording the turtle's y position at every frame.
     Track,
     /// Stop recording, and check the turtle's speed before and after the
     /// given time: about the two speeds, in steps a second.
@@ -310,6 +310,14 @@ impl App {
         }
     }
 
+    /// Called at every frame that plays the animation.
+    pub(crate) fn on_frame(&mut self, now: Instant) {
+        let y = self.animator.as_ref().map_or(0.0, |a| a.pos.y);
+        if let Some(track) = self.autotest.as_mut().and_then(|a| a.track.as_mut()) {
+            track.push((now, y));
+        }
+    }
+
     /// Called whenever the highlight moves.
     pub(crate) fn on_highlight(&mut self) {
         let text = self.highlighted();
@@ -322,13 +330,13 @@ impl App {
         self.animator.as_ref().and_then(|a| a.highlight).map_or(String::new(), |s| self.run_text[s.range()].to_string())
     }
 
-    pub(crate) fn drive_autotest(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Takes the session's next steps, until one has to wait. Returns
+    /// whether it took any, so the window should render.
+    pub(crate) fn drive_autotest(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         if self.autotest.is_none() {
-            return;
+            return false;
         }
-        if let (Some(track), Some(animator)) = (self.autotest.as_mut().unwrap().track.as_mut(), &self.animator) {
-            track.push((Instant::now(), animator.pos.y));
-        }
+        let mut took = false;
         loop {
             let auto = self.autotest.as_mut().unwrap();
             if let Some((step, since)) = auto.waiting.clone() {
@@ -357,13 +365,14 @@ impl App {
                     _ => true,
                 };
                 if !done {
-                    return;
+                    return took;
                 }
                 self.autotest.as_mut().unwrap().waiting = None;
                 continue;
             }
-            let Some(step) = auto.steps.get(auto.next).cloned() else { return };
+            let Some(step) = auto.steps.get(auto.next).cloned() else { return took };
             auto.next += 1;
+            took = true;
             match step.clone() {
                 Step::Say(text) => self.say(format!("\n{text}")),
                 Step::Run(program, speed) => {

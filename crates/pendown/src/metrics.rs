@@ -26,6 +26,10 @@ pub struct WindowMetrics {
     pub canvas: Timer,
     /// Uploading tiles.
     pub upload: Timer,
+    /// Renders of the editor's and the console's views, which should only
+    /// happen when they change.
+    pub editor_renders: Counter,
+    pub console_renders: Counter,
 }
 
 /// Every number at one moment, so two can be compared: over a run for the
@@ -35,6 +39,8 @@ pub struct Snapshot {
     pub at: Instant,
     pub cpu: ThreadCpu,
     pub renders: u64,
+    pub editor_renders: u64,
+    pub console_renders: u64,
     pub render: Duration,
     pub canvas: Duration,
     pub upload: Duration,
@@ -62,6 +68,8 @@ impl Snapshot {
             at: Instant::now(),
             cpu: ThreadCpu::now(),
             renders: window.renders.count(),
+            editor_renders: window.editor_renders.get(),
+            console_renders: window.console_renders.get(),
             render: window.renders.total(),
             canvas: window.canvas.total(),
             upload: window.upload.total(),
@@ -83,6 +91,8 @@ impl Snapshot {
             wall: self.at.saturating_duration_since(earlier.at),
             cpu: self.cpu.since(&earlier.cpu),
             renders: self.renders.saturating_sub(earlier.renders),
+            editor_renders: self.editor_renders.saturating_sub(earlier.editor_renders),
+            console_renders: self.console_renders.saturating_sub(earlier.console_renders),
             render: self.render.saturating_sub(earlier.render),
             canvas: self.canvas.saturating_sub(earlier.canvas),
             upload: self.upload.saturating_sub(earlier.upload),
@@ -105,6 +115,8 @@ pub struct Interval {
     pub wall: Duration,
     pub cpu: ThreadCpu,
     pub renders: u64,
+    pub editor_renders: u64,
+    pub console_renders: u64,
     pub render: Duration,
     pub canvas: Duration,
     pub upload: Duration,
@@ -153,12 +165,14 @@ impl Interval {
     /// `run 3.2 s: 190 renders, UI 4.1 ms a frame (ours 0.3 ms, canvas 0.2 ms) ...`.
     pub fn summary(&self) -> String {
         format!(
-            "run {:.1} s: {} renders at {:.0}/s, UI {:.2} ms a frame (ours {:.2} ms, canvas {:.2} ms, animator {:.2} ms); \
+            "run {:.1} s: {} renders at {:.0}/s (editor {}, console {}), UI {:.2} ms a frame (ours {:.2} ms, canvas {:.2} ms, animator {:.2} ms); \
              {} events, {} marks drawn in {:.0} ms, {} tiles uploaded in {:.0} ms; \
              {} instructions at {}/s, waiting {:.1} s in lockstep, {:.1} s on the channel; CPU {}",
             self.wall.as_secs_f64(),
             self.renders,
             self.per_second(self.renders),
+            self.editor_renders,
+            self.console_renders,
             ms(self.ui_per_frame()),
             ms(self.per_render(self.render)),
             ms(self.per_render(self.canvas)),
@@ -225,7 +239,7 @@ mod tests {
             ..Interval::default()
         };
         let summary = interval.summary();
-        assert!(summary.starts_with("run 2.0 s: 100 renders at 50/s, UI 5.00 ms a frame (ours 0.30 ms"), "{summary}");
+        assert!(summary.starts_with("run 2.0 s: 100 renders at 50/s (editor 0, console 0), UI 5.00 ms a frame (ours 0.30 ms"), "{summary}");
         assert!(summary.contains("2.0 M instructions at 1.0 M/s"), "{summary}");
         assert!(summary.ends_with("CPU UI 25% interpreter 2% other 0%"), "{summary}");
     }

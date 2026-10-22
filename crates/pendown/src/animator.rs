@@ -37,6 +37,10 @@ pub const DEGREES_PER_STEP: f64 = 3.0;
 pub const DWELL_STEPS: f64 = 10.0;
 pub const MAX_DWELL: f64 = 0.25;
 
+/// The longest the window goes without a frame while a run plays: a frame's
+/// animation time is capped at this too, so nothing is lost.
+pub const MAX_FRAME_GAP: Duration = Duration::from_millis(100);
+
 /// Instant mode takes events for at most this long each frame.
 pub const INSTANT_SLICE: Duration = Duration::from_millis(8);
 
@@ -169,6 +173,41 @@ impl Animator {
         !self.finished() && matches!(self.mode, Mode::Running | Mode::StepLine | Mode::StepInstruction)
     }
 
+    /// How long until the picture changes by about a device pixel, so the
+    /// window can skip frames that would look the same (phase 3 issue 08).
+    /// Zero means at the next frame: at Instant, or when there are events to
+    /// take. `px_per_step` is the canvas's scale, and `turtle_px` the
+    /// turtle's length, which says how far its tip moves as it turns.
+    pub fn next_change(&self, px_per_step: f64, turtle_px: f64) -> Duration {
+        let Speed::Animated(steps) = self.speed else { return Duration::ZERO };
+        let secs = |s: f64| Duration::from_secs_f64(s.max(0.0));
+        // The time for `remaining` steps (or degrees, at `rate`) to play,
+        // and for one pixel's change at `px_per_unit`.
+        let gap = |remaining: f64, rate: f64, px_per_unit: f64| {
+            let to_end = remaining / rate;
+            let pixel = if px_per_unit > 0.0 { 1.0 / (rate * px_per_unit) } else { to_end };
+            secs(to_end.min(pixel))
+        };
+        let gap = match &self.current {
+            None => Duration::ZERO,
+            Some(Current::Move { from, to, pen, done }) => {
+                let length = ((to.x - from.x).powi(2) + (to.y - from.y).powi(2)).sqrt();
+                let seen = pen.down || self.shown;
+                gap(length - done, steps, if seen { px_per_step } else { 0.0 })
+            }
+            Some(Current::Mark { mark, length, done }) => {
+                let seen = mark.pen().down || (self.shown && matches!(mark, Mark::Arc { .. }));
+                gap(length - done, steps, if seen { px_per_step } else { 0.0 })
+            }
+            Some(Current::Turn { by, done, .. }) => {
+                let tip = if self.shown { turtle_px * std::f64::consts::PI / 180.0 } else { 0.0 };
+                gap(by.abs() - done, steps * DEGREES_PER_STEP, tip)
+            }
+            Some(Current::Dwell { left } | Current::Wait { left }) => secs(*left),
+        };
+        gap.min(MAX_FRAME_GAP)
+    }
+
     /// Whether a move, turn or dwell is part-way through.
     pub fn in_progress(&self) -> bool {
         self.current.is_some()
@@ -272,7 +311,7 @@ impl Animator {
         let sync_wait_end = started + SYNC_WAIT;
         // Animation time left this frame, in seconds. A long frame (the
         // window was hidden, say) doesn't make the turtle jump.
-        let mut budget = dt.as_secs_f64().min(0.1);
+        let mut budget = dt.min(MAX_FRAME_GAP).as_secs_f64();
         let mut replied = false;
 
         loop {

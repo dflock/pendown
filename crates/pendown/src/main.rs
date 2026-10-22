@@ -5,6 +5,7 @@ mod autotest;
 mod canvas;
 mod files;
 mod highlighter;
+mod panes;
 
 use gpui_kit::*;
 

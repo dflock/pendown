@@ -437,3 +437,39 @@ fn metrics_count_frames_and_events() {
     assert_eq!(interp.lockstep.count(), 1, "one line, one Sync");
     assert_eq!(interp.instructions.get(), 7, "REPEAT, its 2 passes, and 2 each of FD and RT");
 }
+
+/// Issue 08: the window skips frames that would look the same.
+#[test]
+fn next_change_is_when_the_picture_moves_a_pixel() {
+    use pendown::animator::MAX_FRAME_GAP;
+    let ms = |d: Duration| d.as_secs_f64() * 1e3;
+
+    // At 20 steps a second and 0.5 pixels a step, the line grows a pixel
+    // every 100 ms, the most the window waits.
+    let (mut animator, _run) = start("FD 300", Speed::Animated(20.0));
+    frame(&mut animator, FRAME);
+    assert!(animator.in_progress());
+    assert_eq!(animator.next_change(0.5, 18.0), MAX_FRAME_GAP);
+    // At 2 pixels a step, every 25 ms.
+    assert!((ms(animator.next_change(2.0, 18.0)) - 25.0).abs() < 0.01);
+
+    // A turn moves the turtle's tip: 18 pixels long, turning 60 degrees a
+    // second, it moves about 19 pixels a second.
+    let (mut animator, _run) = start("RT 90", Speed::Animated(20.0));
+    frame(&mut animator, FRAME);
+    let gap = ms(animator.next_change(1.0, 18.0));
+    assert!((gap - 1000.0 / (18.0 * 60.0f64.to_radians())).abs() < 0.01, "{gap}");
+
+    // A hidden turtle turning shows nothing until the turn is done.
+    let (mut animator, _run) = start("HT\nRT 3", Speed::Animated(20.0));
+    while !matches!(animator.highlight, Some(span) if span.line == 1) || !animator.in_progress() {
+        frame(&mut animator, FRAME);
+    }
+    let gap = ms(animator.next_change(1.0, 18.0));
+    assert!(gap > 40.0 && gap <= 50.0, "the rest of a 50 ms turn: {gap}");
+
+    // Instant wants every frame.
+    let (mut animator, _run) = start("FD 300", Speed::Instant);
+    frame(&mut animator, FRAME);
+    assert_eq!(animator.next_change(0.5, 18.0), Duration::ZERO);
+}

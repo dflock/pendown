@@ -16,6 +16,9 @@ pub struct Canvas {
     metrics: Rc<WindowMetrics>,
 }
 
+/// The turtle's length in logical pixels, whatever the zoom.
+pub const TURTLE_LENGTH: f32 = 18.0;
+
 /// What changes each frame, painted on top of the buffer.
 #[derive(Clone)]
 pub struct Overlay {
@@ -97,8 +100,8 @@ impl Canvas {
         }
         if let Some((pos, heading)) = overlay.turtle {
             // An isosceles triangle with the turtle's position at the middle
-            // of its short side, 18 logical pixels long whatever the zoom.
-            let length = 18.0 * per_device as f64 / self.drawing.scale().max(0.01);
+            // of its short side.
+            let length = (TURTLE_LENGTH * per_device) as f64 / self.drawing.scale().max(0.01);
             let (s, c) = heading.to_radians().sin_cos();
             let at = |forward: f64, right: f64| Point { x: pos.x + forward * s + right * c, y: pos.y + forward * c - right * s };
             let mut triangle = PathBuilder::fill();

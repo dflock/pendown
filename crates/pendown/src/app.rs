@@ -13,11 +13,11 @@ use gpui_kit::component::{
     h_flex,
     highlighter::{Diagnostic, DiagnosticSeverity},
     input::{
-        Editor, EditorState, Input, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position, RangeDecoration,
-        RangeDecorationCollection, RangeDecorationStyle, Textarea, TextareaState,
+        EditorState, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position, RangeDecoration,
+        RangeDecorationCollection, RangeDecorationStyle, TextareaState,
     },
     resizable::{h_resizable, resizable_panel},
-    slider::{Slider, SliderEvent, SliderState},
+    slider::{SliderEvent, SliderState},
     v_flex,
 };
 use gpui_kit::{prelude::FluentBuilder as _, *};
@@ -28,15 +28,16 @@ use pendown::{
     errors,
     metrics::{Snapshot, WindowMetrics},
     run::{Channel, DEFAULT_CHANNEL, Job, Run, Session},
-    speed::{INSTANT_LEVEL, describe, level_speed, speed_level},
+    speed::{INSTANT_LEVEL, level_speed, speed_level},
 };
 use pendown_logo::{RunError, SourceId};
 
 use crate::{
     autotest::Autotest,
-    canvas::{Canvas, Overlay},
+    canvas::{Canvas, Overlay, TURTLE_LENGTH},
     files::{After, ExportPicture, NewFile, OpenFile, RunProgram, SaveFile, SaveFileAs, ToggleMetrics},
     highlighter::LogoHighlighter,
+    panes::{ConsolePane, EditorPane, ToolbarPane, ToolbarState},
 };
 
 /// The program the editor starts with.
@@ -80,6 +81,18 @@ pub(crate) struct MetricsOverlay {
 }
 
 const OVERLAY_EVERY: Duration = Duration::from_millis(500);
+
+/// How often the scripted session takes its next steps. It runs on a timer,
+/// not on frames, so it doesn't change how often the window renders.
+const AUTOTEST_EVERY: Duration = Duration::from_millis(5);
+
+/// The toolbar's height, which its cached view needs, and the width of the
+/// status beside it.
+const TOOLBAR_HEIGHT: f32 = 41.0;
+const STATUS_WIDTH: f32 = 300.0;
+
+/// A change due sooner than this is left to the next animation frame.
+const FRAME_SOON: Duration = Duration::from_millis(12);
 
 /// Instant mode draws at most about this much a frame, so the window stays
 /// responsive (ADR 0011).
@@ -137,6 +150,10 @@ pub struct App {
     console_dirty: bool,
     console_output: Entity<TextareaState>,
     console_input: Entity<InputState>,
+    /// The editor and console, drawn as cached views (issue 08).
+    editor_pane: Entity<EditorPane>,
+    console_pane: Entity<ConsolePane>,
+    toolbar_pane: Entity<ToolbarPane>,
     console_entry: ConsoleInput,
     /// Definitions typed at the console since the last Run, which "Copy to
     /// editor" keeps.
@@ -155,6 +172,9 @@ pub struct App {
     run_start: Option<Snapshot>,
     /// The metrics overlay, when it's shown (F12).
     pub(crate) overlay: Option<MetricsOverlay>,
+    /// Wakes the window for its next frame, when that's more than a frame
+    /// away.
+    wake: Option<Task<()>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -197,10 +217,30 @@ impl App {
             }),
         ];
         let metrics = Rc::new(WindowMetrics::default());
+        let editor_pane = cx.new(|_| EditorPane::new(editor.clone(), metrics.clone()));
+        let console_pane = cx.new(|_| ConsolePane::new(console_output.clone(), console_input.clone(), metrics.clone()));
         let app = cx.entity().downgrade();
+        let toolbar = ToolbarState { running: false, paused: false, speed };
+        let toolbar_pane = cx.new(|_| ToolbarPane::new(app.clone(), speed_slider.clone(), toolbar));
         window.on_window_should_close(cx, move |window, cx| {
             app.update(cx, |this, cx| this.should_close(window, cx)).unwrap_or(true)
         });
+        if std::env::var_os("PENDOWN_AUTOTEST").is_some() {
+            cx.spawn_in(window, async move |this, cx| {
+                loop {
+                    cx.background_executor().timer(AUTOTEST_EVERY).await;
+                    let alive = this.update_in(cx, |this: &mut App, window, cx| {
+                        if this.drive_autotest(window, cx) {
+                            cx.notify();
+                        }
+                    });
+                    if alive.is_err() {
+                        break;
+                    }
+                }
+            })
+            .detach();
+        }
         App {
             editor,
             highlight,
@@ -221,6 +261,9 @@ impl App {
             console_dirty: false,
             console_output,
             console_input,
+            editor_pane,
+            console_pane,
+            toolbar_pane,
             console_entry: ConsoleInput::default(),
             console_definitions: Vec::new(),
             defining: None,
@@ -232,6 +275,7 @@ impl App {
             metrics,
             run_start: None,
             overlay: None,
+            wake: None,
             _subscriptions: subscriptions,
         }
     }
@@ -331,6 +375,25 @@ impl App {
         let overlay = self.overlay.as_mut().expect("checked above");
         overlay.lines = now.since(&since).lines();
         overlay.since = now;
+    }
+
+    /// Asks for the next frame when the picture will next look different
+    /// (issue 08): at once while it changes every frame, and otherwise after
+    /// a wait. At slow speeds most frames would look the same, and each one
+    /// costs the UI thread a few milliseconds.
+    fn schedule_frame(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.wake = None;
+        let Some(animator) = self.animator.as_ref().filter(|a| a.wants_frames()) else { return };
+        let px_per_step = self.canvas.borrow().drawing.scale();
+        let gap = animator.next_change(px_per_step, TURTLE_LENGTH as f64 * window.scale_factor() as f64);
+        if gap < FRAME_SOON {
+            window.request_animation_frame();
+            return;
+        }
+        self.wake = Some(cx.spawn_in(window, async move |this, cx| {
+            cx.background_executor().timer(gap).await;
+            this.update(cx, |_, cx| cx.notify()).ok();
+        }));
     }
 
     /// Prints the summary of the job that just ended on stderr.
@@ -495,11 +558,18 @@ impl App {
         let color = cx.theme().warning.opacity(0.35);
         self.highlight.set(vec![RangeDecoration::new(span.range()).with_style(RangeDecorationStyle::Fill).with_color(color)], cx);
         let line = span.line as usize;
+        let lines = self.run_text.matches('\n').count() + 1;
         self.editor.update(cx, |state, cx| {
             let (Some(rows), Some(line_height)) = (state.visible_row_range(), state.line_height()) else { return };
-            if line < rows.start + 2 || line + 2 >= rows.end {
+            // Only scroll where there's more text to see, and never past the
+            // end: the editor springs back from there, animating for a third
+            // of a second each time (issue 08).
+            let near_top = line < rows.start + 2 && rows.start > 0;
+            let near_bottom = line + 2 >= rows.end && rows.end < lines;
+            let top = line.saturating_sub(3).min(lines.saturating_sub(rows.len()));
+            if (near_top || near_bottom) && top != rows.start {
                 let offset = state.scroll_offset();
-                state.set_scroll_offset(point(offset.x, -line_height * line.saturating_sub(3) as f32), cx);
+                state.set_scroll_offset(point(offset.x, -line_height * top as f32), cx);
             }
         });
     }
@@ -521,6 +591,7 @@ impl App {
             let max_marks = (INSTANT_DRAWING.as_nanos() / per_segment.as_nanos()).clamp(500, 100_000) as usize;
             let frame = animator.frame(dt, max_marks);
             self.events += frame.events;
+
             let mut canvas = self.canvas.borrow_mut();
             if frame.cleaned {
                 canvas.drawing.clean();
@@ -539,6 +610,7 @@ impl App {
                 // The animator has changed already: this moves the slider.
                 self.set_speed(speed, window, cx);
             }
+            self.on_frame(now);
             if frame.highlight_changed {
                 self.on_highlight();
                 self.show_highlight(cx);
@@ -581,7 +653,15 @@ impl App {
         format!("{state} · {:.1} s · {} lines drawn", elapsed.as_secs_f64(), self.canvas.borrow().drawing.segments())
     }
 
-    fn toggle_pause(&mut self, cx: &mut Context<Self>) {
+    /// Step, or Step instruction.
+    pub(crate) fn step(&mut self, instruction: bool, cx: &mut Context<Self>) {
+        if let Some(a) = &mut self.animator {
+            if instruction { a.step_instruction() } else { a.step_line() }
+        }
+        cx.notify();
+    }
+
+    pub(crate) fn toggle_pause(&mut self, cx: &mut Context<Self>) {
         if let Some(a) = &mut self.animator {
             if a.mode() == Mode::Paused { a.resume() } else { a.pause() }
         }
@@ -606,15 +686,14 @@ impl App {
         }
         self.tick(window, cx);
         self.update_overlay();
-        self.drive_autotest(window, cx);
         self.flush_console(window, cx);
         self.update_title(window, cx);
-        if self.animator.as_ref().is_some_and(|a| a.wants_frames()) || self.autotest.is_some() {
-            window.request_animation_frame();
-        }
+        self.schedule_frame(window, cx);
 
         let theme = cx.theme().clone();
         let running = self.running();
+        self.editor_pane.update(cx, |pane, cx| pane.set_readonly(running, cx));
+        self.console_pane.update(cx, |pane, cx| pane.set_disabled(running, cx));
         let paused = self.animator.as_ref().is_some_and(|a| a.mode() == Mode::Paused && !a.finished());
         let canvas = self.canvas.clone();
         let overlay = match &self.animator {
@@ -626,73 +705,8 @@ impl App {
             None => Overlay { partial: None, turtle: Some((pendown_logo::Point { x: 0.0, y: 0.0 }, 0.0)) },
         };
 
-        let toolbar = h_flex()
-            .gap_2()
-            .p_2()
-            .border_b_1()
-            .border_color(theme.border)
-            .child(Button::new("new").small().ghost().label("New").on_click(cx.listener(|this, _, window, cx| {
-                this.then(After::NewFile, window, cx)
-            })))
-            .child(Button::new("open").small().ghost().label("Open").on_click(cx.listener(|this, _, window, cx| {
-                this.then(After::OpenFile, window, cx)
-            })))
-            .child(Button::new("save").small().ghost().label("Save").on_click(cx.listener(|this, _, window, cx| {
-                this.save(After::Nothing, window, cx)
-            })))
-            .child(
-                Button::new("export")
-                    .small()
-                    .ghost()
-                    .label("Export PNG")
-                    .on_click(cx.listener(|this, _, window, cx| this.export(window, cx))),
-            )
-            .child(div().w(px(12.)))
-            .child(
-                Button::new("run")
-                    .small()
-                    .primary()
-                    .label("Run")
-                    .on_click(cx.listener(|this, _, _, cx| this.start(DEFAULT_CHANNEL, cx))),
-            )
-            .child(
-                Button::new("pause")
-                    .small()
-                    .label(if paused { "Resume" } else { "Pause" })
-                    .disabled(!running)
-                    .on_click(cx.listener(|this, _, _, cx| this.toggle_pause(cx))),
-            )
-            .child(Button::new("step").small().label("Step").disabled(!paused).on_click(cx.listener(|this, _, _, cx| {
-                if let Some(a) = &mut this.animator {
-                    a.step_line();
-                }
-                cx.notify();
-            })))
-            .child(
-                Button::new("step-instruction")
-                    .small()
-                    .label("Step instruction")
-                    .disabled(!paused)
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        if let Some(a) = &mut this.animator {
-                            a.step_instruction();
-                        }
-                        cx.notify();
-                    })),
-            )
-            .child(
-                Button::new("stop")
-                    .small()
-                    .danger()
-                    .label("Stop")
-                    .disabled(!running)
-                    .on_click(cx.listener(|this, _, _, cx| this.stop(cx))),
-            )
-            .child(div().w(px(16.)))
-            .child(div().w(px(160.)).child(Slider::new(&self.speed_slider)))
-            .child(div().w(px(10.)))
-            .child(div().text_sm().w(px(180.)).child(describe(self.speed)))
-            .child(div().text_sm().text_color(theme.muted_foreground).child(self.status()));
+        let toolbar = ToolbarState { running, paused, speed: self.speed };
+        self.toolbar_pane.update(cx, |pane, cx| pane.set(toolbar, cx));
 
         v_flex()
             .size_full()
@@ -705,19 +719,32 @@ impl App {
             .on_action(cx.listener(|this, _: &ToggleMetrics, window, cx| this.toggle_metrics(window, cx)))
             .bg(theme.background)
             .text_color(theme.foreground)
-            .child(toolbar)
+            .child(
+                h_flex()
+                    .h(px(TOOLBAR_HEIGHT))
+                    .px_2()
+                    .gap_2()
+                    .border_b_1()
+                    .border_color(theme.border)
+                    .child(self.toolbar_pane.clone().cached(StyleRefinement::default().h_full().flex_1()))
+                    // A fixed width, so the toolbar's size doesn't change
+                    // with the status, which would redraw it.
+                    .child(
+                        div()
+                            .flex_none()
+                            .w(px(STATUS_WIDTH))
+                            .text_sm()
+                            .text_color(theme.muted_foreground)
+                            .child(self.status()),
+                    ),
+            )
             .child(
                 div().flex_1().min_h_0().child(
                     h_resizable("main")
                         .child(
-                            resizable_panel().size(px(460.)).child(
-                                Editor::new(&self.editor)
-                                    .bordered(false)
-                                    .readonly(running)
-                                    .h_full()
-                                    .font_family(theme.mono_font_family.clone())
-                                    .text_size(theme.mono_font_size),
-                            ),
+                            resizable_panel()
+                                .size(px(460.))
+                                .child(self.editor_pane.clone().cached(StyleRefinement::default().size_full())),
                         )
                         .child(
                             resizable_panel().child(
@@ -781,18 +808,9 @@ impl App {
                             ))),
                     )
                     .child(
-                        div().flex_1().min_h_0().px_1().child(
-                            Textarea::new(&self.console_output)
-                                .readonly(true)
-                                .bordered(false)
-                                .h_full()
-                                .font_family(theme.mono_font_family.clone())
-                                .text_xs(),
-                        ),
-                    )
-                    .child(
                         div()
-                            .p_1()
+                            .flex_1()
+                            .min_h_0()
                             .capture_action(cx.listener(|this, _: &MoveUp, window, cx| {
                                 this.recall(true, window, cx);
                                 cx.stop_propagation();
@@ -801,12 +819,7 @@ impl App {
                                 this.recall(false, window, cx);
                                 cx.stop_propagation();
                             }))
-                            .child(
-                                Input::new(&self.console_input)
-                                    .small()
-                                    .disabled(running)
-                                    .font_family(theme.mono_font_family.clone()),
-                            ),
+                            .child(self.console_pane.clone().cached(StyleRefinement::default().size_full())),
                     ),
             )
     }

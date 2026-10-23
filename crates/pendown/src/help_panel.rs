@@ -998,7 +998,8 @@ impl HelpPanel {
                             .child(div().text_xs().text_color(theme.muted_foreground).child(format!("Lesson {} of {}", l + 1, lessons.len())))
                             .child(div().text_lg().font_weight(FontWeight::BOLD).child(lesson.title.clone())),
                     )
-                    .child(img(ImageSource::Image(kame())).h(px(44.)).w(px(66.)).flex_none()),
+                    // The first lesson has Kame beside its introduction instead.
+                    .when(l > 0, |h| h.child(img(ImageSource::Image(kame())).h(px(44.)).w(px(66.)).flex_none())),
             )
             .child(progress);
 
@@ -1011,6 +1012,15 @@ impl HelpPanel {
                     body.push(self.program_card(l, p, code, cx));
                     p += 1;
                 }
+                // The first lesson's first paragraph introduces Kame, beside it.
+                Block::Paragraph(_) if l == 0 && b == 0 => body.push(
+                    h_flex()
+                        .gap_3()
+                        .items_center()
+                        .child(img(ImageSource::Image(kame())).h(px(64.)).w(px(96.)).flex_none().mt_2())
+                        .child(div().flex_1().min_w_0().children(self.blocks(&format!("lesson-{l}-{b}"), std::slice::from_ref(block), cx)))
+                        .into_any_element(),
+                ),
                 block => body.extend(self.blocks(&format!("lesson-{l}-{b}"), std::slice::from_ref(block), cx)),
             }
         }

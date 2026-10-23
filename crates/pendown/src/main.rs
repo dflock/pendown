@@ -10,19 +10,27 @@ mod icons;
 mod panes;
 mod watching;
 
+use std::borrow::Cow;
+
 use gpui_kit::*;
+
+/// Noto Sans, under the SIL Open Font License: see `fonts/OFL.txt`.
+const FONTS: [&[u8]; 4] = [
+    include_bytes!("../fonts/NotoSans-Regular.ttf"),
+    include_bytes!("../fonts/NotoSans-Italic.ttf"),
+    include_bytes!("../fonts/NotoSans-Bold.ttf"),
+    include_bytes!("../fonts/NotoSans-BoldItalic.ttf"),
+];
 
 fn main() {
     gpui_kit::application().with_assets(icons::AppAssets).run(|cx| {
         gpui_kit::init(cx);
         files::bind_keys(cx);
-        // On Linux the UI font is often a variable one, such as Ubuntu, and
-        // gpui draws only its regular weight, so bold text isn't. Noto Sans
-        // has a file for each weight, and most distributions install it.
-        #[cfg(target_os = "linux")]
-        if cx.text_system().all_font_names().iter().any(|f| f == "Noto Sans") {
-            cx.global_mut::<gpui_kit::component::Theme>().font_family = "Noto Sans".into();
-        }
+        // The UI font is built in, so it looks the same everywhere. The
+        // system's is often a variable font, such as Ubuntu on Linux, and gpui
+        // draws only its regular weight, so bold text isn't.
+        cx.text_system().add_fonts(FONTS.iter().map(|&f| Cow::Borrowed(f)).collect()).expect("the built-in fonts load");
+        cx.global_mut::<gpui_kit::component::Theme>().font_family = "Noto Sans".into();
         // Closing the window ends the app.
         cx.on_window_closed(|cx, _| {
             if cx.windows().is_empty() {

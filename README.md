@@ -115,3 +115,8 @@ The crates are in `crates/`. `spikes/` holds the experiments made before phase 1
 - `pendown-logo.kdl` lists every Logo command, which ones Pendown supports, and how ours differ from UCBLogo.
 - `docs/adr/` records the design decisions and why we made them.
 - `tree-sitter-logo/` is a tree-sitter grammar for Logo, with a Zed extension, ready to become a repository of its own.
+
+## Credits
+
+- Kame's picture, `tutorial/kame-turtle.svg`, is [Turtle](https://openclipart.org/detail/229886/turtle) from Openclipart, in the public domain (CC0).
+- The app's font is [Noto Sans](https://notofonts.github.io/), by the Noto Project Authors, under the SIL Open Font License: see `crates/pendown/fonts/OFL.txt`.

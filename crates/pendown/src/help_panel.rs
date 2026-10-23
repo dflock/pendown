@@ -487,7 +487,8 @@ impl HelpPanel {
         // What it does: ours, or the manual's for a command we don't have.
         match &command.help {
             Some(help) => out.extend(self.blocks("help", &markup::parse(help), cx)),
-            None if !command.desc.is_empty() => {
+            // An obsolete command's reason says enough.
+            None if !command.desc.is_empty() && command.obsolete.is_none() => {
                 out.push(div().mt_2().text_color(theme.muted_foreground).child(command.desc.clone()).into_any_element())
             }
             None => {}
@@ -929,6 +930,16 @@ impl PendownWindow {
         let word = self.word_at_cursor(cx);
         self.cursor_word = word.clone();
         self.help_panel.update(cx, |panel, cx| panel.help_for(word, window, cx));
+        cx.notify();
+    }
+
+    /// Opens the panel on a page, as the console's Help button does.
+    pub(crate) fn open_help(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
+        self.help_open = true;
+        self.help_panel.update(cx, |panel, cx| {
+            panel.go(Page::Command(i), window, cx);
+            panel.pinned = true;
+        });
         cx.notify();
     }
 

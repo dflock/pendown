@@ -155,7 +155,8 @@ fn names_in(usage: &str) -> (Vec<String>, Vec<String>) {
     let (mut names, mut operators): (Vec<String>, Vec<String>) = (Vec::new(), Vec::new());
     for line in usage.lines() {
         let words: Vec<_> = line.trim().trim_start_matches('(').split_whitespace().collect();
-        let Some(&first) = words.first() else { continue };
+        // `(EDIT)` is EDIT with no inputs.
+        let Some(first) = words.first().map(|w| w.trim_end_matches(')')) else { continue };
         let name = if OPERATORS.contains(&first) {
             Err(first)
         } else if let Some(op) = words.get(1).filter(|w| OPERATORS.contains(w)) {
@@ -341,6 +342,7 @@ mod tests {
         assert_eq!(names_in("FORWARD dist\nFD dist"), (vec!["FORWARD".into(), "FD".into()], vec![]));
         assert_eq!(names_in("SUM num1 num2\n(SUM num1 num2 num3 ...)\nnum1 + num2"), (vec!["SUM".into()], vec!["+".into()]));
         assert_eq!(names_in("MINUS num\n- num"), (vec!["MINUS".into()], vec!["-".into()]));
+        assert_eq!(names_in("EDIT contentslist\nED contentslist\n(EDIT)\n(ED)").0, ["EDIT", "ED"]);
     }
 
     #[test]

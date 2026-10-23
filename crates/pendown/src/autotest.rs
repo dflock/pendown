@@ -162,6 +162,9 @@ enum Step {
     CopyExample(&'static str, usize),
     /// The editor's text ends with this.
     CheckEditorEnds(&'static str),
+    /// The console has a Help button for this page, and pressing it opens
+    /// the panel there.
+    CheckErrorHelp(&'static str),
     /// The metrics overlay is shown, with numbers in it, or isn't.
     CheckOverlay(bool),
     Quit,
@@ -406,6 +409,17 @@ fn script() -> Vec<Step> {
         CheckDrawn(48),
         CopyExample("forward", 1),
         CheckEditorEnds("FLOWER 250\n\nREPEAT 5 [FD 20 PU FD 20 PD]\n"),
+        CloseHelp,
+        Say("Phase 5: errors offer help on their command"),
+        Run("REPEAT 3 [FD]", Speed::Instant),
+        WaitFinished,
+        CheckErrorHelp("FORWARD"),
+        Run("EDIT \"square", Speed::Instant),
+        WaitFinished,
+        CheckConsole("Line 1: EDIT isn't in Pendown: it opens an external text editor, and Pendown has its own."),
+        CheckErrorHelp("EDIT"),
+        Wait(ms(100)),
+        Screenshot("error-help"),
         CloseHelp,
         Quit,
     ]
@@ -662,6 +676,14 @@ impl App {
                     let text = self.editor.read(cx).value().to_string();
                     let tail = &text[text.len().saturating_sub(expected.len() + 20)..];
                     self.check(text.ends_with(expected), format!("the editor ends with {tail:?}"));
+                }
+                Step::CheckErrorHelp(expected) => {
+                    let r = pendown_logo::reference::reference();
+                    let title = self.error_help.map_or(String::new(), |i| r.commands[i].title.clone());
+                    self.check(title == expected, format!("the console offers help on {title:?}"));
+                    if let Some(i) = self.error_help {
+                        self.open_help(i, window, cx);
+                    }
                 }
                 Step::CloseHelp => {
                     if self.help_open {

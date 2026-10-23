@@ -20,7 +20,7 @@ use gpui_kit::component::{
     slider::{SliderEvent, SliderState},
     v_flex,
 };
-use gpui_kit::{prelude::FluentBuilder as _, *};
+use gpui_kit::{assets::IconName, prelude::FluentBuilder as _, *};
 use pendown::{
     animator::{Animator, MAX_FRAME_GAP, Mode, Speed},
     console::{ConsoleInput, Submit, defines},
@@ -172,6 +172,9 @@ pub struct App {
     pub(crate) cursor_word: Option<(String, u32)>,
     /// The example on the canvas, with what it set aside (issue 06).
     pub(crate) example: Option<crate::help_panel::ExampleRun>,
+    /// The help page for the last error's command, for the console's Help
+    /// button (issue 07).
+    pub(crate) error_help: Option<usize>,
     console_entry: ConsoleInput,
     /// Definitions typed at the console since the last Run, which "Copy to
     /// editor" keeps.
@@ -297,6 +300,7 @@ impl App {
             help_open: false,
             cursor_word: None,
             example: None,
+            error_help: None,
             console_entry: ConsoleInput::default(),
             console_definitions: Vec::new(),
             defining: None,
@@ -369,6 +373,7 @@ impl App {
 
     /// Starts playing a job's events: the user's, or an example's.
     pub(crate) fn play(&mut self, animator: Animator, run: Run, cx: &mut Context<Self>) {
+        self.error_help = None;
         self.animator = Some(animator);
         self.run = Some(run);
         self.finished_at = None;
@@ -588,6 +593,8 @@ impl App {
     fn show_errors(&mut self, errors: Vec<pendown_logo::Error>, cx: &mut Context<Self>) {
         let mut diagnostics = Vec::new();
         let example = self.example.is_some();
+        let reference = pendown_logo::reference::reference();
+        self.error_help = errors.iter().filter_map(|e| reference.find_index(e.command.as_deref()?)).next();
         for e in &errors {
             let where_ = match e.span {
                 // An example's spans are in its own text, not the editor's.
@@ -895,6 +902,17 @@ impl App {
                     .gap_2()
                     .child(div().text_sm().text_color(theme.muted_foreground).child("Console"))
                     .child(div().flex_1())
+                    .when_some(self.error_help, |row, i| {
+                        let title = &pendown_logo::reference::reference().commands[i].title;
+                        row.child(
+                            Button::new("error-help")
+                                .xsmall()
+                                .ghost()
+                                .icon(IconName::BookOpen)
+                                .label(format!("Help on {title}"))
+                                .on_click(cx.listener(move |this, _, window, cx| this.open_help(i, window, cx))),
+                        )
+                    })
                     .when(!self.console_definitions.is_empty(), |row| {
                         row.child(
                             Button::new("copy-definitions")

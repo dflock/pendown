@@ -13,7 +13,7 @@
 //   7  Advanced and niche: fills, labels and pen modes, objects, macros, property
 //      lists, file I/O, SHELL, bitwise operations, introspection / metaprogramming
 //      and obscure library procedures.
-//   #null  Obsolete: not planned (see obsolete_reason).
+//   #null  Obsolete: not planned. obsolete_reason says why, after "EDIT isn't in Pendown: ".
 // Our changes to UCBLogo (see "Dialect and extensions" in implementation-plan.md):
 //   extension #true  A command that isn't in the manual; `source` says where the idea came from.
 //   differs "..."    How our version behaves differently from the manual's `desc`.
@@ -336,7 +336,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Unsafe low-level list mutation (can create circular lists). Not needed for new programs; SETITEM on arrays covers safe mutation."
+        obsolete_reason "it changes a list in place, which can make a list contain itself. Use an array and SETITEM instead."
       }
       .setbf {
         eg ".SETBF list value"
@@ -348,7 +348,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Unsafe low-level list mutation (can create circular lists). Not needed for new programs; SETITEM on arrays covers safe mutation."
+        obsolete_reason "it changes a list in place, which can make a list contain itself. Use an array and SETITEM instead."
       }
       .setitem {
         eg ".SETITEM index array value"
@@ -361,7 +361,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Unchecked version of SETITEM for speed. SETITEM is enough."
+        obsolete_reason "it's a faster SETITEM that doesn't check its inputs. Use SETITEM."
       }
       push {
         eg "PUSH stackname thing  (library procedure)"
@@ -601,7 +601,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Produces terminal escape codes for bold/inverse text. The GUI console isn't a terminal."
+        obsolete_reason "it makes bold or inverse text in a terminal, and Pendown's console isn't a terminal."
       }
       parse {
         eg "PARSE word"
@@ -977,7 +977,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "A working-directory prefix for old file systems. File paths will be relative to the program's own file."
+        obsolete_reason "it sets a folder for file names, for old file systems. File names will be relative to your program's file."
       }
       prefix {
         eg "PREFIX"
@@ -986,7 +986,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "A working-directory prefix for old file systems. File paths will be relative to the program's own file."
+        obsolete_reason "it sets a folder for file names, for old file systems. File names will be relative to your program's file."
       }
       openread {
         eg "OPENREAD filename"
@@ -1073,7 +1073,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Records a transcript of the terminal session. The GUI console can be saved or copied."
+        obsolete_reason "it records what happens in a terminal. You can copy the console's text instead."
       }
       nodribble {
         eg "NODRIBBLE"
@@ -1081,7 +1081,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Records a transcript of the terminal session. The GUI console can be saved or copied."
+        obsolete_reason "it records what happens in a terminal. You can copy the console's text instead."
       }
       setread {
         eg "SETREAD filename"
@@ -1207,7 +1207,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "The GUI console is a scrolling text pane, not a terminal, so text-cursor positioning doesn't apply."
+        obsolete_reason "it moves the cursor in a terminal, and Pendown's console is a scrolling list of lines."
       }
       cursor {
         eg "CURSOR"
@@ -1215,7 +1215,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "The GUI console is a scrolling text pane, not a terminal, so text-cursor positioning doesn't apply."
+        obsolete_reason "it moves the cursor in a terminal, and Pendown's console is a scrolling list of lines."
       }
       setmargins {
         eg "SETMARGINS vector"
@@ -1224,7 +1224,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Adds margins for projecting a terminal screen onto a wall. Not applicable to a GUI."
+        obsolete_reason "it adds margins for projecting a terminal onto a wall."
       }
       settextcolor {
         eg """
@@ -1240,7 +1240,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Console fonts and colours are GUI settings, not something programs control."
+        obsolete_reason "the console's font and colours are Pendown's settings, not something a program changes."
       }
       increasefont {
         eg """
@@ -1251,7 +1251,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Console fonts and colours are GUI settings, not something programs control."
+        obsolete_reason "the console's font and colours are Pendown's settings, not something a program changes."
       }
       settextsize {
         eg "SETTEXTSIZE height"
@@ -1259,7 +1259,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Console fonts and colours are GUI settings, not something programs control."
+        obsolete_reason "the console's font and colours are Pendown's settings, not something a program changes."
       }
       textsize {
         eg "TEXTSIZE"
@@ -1267,7 +1267,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Console fonts and colours are GUI settings, not something programs control."
+        obsolete_reason "the console's font and colours are Pendown's settings, not something a program changes."
       }
       setfont {
         eg "SETFONT fontname"
@@ -1275,7 +1275,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Console fonts and colours are GUI settings, not something programs control."
+        obsolete_reason "the console's font and colours are Pendown's settings, not something a program changes."
       }
       font {
         eg "FONT"
@@ -1283,7 +1283,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Console fonts and colours are GUI settings, not something programs control."
+        obsolete_reason "the console's font and colours are Pendown's settings, not something a program changes."
       }
     }
   }
@@ -1878,7 +1878,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Corrects the aspect ratio of old monitors. Modern displays have square pixels."
+        obsolete_reason "it corrected the shape of old screens, whose pixels weren't square."
       }
     }
     turtle-and-window-control {
@@ -1983,7 +1983,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Rearranges a single full-screen display between text and graphics. The GUI has a fixed layout with a canvas and a console."
+        obsolete_reason "it switched one screen between text and drawing, and Pendown always shows both."
       }
       fullscreen {
         eg """
@@ -2000,7 +2000,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Rearranges a single full-screen display between text and graphics. The GUI has a fixed layout with a canvas and a console."
+        obsolete_reason "it switched one screen between text and drawing, and Pendown always shows both."
       }
       splitscreen {
         eg """
@@ -2012,7 +2012,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Rearranges a single full-screen display between text and graphics. The GUI has a fixed layout with a canvas and a console."
+        obsolete_reason "it switched one screen between text and drawing, and Pendown always shows both."
       }
       setspeed {
         eg "SETSPEED level"
@@ -2044,7 +2044,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Corrects the aspect ratio of old monitors. Modern displays have square pixels; if stretched drawing is wanted, add a proper transform later."
+        obsolete_reason "it corrected the shape of old screens, whose pixels weren't square."
       }
       refresh {
         eg "REFRESH"
@@ -2052,7 +2052,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Tells Logo whether to remember drawing to save memory. The GUI always keeps the drawing."
+        obsolete_reason "it saved memory by forgetting the drawing, and Pendown always keeps it."
       }
       norefresh {
         eg "NOREFRESH"
@@ -2060,7 +2060,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Tells Logo whether to remember drawing to save memory. The GUI always keeps the drawing."
+        obsolete_reason "it saved memory by forgetting the drawing, and Pendown always keeps it."
       }
     }
     turtle-and-window-queries {
@@ -2081,7 +2081,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Rearranges a single full-screen display between text and graphics. The GUI has a fixed layout with a canvas and a console."
+        obsolete_reason "it switched one screen between text and drawing, and Pendown always shows both."
       }
       turtlemode {
         eg "TURTLEMODE"
@@ -2200,7 +2200,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Hardware-dependent pen settings with no defined behaviour."
+        obsolete_reason "it set pen patterns that depended on the computer, with no defined behaviour."
       }
       setpen {
         eg "SETPEN list  (library procedure)"
@@ -2337,7 +2337,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Saves or loads pictures in UCBLogo's own format. The GUI will have export (PNG/SVG) and the source is the way to reproduce a drawing."
+        obsolete_reason "it uses UCBLogo's own picture format. Use Export PNG, and keep the program to draw it again."
       }
       loadpict {
         eg "LOADPICT filename"
@@ -2346,7 +2346,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Saves or loads pictures in UCBLogo's own format. The GUI will have export (PNG/SVG) and the source is the way to reproduce a drawing."
+        obsolete_reason "it uses UCBLogo's own picture format. Use Export PNG, and keep the program to draw it again."
       }
       epspict {
         eg "EPSPICT filename"
@@ -2354,7 +2354,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Exports Encapsulated PostScript. The GUI will export PNG and SVG instead."
+        obsolete_reason "it saves PostScript. Use Export PNG."
       }
     }
     mouse-queries {
@@ -2489,7 +2489,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Gives a procedure's text with its formatting so the editor can show it. The GUI editor already has the source."
+        obsolete_reason "it gives a procedure's text for an editor, and Pendown's editor already shows your program."
       }
       copydef {
         eg "COPYDEF newname oldname"
@@ -2658,7 +2658,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
+        obsolete_reason "it lists the workspace for commands Pendown doesn't have. The variables panel shows your variables, and the editor your procedures."
       }
       buried {
         eg "BURIED"
@@ -2666,7 +2666,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
+        obsolete_reason "it lists the workspace for commands Pendown doesn't have. The variables panel shows your variables, and the editor your procedures."
       }
       traced {
         eg "TRACED"
@@ -2674,7 +2674,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
+        obsolete_reason "it lists the workspace for commands Pendown doesn't have. The variables panel shows your variables, and the editor your procedures."
       }
       stepped {
         eg "STEPPED"
@@ -2682,7 +2682,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
+        obsolete_reason "it lists the workspace for commands Pendown doesn't have. The variables panel shows your variables, and the editor your procedures."
       }
       procedures {
         eg "PROCEDURES"
@@ -2690,7 +2690,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
+        obsolete_reason "it lists the workspace for commands Pendown doesn't have. The variables panel shows your variables, and the editor your procedures."
       }
       primitives {
         eg "PRIMITIVES"
@@ -2698,7 +2698,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Lists every built-in procedure. The GUI's reference/help panel covers this."
+        obsolete_reason "it lists every built-in command, and the help panel shows them all."
       }
       names {
         eg "NAMES"
@@ -2706,7 +2706,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
+        obsolete_reason "it lists the workspace for commands Pendown doesn't have. The variables panel shows your variables, and the editor your procedures."
       }
       plists {
         eg "PLISTS"
@@ -2714,7 +2714,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
+        obsolete_reason "it lists the workspace for commands Pendown doesn't have. The variables panel shows your variables, and the editor your procedures."
       }
       namelist {
         eg """
@@ -2725,7 +2725,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
+        obsolete_reason "it lists the workspace for commands Pendown doesn't have. The variables panel shows your variables, and the editor your procedures."
       }
       pllist {
         eg """
@@ -2737,7 +2737,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Exists to feed the PO / ERASE / SAVE / EDIT family of commands. The GUI shows the defined procedures and variables instead."
+        obsolete_reason "it lists the workspace for commands Pendown doesn't have. The variables panel shows your variables, and the editor your procedures."
       }
       arity {
         eg "ARITY procedurename"
@@ -2752,7 +2752,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Manual memory management for 1980s machines. A modern runtime handles this itself."
+        obsolete_reason "it managed memory by hand, which Pendown does for you."
       }
     }
     workspace-inspection {
@@ -2765,7 +2765,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
+        obsolete_reason "it prints definitions because there was no editor, and Pendown's editor shows them."
       }
       poall {
         eg "POALL  (library procedure)"
@@ -2774,7 +2774,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
+        obsolete_reason "it prints definitions because there was no editor, and Pendown's editor shows them."
       }
       pops {
         eg "POPS  (library procedure)"
@@ -2783,7 +2783,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
+        obsolete_reason "it prints definitions because there was no editor, and Pendown's editor shows them."
       }
       pons {
         eg "PONS  (library procedure)"
@@ -2792,7 +2792,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
+        obsolete_reason "it prints definitions because there was no editor, and Pendown's editor shows them."
       }
       popls {
         eg "POPLS  (library procedure)"
@@ -2801,7 +2801,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
+        obsolete_reason "it prints definitions because there was no editor, and Pendown's editor shows them."
       }
       pon {
         eg """
@@ -2817,7 +2817,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
+        obsolete_reason "it prints definitions because there was no editor, and Pendown's editor shows them."
       }
       popl {
         eg """
@@ -2833,7 +2833,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
+        obsolete_reason "it prints definitions because there was no editor, and Pendown's editor shows them."
       }
       pot {
         eg "POT contentslist"
@@ -2842,7 +2842,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
+        obsolete_reason "it prints definitions because there was no editor, and Pendown's editor shows them."
       }
       pots {
         eg "POTS  (library procedure)"
@@ -2851,7 +2851,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Prints definitions to the screen because there was no editor to look at. The GUI editor and workspace browser show them."
+        obsolete_reason "it prints definitions because there was no editor, and Pendown's editor shows them."
       }
     }
     workspace-control {
@@ -2865,7 +2865,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
+        obsolete_reason "your program is what's in the editor, so you remove a procedure by deleting it there."
       }
       erall {
         eg "ERALL"
@@ -2874,7 +2874,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
+        obsolete_reason "your program is what's in the editor, so you remove a procedure by deleting it there."
       }
       erps {
         eg "ERPS"
@@ -2887,7 +2887,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
+        obsolete_reason "your program is what's in the editor, so you remove a procedure by deleting it there."
       }
       erns {
         eg "ERNS"
@@ -2896,7 +2896,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
+        obsolete_reason "your program is what's in the editor, so you remove a procedure by deleting it there."
       }
       erpls {
         eg "ERPLS"
@@ -2909,7 +2909,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
+        obsolete_reason "your program is what's in the editor, so you remove a procedure by deleting it there."
       }
       ern {
         eg """
@@ -2921,7 +2921,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
+        obsolete_reason "your program is what's in the editor, so you remove a procedure by deleting it there."
       }
       erpl {
         eg """
@@ -2933,7 +2933,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "The editor's source is the definition of the program, so procedures are removed by editing, not by erasing them from a workspace."
+        obsolete_reason "your program is what's in the editor, so you remove a procedure by deleting it there."
       }
       bury {
         eg "BURY contentslist"
@@ -2942,7 +2942,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
+        obsolete_reason "it hides procedures from commands Pendown doesn't have."
       }
       buryall {
         eg "BURYALL  (library procedure)"
@@ -2951,7 +2951,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
+        obsolete_reason "it hides procedures from commands Pendown doesn't have."
       }
       buryname {
         eg """
@@ -2963,7 +2963,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
+        obsolete_reason "it hides procedures from commands Pendown doesn't have."
       }
       unbury {
         eg "UNBURY contentslist"
@@ -2972,7 +2972,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
+        obsolete_reason "it hides procedures from commands Pendown doesn't have."
       }
       unburyall {
         eg "UNBURYALL  (library procedure)"
@@ -2981,7 +2981,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
+        obsolete_reason "it hides procedures from commands Pendown doesn't have."
       }
       unburyname {
         eg """
@@ -2993,7 +2993,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
+        obsolete_reason "it hides procedures from commands Pendown doesn't have."
       }
       buriedp {
         eg """
@@ -3004,7 +3004,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Burying only hides items from the PO / ERASE / SAVE / EDIT commands, which are themselves obsolete."
+        obsolete_reason "it hides procedures from commands Pendown doesn't have."
       }
       trace {
         eg "TRACE contentslist"
@@ -3013,7 +3013,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see implementation-plan.md)."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step buttons do that."
       }
       untrace {
         eg "UNTRACE contentslist"
@@ -3021,7 +3021,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see implementation-plan.md)."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step buttons do that."
       }
       tracedp {
         eg """
@@ -3032,7 +3032,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see implementation-plan.md)."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step buttons do that."
       }
       step {
         eg "STEP contentslist"
@@ -3041,7 +3041,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see implementation-plan.md)."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step buttons do that."
       }
       unstep {
         eg "UNSTEP contentslist"
@@ -3049,7 +3049,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see implementation-plan.md)."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step buttons do that."
       }
       steppedp {
         eg """
@@ -3060,7 +3060,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Debugging toggles typed at the prompt. The GUI provides tracing and stepping as debugger controls (see implementation-plan.md)."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step buttons do that."
       }
       edit {
         eg """
@@ -3082,7 +3082,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Opens an external text editor. The GUI has its own editor."
+        obsolete_reason "it opens an external text editor, and Pendown has its own."
       }
       editfile {
         eg "EDITFILE filename"
@@ -3096,7 +3096,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Opens an external text editor. The GUI has its own editor."
+        obsolete_reason "it opens an external text editor, and Pendown has its own."
       }
       edall {
         eg "EDALL  (library procedure)"
@@ -3105,7 +3105,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Opens an external text editor. The GUI has its own editor."
+        obsolete_reason "it opens an external text editor, and Pendown has its own."
       }
       edps {
         eg "EDPS  (library procedure)"
@@ -3114,7 +3114,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Opens an external text editor. The GUI has its own editor."
+        obsolete_reason "it opens an external text editor, and Pendown has its own."
       }
       edns {
         eg "EDNS  (library procedure)"
@@ -3123,7 +3123,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Opens an external text editor. The GUI has its own editor."
+        obsolete_reason "it opens an external text editor, and Pendown has its own."
       }
       edpls {
         eg "EDPLS  (library procedure)"
@@ -3132,7 +3132,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Opens an external text editor. The GUI has its own editor."
+        obsolete_reason "it opens an external text editor, and Pendown has its own."
       }
       edn {
         eg """
@@ -3144,7 +3144,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Opens an external text editor. The GUI has its own editor."
+        obsolete_reason "it opens an external text editor, and Pendown has its own."
       }
       edpl {
         eg """
@@ -3156,7 +3156,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Opens an external text editor. The GUI has its own editor."
+        obsolete_reason "it opens an external text editor, and Pendown has its own."
       }
       save {
         eg "SAVE filename"
@@ -3178,7 +3178,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Saves or loads the whole workspace as a file. The GUI opens and saves program files instead. If modules are needed later, design a proper import."
+        obsolete_reason "it saves or loads a whole workspace. Use Open and Save for program files."
       }
       savel {
         eg "SAVEL contentslist filename  (library procedure)"
@@ -3186,7 +3186,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Saves or loads the whole workspace as a file. The GUI opens and saves program files instead. If modules are needed later, design a proper import."
+        obsolete_reason "it saves or loads a whole workspace. Use Open and Save for program files."
       }
       load {
         eg "LOAD filename"
@@ -3195,7 +3195,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Saves or loads the whole workspace as a file. The GUI opens and saves program files instead. If modules are needed later, design a proper import."
+        obsolete_reason "it saves or loads a whole workspace. Use Open and Save for program files."
       }
       cslsload {
         eg "CSLSLOAD name"
@@ -3204,7 +3204,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Loads example programs from the Computer Science Logo Style books. Not applicable."
+        obsolete_reason "it loads programs from the Computer Science Logo Style books."
       }
       help {
         eg """
@@ -3221,7 +3221,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Prints manual entries at the prompt. The GUI will have a reference panel (which can be built from this file)."
+        obsolete_reason "it prints the manual, and Pendown's help panel shows it: press F1."
       }
       seteditor {
         eg "SETEDITOR path"
@@ -3229,7 +3229,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Configures where UCBLogo finds its own support files (editor, library, help, temp files). Not applicable."
+        obsolete_reason "it sets where UCBLogo keeps its own files."
       }
       setlibloc {
         eg "SETLIBLOC path"
@@ -3237,7 +3237,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Configures where UCBLogo finds its own support files (editor, library, help, temp files). Not applicable."
+        obsolete_reason "it sets where UCBLogo keeps its own files."
       }
       setcslsloc {
         eg "SETCSLSLOC path"
@@ -3246,7 +3246,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Configures where UCBLogo finds its own support files (editor, library, help, temp files). Not applicable."
+        obsolete_reason "it sets where UCBLogo keeps its own files."
       }
       sethelploc {
         eg "SETHELPLOC path"
@@ -3254,7 +3254,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Configures where UCBLogo finds its own support files (editor, library, help, temp files). Not applicable."
+        obsolete_reason "it sets where UCBLogo keeps its own files."
       }
       settemploc {
         eg "SETTEMPLOC path"
@@ -3262,7 +3262,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Configures where UCBLogo finds its own support files (editor, library, help, temp files). Not applicable."
+        obsolete_reason "it sets where UCBLogo keeps its own files."
       }
       gc {
         eg """
@@ -3273,7 +3273,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Manual memory management for 1980s machines. A modern runtime handles this itself."
+        obsolete_reason "it managed memory by hand, which Pendown does for you."
       }
       .setsegmentsize {
         eg ".SETSEGMENTSIZE num"
@@ -3281,7 +3281,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Manual memory management for 1980s machines. A modern runtime handles this itself."
+        obsolete_reason "it managed memory by hand, which Pendown does for you."
       }
     }
   }
@@ -3365,7 +3365,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Superseded by IFELSE. TEST stores hidden state that IFTRUE / IFFALSE read later, which is confusing."
+        obsolete_reason "it keeps a hidden answer for IFTRUE and IFFALSE to use later, which is confusing. Use IFELSE."
       }
       iftrue {
         eg """
@@ -3376,7 +3376,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Superseded by IFELSE. TEST stores hidden state that IFTRUE / IFFALSE read later, which is confusing."
+        obsolete_reason "it keeps a hidden answer for IFTRUE and IFFALSE to use later, which is confusing. Use IFELSE."
       }
       iffalse {
         eg """
@@ -3388,7 +3388,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Superseded by IFELSE. TEST stores hidden state that IFTRUE / IFFALSE read later, which is confusing."
+        obsolete_reason "it keeps a hidden answer for IFTRUE and IFFALSE to use later, which is confusing. Use IFELSE."
       }
       stop {
         eg "STOP"
@@ -3460,7 +3460,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Opens an interactive prompt inside a running procedure. The GUI's pause button and variable inspector replace it."
+        obsolete_reason "it stops for typing in the middle of a procedure. Use the Pause button, and the variables panel."
       }
       continue {
         eg """
@@ -3477,7 +3477,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Ends an interactive PAUSE, which is obsolete."
+        obsolete_reason "it ends a PAUSE, which Pendown doesn't have."
       }
       wait {
         eg "WAIT time"
@@ -3493,7 +3493,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Exits Logo. In the GUI you close the window; the CLI ends when the program does."
+        obsolete_reason "it leaves Logo. Close the window instead."
       }
       .maybeoutput {
         eg ".MAYBEOUTPUT value  (special form)"
@@ -3522,7 +3522,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Unstructured jumps. Loops, recursion and STOP/OUTPUT cover every use in new programs."
+        obsolete_reason "it jumps to a TAG. Use REPEAT, WHILE, procedures, STOP and OUTPUT instead."
       }
       tag {
         eg "TAG quoted.word"
@@ -3530,7 +3530,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "Only exists as a target for GOTO, which is obsolete."
+        obsolete_reason "it marks a place for GOTO, which Pendown doesn't have."
       }
       ignore {
         eg "IGNORE value  (library procedure)"
@@ -4074,7 +4074,7 @@ logo {
       supported #false
       obsolete #true
       phase #null
-      obsolete_reason "Controls messages printed by LOAD, which is obsolete."
+      obsolete_reason "it controls what LOAD prints, and Pendown doesn't have LOAD."
     }
     printdepthlimit {
       eg "PRINTDEPTHLIMIT  (variable)"
@@ -4107,7 +4107,7 @@ logo {
       supported #false
       obsolete #true
       phase #null
-      obsolete_reason "Runs instructions after LOAD of a saved workspace, which is obsolete."
+      obsolete_reason "it runs after LOAD, and Pendown doesn't have LOAD."
     }
     unburyonedit {
       eg "UNBURYONEDIT  (variable)"
@@ -4116,7 +4116,7 @@ logo {
       supported #false
       obsolete #true
       phase #null
-      obsolete_reason "Controls burying and EDIT, which are obsolete."
+      obsolete_reason "it controls burying and EDIT, which Pendown doesn't have."
     }
     usealternatenames {
       eg "USEALTERNATENAMES  (variable)"
@@ -4128,7 +4128,7 @@ logo {
       supported #false
       obsolete #true
       phase #null
-      obsolete_reason "Swaps TRUE/FALSE/END for translated words. Translation, if wanted, belongs in the GUI and error messages, not in the language."
+      obsolete_reason "it swaps TRUE, FALSE and END for words in another language."
     }
     logoversion {
       eg "LOGOVERSION  (variable)"
@@ -4144,7 +4144,7 @@ logo {
       supported #false
       obsolete #true
       phase #null
-      obsolete_reason "Lets programs adapt to UCBLogo's different builds (wxWidgets, X11, ...). There's only one platform here."
+      obsolete_reason "it tells a program which build of UCBLogo it's in, and Pendown has only one."
     }
   }
 }

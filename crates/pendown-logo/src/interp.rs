@@ -519,11 +519,11 @@ impl Interpreter {
                 Err(Flow::Throw { tag, .. }) if tag.eq_ignore_ascii_case("toplevel") => return Ok(()),
                 Err(Flow::Throw { tag, value, span }) => return Err(RunError::Runtime(uncaught(&tag, value, span))),
                 Err(Flow::Stop(span)) => {
-                    let e = Error::new("STOP can only be used inside a procedure", Some(span));
+                    let e = Error::new("STOP can only be used inside a procedure", Some(span)).about("STOP");
                     return Err(RunError::Runtime(e));
                 }
                 Err(Flow::Output(_, span)) => {
-                    let e = Error::new("OUTPUT can only be used inside a procedure", Some(span));
+                    let e = Error::new("OUTPUT can only be used inside a procedure", Some(span)).about("OUTPUT");
                     return Err(RunError::Runtime(e));
                 }
             }
@@ -1149,7 +1149,7 @@ impl Interpreter {
     fn lookup(&self, sym: Sym, call: &Call) -> Result<Rc<Proc>, Flow> {
         match &self.procs[sym as usize] {
             Some(proc) => Ok(proc.clone()),
-            None => Err(Error::new(format!("I don't know how to {}", call.name.to_uppercase()), Some(call.span)).into()),
+            None => Err(Error::unknown(&call.name, Some(call.span)).into()),
         }
     }
 

@@ -11,7 +11,7 @@ pub const PICTURE_SIZE: u32 = 200;
 /// How an example is drawn for its picture: fitted, with `RANDOM`'s seed
 /// fixed so the picture is always the same, as in the tests.
 pub fn picture_options() -> Options {
-    Options { width: PICTURE_SIZE, height: PICTURE_SIZE, limit: 1_000_000, seed: Some(1), fit: true }
+    Options { width: PICTURE_SIZE, height: PICTURE_SIZE, limit: 1_000_000, seed: Some(1), fit: true, svg: false }
 }
 
 /// An example's name, for its saved picture: `forward-1` for FORWARD's

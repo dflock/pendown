@@ -4667,6 +4667,7 @@ dependencies = [
  "pendown-cli",
  "pendown-logo",
  "pendown-render",
+ "resvg 0.46.0",
 ]
 
 [[package]]

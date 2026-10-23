@@ -1,4 +1,5 @@
-//! `pendown-cli`: runs a Logo program and saves the drawing as a PNG.
+//! `pendown-cli`: runs a Logo program and saves the drawing as a PNG, or an
+//! SVG.
 
 use std::{path::PathBuf, process::ExitCode};
 
@@ -6,7 +7,7 @@ use clap::Parser;
 use pendown_cli::{Options, describe, parse_size, render};
 use pendown_logo::RunError;
 
-/// Runs a Pendown Logo program and saves its drawing as a PNG.
+/// Runs a Pendown Logo program and saves its drawing as a PNG, or an SVG.
 #[derive(Parser)]
 #[command(version)]
 struct Args {
@@ -14,6 +15,8 @@ struct Args {
     program: PathBuf,
 
     /// Where to save the drawing. Defaults to the program's name with `.png`.
+    /// A name ending `.svg` saves an SVG of the whole turtle area instead,
+    /// and ignores `--size`.
     #[arg(short, long)]
     output: Option<PathBuf>,
 
@@ -49,13 +52,15 @@ fn main() -> ExitCode {
     };
     let output_path = args.output.unwrap_or_else(|| args.program.with_extension("png"));
     let (width, height) = args.size;
-    let output = render(&source, Options { width, height, limit: args.limit, seed: args.seed, fit: args.fit });
+    let svg = output_path.extension().is_some_and(|e| e.eq_ignore_ascii_case("svg"));
+    let output = render(&source, Options { width, height, limit: args.limit, seed: args.seed, fit: args.fit, svg });
     print!("{}", output.printed);
     if let Some(summary) = &output.summary {
         eprintln!("{summary}");
     }
 
-    let save = || match std::fs::write(&output_path, &output.png) {
+    let picture = output.svg.as_ref().map_or(&output.png[..], |svg| svg.as_bytes());
+    let save = || match std::fs::write(&output_path, picture) {
         Ok(()) => true,
         Err(e) => {
             eprintln!("{}: can't save the drawing: {e}", output_path.display());

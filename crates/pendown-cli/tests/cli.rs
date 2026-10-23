@@ -61,6 +61,19 @@ fn output_and_size_options() {
 }
 
 #[test]
+fn an_svg_name_saves_an_svg_of_the_turtle_area() {
+    let d = dir("svg");
+    std::fs::write(d.join("square.logo"), "REPEAT 4 [FD 100 RT 90]").unwrap();
+    let r = cli(&d, &["square.logo", "-o", "square.svg", "-s", "250x300"]);
+    assert_eq!(r.status, 0, "{}", r.stderr);
+    let svg = std::fs::read_to_string(d.join("square.svg")).unwrap();
+    assert!(svg.starts_with("<svg "), "{svg}");
+    assert!(svg.contains(r#"viewBox="-500 -500 1000 1000""#), "{svg}");
+    assert_eq!(svg.matches("<line ").count(), 4, "{svg}");
+    assert!(!d.join("square.png").exists());
+}
+
+#[test]
 fn a_bad_size_is_a_usage_error() {
     let d = dir("bad-size");
     std::fs::write(d.join("p.logo"), "FD 10").unwrap();

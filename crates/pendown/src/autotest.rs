@@ -116,6 +116,9 @@ enum Step {
     CheckEditor(&'static str),
     /// The exported picture is a PNG the size of the canvas.
     CheckExported(&'static str),
+    /// The exported picture is an SVG with an element for every line and
+    /// shape drawn.
+    CheckExportedSvg(&'static str),
     /// The editor shows exactly these diagnostics.
     CheckDiagnostics(&'static [&'static str]),
     /// Start counting renders and highlight changes.
@@ -236,6 +239,8 @@ fn script() -> Vec<Step> {
         CheckTitle("● triangle.logo — Pendown"),
         ExportTo("star.png"),
         CheckExported("star.png"),
+        ExportTo("star.svg"),
+        CheckExportedSvg("star.svg"),
         OpenFrom("triangle.logo"),
         CheckEditor("REPEAT 3 [FD 200 RT 120]"),
         CheckTitle("triangle.logo — Pendown"),
@@ -641,7 +646,7 @@ impl App {
                 }
                 Step::ExportTo(name) => {
                     let path = self.autotest.as_ref().unwrap().dir.join(name);
-                    self.export_to(&path, cx);
+                    self.export_to(&path, crate::files::Picture::Png, cx);
                 }
                 Step::CursorAt(marker) | Step::F1At(marker) => {
                     let text = self.editor.read(cx).value().to_string();
@@ -756,6 +761,14 @@ impl App {
                     let drawn = image.as_ref().map_or(0, |i| i.pixels().filter(|p| p.0 != [0, 0, 0, 255]).count());
                     let ok = found.as_ref().is_ok_and(|s| *s == size) && drawn > 0;
                     self.check(ok, format!("exported a {found:?} PNG with {drawn} drawn pixels, the canvas is {size:?}"));
+                }
+                Step::CheckExportedSvg(name) => {
+                    let path = self.autotest.as_ref().unwrap().dir.join(name);
+                    let svg = std::fs::read_to_string(&path).unwrap_or_default();
+                    // The background, then a line for each mark.
+                    let marks = svg.lines().filter(|l| l.starts_with('<') && !l.starts_with("</") && !l.starts_with("<svg") && !l.starts_with("<g")).count() - 1;
+                    let drawn = self.canvas.borrow().drawing.segments();
+                    self.check(svg.starts_with("<svg ") && marks == drawn, format!("exported an SVG with {marks} marks, and {drawn} were drawn"));
                 }
                 Step::CheckDrawn(expected) => {
                     let drawn = self.canvas.borrow().drawing.segments();

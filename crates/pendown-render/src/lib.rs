@@ -6,6 +6,7 @@
 
 mod mark;
 pub mod metrics;
+mod svg;
 
 pub use mark::Mark;
 pub use metrics::DrawingMetrics;

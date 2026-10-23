@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- The top of the turtle's shell, painted in a lighter colour over
+       turtle-body.svg, with a ring around the middle plate where the body
+       shows through. -->
+  <path fill-rule="evenodd" d="
+    M50 26 A21 26 0 1 1 50 78 A21 26 0 1 1 50 26 Z
+    M50 39 L61.3 45.5 L61.3 58.5 L50 65 L38.7 58.5 L38.7 45.5 Z
+    M50 43.5 L57.4 47.8 L57.4 56.2 L50 60.5 L42.6 56.2 L42.6 47.8 Z"/>
+</svg>

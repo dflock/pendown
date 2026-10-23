@@ -34,7 +34,7 @@ use pendown_logo::{RunError, SourceId};
 
 use crate::{
     autotest::Autotest,
-    canvas::{Canvas, Overlay, TURTLE_LENGTH},
+    canvas::{Canvas, Overlay, TURTLE_SIZE},
     files::{After, ExportPicture, NewFile, OpenFile, RunProgram, SaveFile, SaveFileAs, ShowHelp, ToggleMetrics},
     help_panel::HelpPanel,
     highlighter::LogoHighlighter,
@@ -434,7 +434,7 @@ impl App {
         self.wake = None;
         let Some(animator) = self.animator.as_ref().filter(|a| a.wants_frames()) else { return };
         let px_per_step = self.canvas.borrow().drawing.scale();
-        let mut gap = animator.next_change(px_per_step, TURTLE_LENGTH as f64 * window.scale_factor() as f64);
+        let mut gap = animator.next_change(px_per_step, TURTLE_SIZE as f64 / 2. * window.scale_factor() as f64);
         if gap < FRAME_SOON {
             window.request_animation_frame();
             // gpui can drop an animation frame, as when it throttles a window
@@ -800,7 +800,7 @@ impl App {
             .child(
                 gpui_kit::canvas(
                     move |bounds, _, _| bounds,
-                    move |_, bounds, window, _| canvas.borrow_mut().paint(bounds, window, overlay.clone()),
+                    move |_, bounds, window, cx| canvas.borrow_mut().paint(bounds, window, overlay.clone(), cx),
                 )
                 .size_full(),
             )

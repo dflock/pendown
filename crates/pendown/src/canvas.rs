@@ -1,5 +1,6 @@
 //! The canvas (ADR 0010): `pendown-render`'s pixel buffer shown as tiles,
-//! with the move in progress and the turtle painted as paths each frame.
+//! with the move in progress painted as a path each frame, and the turtle as
+//! two SVGs, which gpui renders once and keeps on the GPU.
 
 use std::{rc::Rc, sync::Arc, time::Duration};
 
@@ -16,8 +17,16 @@ pub struct Canvas {
     metrics: Rc<WindowMetrics>,
 }
 
-/// The turtle's length in logical pixels, whatever the zoom.
-pub const TURTLE_LENGTH: f32 = 18.0;
+/// The turtle's size in logical pixels, whatever the zoom: the square its
+/// pictures fill, centred on its position.
+pub const TURTLE_SIZE: f32 = 32.0;
+
+/// The turtle, facing up: its body, then the top of its shell, painted over
+/// it in a lighter colour. gpui paints an SVG in one colour.
+const TURTLE: [(&str, &[u8], u32); 2] = [
+    ("pendown/turtle-body.svg", include_bytes!("../images/turtle-body.svg"), 0x2e7d32),
+    ("pendown/turtle-shell.svg", include_bytes!("../images/turtle-shell.svg"), 0x8bc34a),
+];
 
 /// What changes each frame, painted on top of the buffer.
 #[derive(Clone)]
@@ -33,12 +42,12 @@ impl Canvas {
         Canvas { drawing: Drawing::new(), tiles: Vec::new(), rerender: None, metrics }
     }
 
-    pub fn paint(&mut self, bounds: Bounds<Pixels>, window: &mut Window, overlay: Overlay) {
+    pub fn paint(&mut self, bounds: Bounds<Pixels>, window: &mut Window, overlay: Overlay, cx: &App) {
         let metrics = self.metrics.clone();
-        metrics.canvas.time(|| self.paint_timed(bounds, window, overlay));
+        metrics.canvas.time(|| self.paint_timed(bounds, window, overlay, cx));
     }
 
-    fn paint_timed(&mut self, bounds: Bounds<Pixels>, window: &mut Window, overlay: Overlay) {
+    fn paint_timed(&mut self, bounds: Bounds<Pixels>, window: &mut Window, overlay: Overlay, cx: &App) {
         let per_device = window.scale_factor();
         let width = (bounds.size.width.as_f32() * per_device).round() as u32;
         let height = (bounds.size.height.as_f32() * per_device).round() as u32;
@@ -99,18 +108,18 @@ impl Canvas {
             }
         }
         if let Some((pos, heading)) = overlay.turtle {
-            // An isosceles triangle with the turtle's position at the middle
-            // of its short side.
-            let length = (TURTLE_LENGTH * per_device) as f64 / self.drawing.scale().max(0.01);
-            let (s, c) = heading.to_radians().sin_cos();
-            let at = |forward: f64, right: f64| Point { x: pos.x + forward * s + right * c, y: pos.y + forward * c - right * s };
-            let mut triangle = PathBuilder::fill();
-            triangle.move_to(to_window(at(length, 0.0)));
-            triangle.line_to(to_window(at(0.0, length * 0.4)));
-            triangle.line_to(to_window(at(0.0, -length * 0.4)));
-            triangle.close();
-            if let Ok(triangle) = triangle.build() {
-                window.paint_path(triangle, rgb(0x4caf50));
+            let centre = to_window(pos);
+            let half = px(TURTLE_SIZE / 2.);
+            let turtle = Bounds::new(point(centre.x - half, centre.y - half), size(px(TURTLE_SIZE), px(TURTLE_SIZE)));
+            // Turned clockwise by its heading, about its centre, as gpui's
+            // `svg()` does, in device pixels.
+            let (x, y) = (centre.x.as_f32() * per_device, centre.y.as_f32() * per_device);
+            let turn = TransformationMatrix::unit()
+                .translate(point(ScaledPixels(x), ScaledPixels(y)))
+                .rotate(Radians(heading.to_radians() as f32))
+                .translate(point(ScaledPixels(-x), ScaledPixels(-y)));
+            for (path, svg, colour) in TURTLE {
+                window.paint_svg(turtle, path.into(), Some(svg), turn, rgb(colour).into(), cx).ok();
             }
         }
     }

@@ -182,8 +182,9 @@ impl Animator {
     /// How long until the picture changes by about a device pixel, so the
     /// window can skip frames that would look the same (phase 3 issue 08).
     /// Zero means at the next frame: at Instant, or when there are events to
-    /// take. `px_per_step` is the canvas's scale, and `turtle_px` the
-    /// turtle's length, which says how far its tip moves as it turns.
+    /// take. `px_per_step` is the canvas's scale, and `turtle_px` how far
+    /// the turtle reaches from its position, which says how far its head
+    /// moves as it turns.
     pub fn next_change(&self, px_per_step: f64, turtle_px: f64) -> Duration {
         let Speed::Animated(steps) = self.speed else { return Duration::ZERO };
         let secs = |s: f64| Duration::from_secs_f64(s.max(0.0));

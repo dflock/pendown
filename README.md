@@ -72,7 +72,9 @@ The help comes from `pendown-logo.kdl`, and the lessons are markdown files in `t
 cargo run --release -p pendown-cli -- flower.logo --output flower.png --size 800x600
 ```
 
-`--fit` zooms in on the drawing, rather than showing the whole turtle area.
+`--fit` zooms in on the drawing, rather than showing the whole turtle area. An output name ending `.svg` saves an SVG of the whole turtle area instead of a PNG.
+
+In the app, **Export** saves the drawing as a PNG, the size of the canvas, or as an SVG of the whole turtle area, which stays sharp at any size.
 
 ### Performance
 

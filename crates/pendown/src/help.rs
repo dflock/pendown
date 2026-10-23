@@ -3,15 +3,17 @@
 
 use pendown_cli::Options;
 
-/// The pictures of examples are this many pixels square, fitted to the
-/// drawing. The panel shows them smaller, so they're sharp on a HiDPI
-/// screen.
-pub const PICTURE_SIZE: u32 = 200;
+/// The panel shows the pictures of examples this many logical pixels
+/// square. They're SVGs, fitted to the drawing, and rendered at exactly the
+/// size they're shown.
+pub const PICTURE_SIZE: u32 = 84;
 
 /// How an example is drawn for its picture: fitted, with `RANDOM`'s seed
-/// fixed so the picture is always the same, as in the tests.
+/// fixed so the picture is always the same, as in the tests. No line is
+/// thinner than a pixel, or thin lines would be grey on a 1× screen.
 pub fn picture_options() -> Options {
-    Options { width: PICTURE_SIZE, height: PICTURE_SIZE, limit: 1_000_000, seed: Some(1), fit: true }
+    let thinnest = 1.0 / PICTURE_SIZE as f64;
+    Options { width: PICTURE_SIZE, height: PICTURE_SIZE, limit: 1_000_000, seed: Some(1), fit: true, svg: Some(thinnest) }
 }
 
 /// An example's name, for its saved picture: `forward-1` for FORWARD's

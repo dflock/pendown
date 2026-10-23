@@ -27,7 +27,7 @@ Spike 02 (`.scratch/phase-1-spikes/issues/02-pixel-buffer-streaming.md`) measure
 
 ## Consequences
 
-- PNG export comes straight from the buffer, and includes fills and pen modes. An SVG export from the event stream couldn't show those.
+- PNG export comes straight from the buffer, and includes fills and pen modes. An SVG export from the event stream couldn't show those. SVG export, from the marks, came later (ADR 0024).
 - How the buffer's resolution follows the canvas is decided in ADR 0003.
 - vello_cpu is young, its API is still changing, and it brings about 44 crates, including rayon and kurbo. Upgrades may need code changes.
 - The colour docs (`SETPENCOLOR` in `pendown-logo.kdl`, the plan and ADR 0015) say that a translucent pen darkens where moves meet.

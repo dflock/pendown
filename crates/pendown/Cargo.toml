@@ -12,3 +12,8 @@ image.workspace = true
 pendown-cli.workspace = true
 pendown-logo.workspace = true
 pendown-render.workspace = true
+
+[dev-dependencies]
+# Renders exported SVGs back into pixels, to compare with the PNG. The
+# version gpui already uses, so it adds nothing to build.
+resvg = { version = "0.46", default-features = false }

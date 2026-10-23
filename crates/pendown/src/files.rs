@@ -10,6 +10,22 @@ use crate::app::App;
 
 actions!(pendown, [NewFile, OpenFile, SaveFile, SaveFileAs, ExportPicture, RunProgram, ToggleMetrics, ShowHelp]);
 
+/// What the drawing can be exported as.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Picture {
+    Png,
+    Svg,
+}
+
+impl Picture {
+    pub(crate) fn extension(self) -> &'static str {
+        match self {
+            Picture::Png => "png",
+            Picture::Svg => "svg",
+        }
+    }
+}
+
 /// The usual shortcuts: Ctrl on Linux and Windows, Cmd on macOS.
 pub fn bind_keys(cx: &mut gpui_kit::App) {
     cx.bind_keys([
@@ -188,27 +204,39 @@ impl App {
         saved
     }
 
-    /// Saves the drawing as a PNG, at the canvas's resolution, without the
-    /// turtle (ADR 0010).
-    pub(crate) fn export(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let path = cx.prompt_for_new_path(&self.folder(), Some(&self.document.suggested_name("png")));
+    /// Saves the drawing, without the turtle: as a PNG at the canvas's
+    /// resolution (ADR 0010), or as an SVG of the whole turtle area.
+    pub(crate) fn export(&mut self, picture: Picture, window: &mut Window, cx: &mut Context<Self>) {
+        let path = cx.prompt_for_new_path(&self.folder(), Some(&self.document.suggested_name(picture.extension())));
         cx.spawn_in(window, async move |this, cx| {
             let Ok(Ok(Some(path))) = path.await else { return };
-            this.update_in(cx, |this, _, cx| this.export_to(&path, cx)).ok();
+            this.update_in(cx, |this, _, cx| this.export_to(&path, picture, cx)).ok();
         })
         .detach();
     }
 
-    pub(crate) fn export_to(&mut self, path: &Path, cx: &mut Context<Self>) {
-        let path = if path.extension().is_none() { path.with_extension("png") } else { path.to_path_buf() };
-        // The canvas only draws what's new when it paints, which may not
-        // have happened since the program finished.
-        let png = {
-            let mut canvas = self.canvas.borrow_mut();
-            canvas.drawing.draw_pending();
-            canvas.drawing.png()
+    /// Saves the drawing to `path`. A name ending `.png` or `.svg` says
+    /// which, whatever `picture` asked for.
+    pub(crate) fn export_to(&mut self, path: &Path, picture: Picture, cx: &mut Context<Self>) {
+        let picture = match path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
+            Some("png") => Picture::Png,
+            Some("svg") => Picture::Svg,
+            _ => picture,
         };
-        match std::fs::write(&path, png) {
+        let path = if path.extension().is_none() { path.with_extension(picture.extension()) } else { path.to_path_buf() };
+        let bytes = {
+            let mut canvas = self.canvas.borrow_mut();
+            match picture {
+                Picture::Png => {
+                    // The canvas only draws what's new when it paints, which
+                    // may not have happened since the program finished.
+                    canvas.drawing.draw_pending();
+                    canvas.drawing.png()
+                }
+                Picture::Svg => canvas.drawing.svg(0.0).into_bytes(),
+            }
+        };
+        match std::fs::write(&path, bytes) {
             Ok(()) => {
                 remember_folder(&path);
                 self.print(format!("Saved the drawing to {}", path.display()));

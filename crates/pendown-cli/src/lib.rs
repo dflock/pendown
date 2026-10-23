@@ -35,6 +35,9 @@ pub struct Options {
     /// Zoom in on what's drawn, rather than showing the whole turtle area
     /// (`Drawing::fit`).
     pub fit: bool,
+    /// Make an SVG of the drawing too, with no line thinner than this
+    /// fraction of its width (`Drawing::svg`).
+    pub svg: Option<f64>,
 }
 
 /// The smallest area, in turtle steps, that `fit` zooms in to.
@@ -43,6 +46,8 @@ pub const FIT_MIN: f64 = 100.0;
 pub struct Output {
     /// The picture, as far as the program got.
     pub png: Vec<u8>,
+    /// The same as SVG, if `Options::svg` asked for it.
+    pub svg: Option<String>,
     /// Everything the program printed.
     pub printed: String,
     pub result: Result<(), RunError>,
@@ -143,6 +148,7 @@ pub fn render(source: &str, options: Options) -> Output {
             }
             let drawing = drawing.borrow();
             let png = drawing.png();
+            let svg = options.svg.map(|thinnest| drawing.svg(thinnest));
             let printed = printed.borrow().clone();
             let summary = metrics::enabled().then(|| {
                 let wall = started.elapsed();
@@ -157,7 +163,7 @@ pub fn render(source: &str, options: Options) -> Output {
                     ThreadCpu::now().since(&cpu).percentages(wall, "main"),
                 )
             });
-            Output { png, printed, result, drawn: drawing.segments(), summary }
+            Output { png, svg, printed, result, drawn: drawing.segments(), summary }
         })
         .expect("can start the interpreter thread")
         .join()

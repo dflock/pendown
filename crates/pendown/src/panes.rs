@@ -10,6 +10,7 @@ use gpui_kit::component::{
     ActiveTheme, Disableable as _, Sizable,
     Selectable as _,
     button::{Button, ButtonVariants as _},
+    menu::{DropdownMenu as _, PopupMenuItem},
     h_flex,
     input::{Editor, EditorState, Input, InputState, Textarea, TextareaState},
     slider::{Slider, SliderState},
@@ -17,7 +18,10 @@ use gpui_kit::component::{
 use gpui_kit::{assets::IconName, *};
 use pendown::{animator::Speed, metrics::WindowMetrics, run::DEFAULT_CHANNEL, speed::describe};
 
-use crate::{app::App, files::After};
+use crate::{
+    app::App,
+    files::{After, Picture},
+};
 
 pub struct EditorPane {
     pub editor: Entity<EditorState>,
@@ -144,6 +148,22 @@ impl ToolbarPane {
     }
 }
 
+impl ToolbarPane {
+    /// Export, with a menu of the formats.
+    fn export_menu(&self) -> impl IntoElement {
+        let app = self.app.clone();
+        let item = move |label: &'static str, picture: Picture| {
+            let app = app.clone();
+            PopupMenuItem::new(label).on_click(move |_, window, cx| {
+                app.update(cx, |this, cx| this.export(picture, window, cx)).ok();
+            })
+        };
+        Button::new("export").flex_none().small().ghost().icon(IconName::ImageDown).label("Export").dropdown_caret(true).dropdown_menu(
+            move |menu, _, _| menu.item(item("PNG picture", Picture::Png)).item(item("SVG drawing", Picture::Svg)),
+        )
+    }
+}
+
 impl Render for ToolbarPane {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         let ToolbarState { running, paused, speed, help } = self.state;
@@ -154,7 +174,7 @@ impl Render for ToolbarPane {
             .child(self.button("new", IconName::FilePlus, "New", |this, window, cx| this.then(After::NewFile, window, cx)).ghost())
             .child(self.button("open", IconName::FolderOpen, "Open", |this, window, cx| this.then(After::OpenFile, window, cx)).ghost())
             .child(self.button("save", IconName::Save, "Save", |this, window, cx| this.save(After::Nothing, window, cx)).ghost())
-            .child(self.button("export", IconName::ImageDown, "Export PNG", |this, window, cx| this.export(window, cx)).ghost())
+            .child(self.export_menu())
             .child(div().flex_none().w(px(12.)))
             .child(self.button("run", IconName::Play, "Run", |this, _, cx| this.start(DEFAULT_CHANNEL, cx)).primary())
             .child(

@@ -439,7 +439,7 @@ The CLI reads the same event stream with no timing and renders it to a file. `WA
 pendown-cli <program.logo> [--output <file.png>] [--size <width>x<height>] [--limit <instructions>] [--seed <n>]
 ```
 
-- **`--output`** (`-o`) defaults to the program's name with `.png`.
+- **`--output`** (`-o`) defaults to the program's name with `.png`. A name ending `.svg` saves an SVG of the whole turtle area instead (ADR 0024).
 - **`--size`** (`-s`) defaults to `1000x1000`. The turtle area is fitted to it without stretching.
 - **`--seed`** fixes `RANDOM`'s seed, so the picture is the same every time. Without it, each run is different.
 - **`--limit`** defaults to 10 million instructions. A program that never ends, such as `FOREVER`, stops there with an error, and the picture is saved as far as it got.
@@ -448,7 +448,7 @@ pendown-cli <program.logo> [--output <file.png>] [--size <width>x<height>] [--li
   - 1 for a parse error, which saves nothing;
   - 1 for a runtime error, which saves the picture as far as it got;
   - 2 for a bad option.
-- **Later:** SVG export, drawn from the event stream rather than the pixel buffer.
+- **SVG export** (done, ADR 0024): drawn from the drawing's marks rather than the pixel buffer, in the CLI and the app's Export menu.
 
 ### Open questions
 

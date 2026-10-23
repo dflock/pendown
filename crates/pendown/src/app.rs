@@ -35,7 +35,7 @@ use pendown_logo::{RunError, SourceId};
 use crate::{
     autotest::Autotest,
     canvas::{Canvas, Overlay, TURTLE_SIZE},
-    files::{After, ExportPicture, NewFile, OpenFile, RunProgram, SaveFile, SaveFileAs, ShowHelp, ToggleMetrics},
+    files::{After, ExportPicture, NewFile, OpenFile, Picture, RunProgram, SaveFile, SaveFileAs, ShowHelp, ToggleMetrics},
     help_panel::HelpPanel,
     highlighter::LogoHighlighter,
     panes::{ConsolePane, EditorPane, ToolbarPane, ToolbarState},
@@ -828,7 +828,7 @@ impl App {
             .on_action(cx.listener(|this, _: &OpenFile, window, cx| this.then(After::OpenFile, window, cx)))
             .on_action(cx.listener(|this, _: &SaveFile, window, cx| this.save(After::Nothing, window, cx)))
             .on_action(cx.listener(|this, _: &SaveFileAs, window, cx| this.save_as(After::Nothing, window, cx)))
-            .on_action(cx.listener(|this, _: &ExportPicture, window, cx| this.export(window, cx)))
+            .on_action(cx.listener(|this, _: &ExportPicture, window, cx| this.export(Picture::Png, window, cx)))
             .on_action(cx.listener(|this, _: &RunProgram, _, cx| this.start(DEFAULT_CHANNEL, cx)))
             .on_action(cx.listener(|this, _: &ToggleMetrics, window, cx| this.toggle_metrics(window, cx)))
             .on_action(cx.listener(|this, _: &ShowHelp, window, cx| this.show_help(window, cx)))

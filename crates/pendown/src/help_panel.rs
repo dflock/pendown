@@ -318,6 +318,12 @@ fn tab(id: &'static str, label: &'static str, active: bool, cx: &App) -> Statefu
         .child(label)
 }
 
+/// Kame's picture, for the top of each lesson.
+fn kame() -> Arc<Image> {
+    static KAME: std::sync::OnceLock<Arc<Image>> = std::sync::OnceLock::new();
+    KAME.get_or_init(|| Arc::new(Image::from_bytes(ImageFormat::Svg, pendown::tutorial::KAME.to_vec()))).clone()
+}
+
 /// A heading for a part of a page, such as Examples.
 fn part(text: &'static str, cx: &App) -> Div {
     div().mt_4().mb_2().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(cx.theme().muted_foreground).child(text.to_uppercase())
@@ -384,13 +390,19 @@ impl HelpPanel {
                     Block::Heading(_, inlines) => {
                         div().mt_4().text_base().font_weight(FontWeight::SEMIBOLD).child(self.rich(id(0), inlines, cx)).into_any_element()
                     }
-                    Block::Note(inlines) => div()
-                        .mt_3()
-                        .p_2()
-                        .rounded_md()
-                        .bg(theme.success.opacity(0.12))
-                        .child(self.rich(id(0), inlines, cx))
-                        .into_any_element(),
+                    Block::Note(inlines) => {
+                        let try_this = matches!(inlines.first(), Some(Inline::Bold(t)) if t.starts_with("Try this"));
+                        h_flex()
+                            .mt_3()
+                            .p_2()
+                            .gap_2()
+                            .items_start()
+                            .rounded_md()
+                            .bg(theme.success.opacity(0.12))
+                            .when(try_this, |n| n.child(Icon::new(IconName::PencilLine).small().mt(px(3.)).flex_none()))
+                            .child(div().flex_1().min_w_0().child(self.rich(id(0), inlines, cx)))
+                            .into_any_element()
+                    }
                     Block::List(items) => v_flex()
                         .mt_2()
                         .gap_1()
@@ -976,8 +988,18 @@ impl HelpPanel {
             .px_3()
             .pt_3()
             .pb_2()
-            .child(div().text_xs().text_color(theme.muted_foreground).child(format!("Lesson {} of {}", l + 1, lessons.len())))
-            .child(div().text_lg().font_weight(FontWeight::BOLD).child(lesson.title.clone()))
+            .child(
+                h_flex()
+                    .gap_2()
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .child(div().text_xs().text_color(theme.muted_foreground).child(format!("Lesson {} of {}", l + 1, lessons.len())))
+                            .child(div().text_lg().font_weight(FontWeight::BOLD).child(lesson.title.clone())),
+                    )
+                    .child(img(ImageSource::Image(kame())).h(px(44.)).w(px(66.)).flex_none()),
+            )
             .child(progress);
 
         // The lesson, with Load into editor and Run on its programs.
@@ -996,8 +1018,12 @@ impl HelpPanel {
         let nav = |id: &'static str, to: Option<usize>, back: bool| {
             to.map(|i| {
                 let label = lessons[i].title.clone();
-                let button = Button::new(id).small().label(label);
-                let button = if back { button.icon(IconName::ArrowLeft) } else { button.primary() };
+                let button = Button::new(id).small().flex_shrink(1.).min_w_0().tooltip(label.clone()).label(label);
+                let button = if back {
+                    button.icon(IconName::ArrowLeft)
+                } else {
+                    button.primary().child(Icon::new(IconName::ArrowRight).small().flex_none())
+                };
                 button.on_click(cx.listener(move |this, _, _, cx| {
                     this.lesson = i;
                     cx.notify();

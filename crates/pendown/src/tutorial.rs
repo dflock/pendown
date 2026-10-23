@@ -17,6 +17,9 @@ const SOURCES: [&str; 6] = [
     include_str!("../../../tutorial/06-colours-and-shapes.md"),
 ];
 
+/// A picture of Kame, for the top of each lesson.
+pub const KAME: &[u8] = include_bytes!("../../../tutorial/kame-turtle.svg");
+
 pub struct Lesson {
     pub title: String,
     /// Everything after the title.

@@ -26,8 +26,9 @@ fn colour([r, g, b, a]: [u8; 4]) -> (String, Option<String>) {
     (format!("#{r:02x}{g:02x}{b:02x}"), (a < 255).then(|| num(a as f64 / 255.0)))
 }
 
-/// The fill and stroke attributes for a mark.
-fn paint(mark: &Mark) -> String {
+/// The fill and stroke attributes for a mark, with no line thinner than
+/// `thinnest` steps.
+fn paint(mark: &Mark, thinnest: f64) -> String {
     let mut out = String::new();
     if let Some(fill) = mark.fill() {
         let (hex, opacity) = colour(fill);
@@ -39,7 +40,7 @@ fn paint(mark: &Mark) -> String {
     let pen = mark.pen();
     if pen.down {
         let (hex, opacity) = colour(pen.color);
-        let _ = write!(out, r#" stroke="{hex}" stroke-width="{}""#, num(pen.size));
+        let _ = write!(out, r#" stroke="{hex}" stroke-width="{}""#, num(pen.size.max(thinnest)));
         if let Some(o) = opacity {
             let _ = write!(out, r#" stroke-opacity="{o}""#);
         }
@@ -54,8 +55,8 @@ fn turned(heading: f64, center: Point) -> String {
 }
 
 /// One mark as an SVG element.
-fn element(mark: &Mark) -> String {
-    let paint = paint(mark);
+fn element(mark: &Mark, thinnest: f64) -> String {
+    let paint = paint(mark, thinnest);
     match *mark {
         Mark::Line(s) => {
             format!(r#"<line x1="{}" y1="{}" x2="{}" y2="{}"{paint}/>"#, num(s.from.x), num(-s.from.y), num(s.to.x), num(-s.to.y))
@@ -98,8 +99,11 @@ fn element(mark: &Mark) -> String {
 impl Drawing {
     /// The drawing as an SVG file: the background, then everything drawn
     /// since the last `CLEAN`, over the whole turtle area. One turtle step
-    /// is one pixel.
-    pub fn svg(&self) -> String {
+    /// is one pixel. No line is thinner than `thinnest`, a fraction of the
+    /// width: an SVG shown small, as the help panel's pictures are, would
+    /// otherwise lose its thin lines. Zero keeps every pen's own width.
+    pub fn svg(&self, thinnest: f64) -> String {
+        let thinnest = thinnest * self.area;
         let area = num(self.area);
         let corner = num(-self.area / 2.0);
         let (background, opacity) = colour(self.background);
@@ -110,7 +114,7 @@ impl Drawing {
             opacity.map(|o| format!(r#" fill-opacity="{o}""#)).unwrap_or_default(),
         );
         for mark in &self.display {
-            out.push_str(&element(mark));
+            out.push_str(&element(mark, thinnest));
             out.push('\n');
         }
         out.push_str("</g>\n</svg>\n");
@@ -137,7 +141,7 @@ mod tests {
             Segment { from: p(0.0, 0.0), to: p(0.0, 100.0), pen: RED }.into(),
             Mark::Ellipse { center: p(10.0, 20.0), radii: (30.0, 40.0), heading: 45.0, pen: Pen { down: false, ..RED }, fill: Some([0, 0, 255, 255]) },
         ]);
-        let svg = d.svg();
+        let svg = d.svg(0.0);
         assert!(svg.contains(r#"viewBox="-500 -500 1000 1000""#), "{svg}");
         assert!(svg.contains(r##"<rect x="-500" y="-500" width="1000" height="1000" fill="#000000"/>"##), "{svg}");
         assert!(
@@ -148,10 +152,19 @@ mod tests {
     }
 
     #[test]
+    fn no_line_is_thinner_than_asked() {
+        let mut d = Drawing::new();
+        d.push(&[Segment { from: p(0.0, 0.0), to: p(0.0, 100.0), pen: RED }.into()]);
+        // A hundredth of the 1000-step area is 10 steps.
+        assert!(d.svg(0.01).contains(r#"stroke-width="10""#));
+        assert!(d.svg(0.001).contains(r#"stroke-width="2.5""#));
+    }
+
+    #[test]
     fn arcs_go_round_in_half_turns_at_most() {
         let mut d = Drawing::new();
         d.push(&[Mark::Arc { center: p(0.0, 0.0), radius: 50.0, start_heading: 0.0, angle: 360.0, pen: RED }]);
-        let svg = d.svg();
+        let svg = d.svg(0.0);
         // The turtle starts on the centre's left, facing up, and goes
         // clockwise: over the top to the right, and back underneath.
         assert!(svg.contains(r#"d="M-50 0 A50 50 0 0 1 50 0 A50 50 0 0 1 -50 0""#), "{svg}");

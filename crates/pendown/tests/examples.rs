@@ -1,18 +1,18 @@
 //! Examples are tests (phase 5 issue 04): every example in the help, and
 //! every program in the tutorial, runs as it should, and draws the picture
-//! the panel shows, which must match the saved one in
+//! the panel shows, an SVG, which must be the same as the saved one in
 //! `tests/help-pictures/`. What a program prints is saved beside it, as
-//! `.txt`.
+//! `.txt`. Being text, a change to a picture shows in `git diff`.
 //!
 //! After a change that's meant to alter them, look at the pictures, then
 //! update them with `UPDATE_PICTURES=1 cargo test -p pendown --test examples`.
 //!
-//! The same programs check SVG export: rendered back into pixels by resvg,
-//! each SVG must look like the PNG.
+//! The same programs check SVG export against the PNG: rendered back into
+//! pixels by resvg, each SVG must look like the PNG.
 
 use std::path::PathBuf;
 
-use pendown::help::{PICTURE_SIZE, picture_options};
+use pendown::help::picture_options;
 use pendown_logo::reference::reference;
 
 /// As in `pendown-cli`'s picture tests: a pixel counts as different if a
@@ -25,6 +25,24 @@ fn dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/help-pictures")
 }
 
+/// Every example and lesson program: its name, as `forward-1` for
+/// FORWARD's first example and `tutorial-1-2` for lesson 1's second
+/// program, its code, and whether it should stop with an error.
+fn programs() -> Vec<(String, String, bool)> {
+    let mut out = Vec::new();
+    for command in reference().commands.iter().filter(|c| c.implemented) {
+        for (i, example) in command.examples.iter().enumerate() {
+            out.push((pendown::help::example_name(&command.key, i), example.code.clone(), example.fails));
+        }
+    }
+    for (l, lesson) in pendown::tutorial::lessons().iter().enumerate() {
+        for (p, program) in lesson.programs().enumerate() {
+            out.push((format!("tutorial-{}-{}", l + 1, p + 1), program.to_string(), false));
+        }
+    }
+    out
+}
+
 /// Checks one program, named `name`, and returns what went wrong, if
 /// anything.
 fn check(name: &str, code: &str, fails: bool) -> Option<String> {
@@ -34,10 +52,11 @@ fn check(name: &str, code: &str, fails: bool) -> Option<String> {
         (Err(e), false) => return Some(format!("{name}: {e:?}")),
         _ => {}
     }
-    let png = dir().join(format!("{name}.png"));
+    let svg = output.svg.expect("the panel's pictures are SVGs");
+    let saved = dir().join(format!("{name}.svg"));
     let txt = dir().join(format!("{name}.txt"));
     if std::env::var_os("UPDATE_PICTURES").is_some() {
-        std::fs::write(&png, &output.png).unwrap();
+        std::fs::write(&saved, &svg).unwrap();
         if output.printed.is_empty() {
             let _ = std::fs::remove_file(&txt);
         } else {
@@ -49,45 +68,22 @@ fn check(name: &str, code: &str, fails: bool) -> Option<String> {
     if output.printed != printed {
         return Some(format!("{name}: printed {:?}, not {printed:?}", output.printed));
     }
-    let expected = match image::open(&png) {
-        Ok(image) => image.to_rgba8(),
-        Err(e) => return Some(format!("{}: {e}. Run with UPDATE_PICTURES=1 to make it", png.display())),
-    };
-    let actual = image::load_from_memory(&output.png).unwrap().to_rgba8();
-    let different = actual
-        .pixels()
-        .zip(expected.pixels())
-        .filter(|(a, e)| a.0.iter().zip(e.0).any(|(a, e)| a.abs_diff(e) > TOLERANCE))
-        .count();
-    let share = different as f64 / (PICTURE_SIZE * PICTURE_SIZE) as f64;
-    if actual.dimensions() != expected.dimensions() || share > MAX_DIFFERENT {
-        let failed = png.with_extension("actual.png");
-        std::fs::write(&failed, &output.png).unwrap();
-        return Some(format!("{name}: {different} pixels differ; the new picture is in {}", failed.display()));
+    match std::fs::read_to_string(&saved) {
+        Ok(expected) if expected == svg => None,
+        Ok(_) => {
+            let failed = saved.with_extension("actual.svg");
+            std::fs::write(&failed, &svg).unwrap();
+            Some(format!("{name}: the picture changed; the new one is in {}", failed.display()))
+        }
+        Err(e) => Some(format!("{}: {e}. Run with UPDATE_PICTURES=1 to make it", saved.display())),
     }
-    None
 }
 
 #[test]
 fn every_example_runs_and_draws_its_picture() {
     std::fs::create_dir_all(dir()).unwrap();
-    let mut problems = Vec::new();
-    let mut names = Vec::new();
-    for command in reference().commands.iter().filter(|c| c.implemented) {
-        for (i, example) in command.examples.iter().enumerate() {
-            let name = pendown::help::example_name(&command.key, i);
-            problems.extend(check(&name, &example.code, example.fails));
-            names.push(name);
-        }
-    }
-    // And the tutorial's programs, as `tutorial-1-2` for lesson 1's second.
-    for (l, lesson) in pendown::tutorial::lessons().iter().enumerate() {
-        for (p, program) in lesson.programs().enumerate() {
-            let name = format!("tutorial-{}-{}", l + 1, p + 1);
-            problems.extend(check(&name, program, false));
-            names.push(name);
-        }
-    }
+    let programs = programs();
+    let problems: Vec<_> = programs.iter().filter_map(|(name, code, fails)| check(name, code, *fails)).collect();
     assert!(problems.is_empty(), "{problems:#?}");
     // No pictures are left from examples that have gone.
     let stale: Vec<_> = std::fs::read_dir(dir())
@@ -95,49 +91,20 @@ fn every_example_runs_and_draws_its_picture() {
         .map(|e| e.unwrap().path())
         .filter(|p| {
             let stem = p.file_name().unwrap().to_string_lossy();
-            let stem = stem.trim_end_matches(".actual.png").trim_end_matches(".png").trim_end_matches(".txt");
-            !names.iter().any(|n| n == stem)
+            let stem = stem.trim_end_matches(".actual.svg").trim_end_matches(".svg").trim_end_matches(".txt");
+            !programs.iter().any(|(n, ..)| n == stem)
         })
         .collect();
     assert!(stale.is_empty(), "pictures with no example: {stale:#?}");
 }
 
-/// Every example and lesson program, named as their pictures are.
-fn programs() -> Vec<(String, String)> {
-    let mut out = Vec::new();
-    for command in reference().commands.iter().filter(|c| c.implemented) {
-        for (i, example) in command.examples.iter().enumerate() {
-            out.push((pendown::help::example_name(&command.key, i), example.code.clone()));
-        }
-    }
-    for (l, lesson) in pendown::tutorial::lessons().iter().enumerate() {
-        for (p, program) in lesson.programs().enumerate() {
-            out.push((format!("tutorial-{}-{}", l + 1, p + 1), program.to_string()));
-        }
-    }
-    out
-}
-
-/// `svg` with every number after `attribute` made at least `min`.
-fn at_least(svg: &str, attribute: &str, min: f64) -> String {
-    let mut out = String::new();
-    let mut rest = svg;
-    while let Some(i) = rest.find(attribute) {
-        let (before, after) = rest.split_at(i + attribute.len());
-        let end = after.find('"').expect("a closing quote");
-        let value: f64 = after[..end].parse().expect("a number");
-        out.push_str(before);
-        out.push_str(&value.max(min).to_string());
-        rest = &after[end..];
-    }
-    out.push_str(rest);
-    out
-}
-
 #[test]
 fn every_svg_looks_like_its_png() {
     const SIZE: u32 = 500;
-    let options = pendown_cli::Options { width: SIZE, height: SIZE, limit: 1_000_000, seed: Some(1), fit: false, svg: true };
+    // The PNG never draws a line thinner than a pixel, so for the same
+    // picture, neither does the SVG.
+    let thinnest = 1.0 / SIZE as f64;
+    let options = pendown_cli::Options { width: SIZE, height: SIZE, limit: 1_000_000, seed: Some(1), fit: false, svg: Some(thinnest) };
     // And some that the examples don't cover: shapes at headings where
     // turning the wrong way would show, arcs both ways and past a whole
     // turn, rounded corners, fills, and translucent pens.
@@ -147,14 +114,11 @@ fn every_svg_looks_like_its_png() {
         ("translucent", "SETPC [255 0 0 120] SETPENSIZE 20 REPEAT 5 [FD 300 RT 144]"),
     ];
     let mut problems = Vec::new();
-    for (name, code) in programs().into_iter().chain(extra.map(|(n, c)| (n.to_string(), c.to_string()))) {
+    let programs = programs().into_iter().map(|(n, c, _)| (n, c));
+    for (name, code) in programs.chain(extra.map(|(n, c)| (n.to_string(), c.to_string()))) {
         let output = pendown_cli::render(&code, options);
         let svg = output.svg.expect("asked for");
-        // The PNG never draws a line thinner than a pixel, so for the same
-        // picture, neither does this.
-        let min_width = pendown_render::TURTLE_AREA / SIZE as f64;
-        let widened = at_least(&svg, "stroke-width=\"", min_width);
-        let tree = match resvg::usvg::Tree::from_str(&widened, &resvg::usvg::Options::default()) {
+        let tree = match resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default()) {
             Ok(tree) => tree,
             Err(e) => {
                 problems.push(format!("{name}: the SVG doesn't parse: {e}"));
@@ -178,7 +142,7 @@ fn every_svg_looks_like_its_png() {
             .filter(|(a, e)| a.0.iter().zip(e.0).any(|(a, e)| a.abs_diff(e) > TOLERANCE))
             .count();
         if different as f64 / (png.width() * png.height()) as f64 > MAX_DIFFERENT {
-            let dir = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("svg-differences");
+            let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("svg-differences");
             std::fs::create_dir_all(&dir).unwrap();
             std::fs::write(dir.join(format!("{name}.svg")), &svg).unwrap();
             std::fs::write(dir.join(format!("{name}.png")), &output.png).unwrap();

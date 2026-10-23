@@ -233,7 +233,7 @@ impl App {
                     canvas.drawing.draw_pending();
                     canvas.drawing.png()
                 }
-                Picture::Svg => canvas.drawing.svg().into_bytes(),
+                Picture::Svg => canvas.drawing.svg(0.0).into_bytes(),
             }
         };
         match std::fs::write(&path, bytes) {

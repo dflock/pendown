@@ -2,7 +2,11 @@
 //! from `pendown-logo.kdl`, and the Tutorial. It's drawn as a cached view,
 //! so it only redraws when it changes, not on every animation frame.
 
-use std::{collections::HashMap, collections::HashSet, ops::Range, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Range,
+    sync::{Arc, Mutex, OnceLock},
+};
 
 use gpui_kit::component::{
     ActiveTheme, Disableable as _, Icon, Selectable as _, Sizable as _,
@@ -14,7 +18,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{assets::IconName, prelude::FluentBuilder as _, *};
 use pendown::{
-    help::picture_options,
+    help::{PICTURE_SIZE, picture_options},
     markup::{self, Block, Inline},
 };
 use pendown_logo::reference::{Command, Kind, reference};
@@ -38,7 +42,8 @@ pub enum Page {
 /// An example's picture, drawn on a background thread when first shown.
 #[derive(Clone)]
 pub enum Picture {
-    Drawing(Arc<Image>),
+    /// An SVG, and its pictures at the sizes it's been shown.
+    Drawing(Arc<[u8]>, Rendered),
     /// It drew nothing, but printed this.
     Printed(String),
     Failed(String),
@@ -281,7 +286,7 @@ impl HelpPanel {
             let picture = match &output.result {
                 Err(e) if output.drawn == 0 => Picture::Failed(format!("{e:?}")),
                 _ if output.drawn == 0 => Picture::Printed(output.printed.clone()),
-                _ => Picture::Drawing(Arc::new(Image::from_bytes(ImageFormat::Png, output.png))),
+                _ => Picture::Drawing(Arc::from(output.svg.expect("asked for").into_bytes()), Rendered::default()),
             };
             this.update(cx, |this, cx| {
                 this.pictures.insert(key, picture);
@@ -318,32 +323,38 @@ fn tab(id: &'static str, label: &'static str, active: bool, cx: &App) -> Statefu
         .child(label)
 }
 
-/// Kame's picture, `width` by `height` logical pixels. It's rendered at
-/// exactly that size in device pixels: an SVG image is otherwise rendered
-/// at its own size, about 800 pixels wide, and shrunk on the GPU, which
-/// leaves it jagged.
-fn kame(width: f32, height: f32) -> impl IntoElement {
-    thread_local! {
-        static RENDERED: std::cell::RefCell<HashMap<(i32, i32), Arc<RenderImage>>> = Default::default();
-    }
+/// Pictures of an SVG already rendered, by their size in device pixels.
+type Rendered = Arc<Mutex<HashMap<(i32, i32), Arc<RenderImage>>>>;
+
+/// An SVG, `width` by `height` logical pixels. It's rendered at exactly
+/// that size in device pixels, once for each size, in `rendered`: an SVG
+/// image is otherwise rendered at its own size and shrunk on the GPU,
+/// which leaves it jagged or blurred.
+fn svg_image(svg: Arc<[u8]>, rendered: Rendered, width: f32, height: f32) -> Img {
     let source = ImageSource::Custom(Arc::new(move |window: &mut Window, cx: &mut App| {
         let scale = window.scale_factor();
         let device = ((width * scale).round() as i32, (height * scale).round() as i32);
-        let image = RENDERED.with_borrow_mut(|rendered| {
-            if let Some(image) = rendered.get(&device) {
-                return Ok(image.clone());
-            }
-            let renderer = cx.svg_renderer();
-            let svg = renderer.parse_svg(pendown::tutorial::KAME).map_err(|e| ImageCacheError::Asset(e.to_string().into()))?;
-            let image = renderer
-                .render_parsed(&svg, SvgSize::Size(size(DevicePixels(device.0), DevicePixels(device.1))))
-                .map_err(|e| ImageCacheError::Asset(e.to_string().into()))?;
-            rendered.insert(device, image.clone());
-            Ok(image)
-        });
+        if let Some(image) = rendered.lock().unwrap().get(&device) {
+            return Some(Ok(image.clone()));
+        }
+        let renderer = cx.svg_renderer();
+        let image = renderer
+            .parse_svg(&svg)
+            .and_then(|tree| renderer.render_parsed(&tree, SvgSize::Size(size(DevicePixels(device.0), DevicePixels(device.1)))))
+            .map_err(|e| ImageCacheError::Asset(e.to_string().into()));
+        if let Ok(image) = &image {
+            rendered.lock().unwrap().insert(device, image.clone());
+        }
         Some(image)
     }));
     img(source).w(px(width)).h(px(height)).flex_none()
+}
+
+/// Kame's picture, `width` by `height` logical pixels.
+fn kame(width: f32, height: f32) -> impl IntoElement {
+    static KAME: OnceLock<(Arc<[u8]>, Rendered)> = OnceLock::new();
+    let (svg, rendered) = KAME.get_or_init(|| (Arc::from(pendown::tutorial::KAME), Rendered::default()));
+    svg_image(svg.clone(), rendered.clone(), width, height)
 }
 
 /// A heading for a part of a page, such as Examples.
@@ -602,10 +613,11 @@ impl HelpPanel {
         let highlight = running.and_then(|r| r.highlight.clone());
         let is_running = running.is_some_and(|r| !r.finished);
         let code = example.code.clone();
-        let size = px(84.);
+        let shown = PICTURE_SIZE as f32;
+        let size = px(shown);
         let picture_element = match &picture {
-            Some(Picture::Drawing(image)) => {
-                Some(img(ImageSource::Image(image.clone())).size(size).flex_none().rounded_sm().into_any_element())
+            Some(Picture::Drawing(svg, rendered)) => {
+                Some(svg_image(svg.clone(), rendered.clone(), shown, shown).rounded_sm().into_any_element())
             }
             None => Some(div().size(size).flex_none().rounded_sm().bg(black()).into_any_element()),
             _ => None,

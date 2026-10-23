@@ -16,9 +16,11 @@ PNG export saves the pixel buffer (ADR 0010). An SVG stays sharp at any size and
   - an ellipse is an `<ellipse>`, and a rectangle a `<rect>` with `rx` and `ry` for rounded corners, both rotated by their heading;
   - a fill comes before its outline, as SVG paints them.
 - **It shows the whole turtle area,** whatever the canvas shows, with the background as a rectangle behind everything. Its `viewBox` is in turtle steps, one step to a pixel, with y flipped to point down, as SVG's does.
-- **Pens keep their width in turtle steps.** The PNG never draws a line thinner than a pixel, but an SVG has no pixels, so a size-1 pen is one step wide however the SVG is scaled.
+- **Pens keep their width in turtle steps.** The PNG never draws a line thinner than a pixel, but an SVG has no pixels, so in an export a size-1 pen is one step wide however the SVG is scaled.
+- **A thinnest line can be asked for,** as a fraction of the SVG's width. The help panel's pictures are SVGs fitted to the drawing and shown 84 pixels wide, so a size-1 pen in a 1000-step drawing would be a tenth of a pixel; they ask for one pixel. The tests that compare SVGs with PNGs ask for one pixel at their size, as the PNG draws.
+- **The saved pictures of the help examples are these SVGs,** in `crates/pendown/tests/help-pictures/`, compared as text. A change to an example's picture shows in `git diff`, and how the PNG renderer draws is checked by comparing SVGs with PNGs instead.
 - **Choosing it:** the app's Export button has a menu, PNG picture or SVG drawing; a name ending `.png` or `.svg` overrides it. The CLI saves an SVG when the output name ends `.svg`, and ignores `--size`.
-- **Tests:** every help example and tutorial program, and a few programs of the test's own, are exported, rendered back into pixels by resvg (which gpui already uses), and compared with the PNG. They're compared at an eighth of the size, where the two renderers' different smoothing of edges averages out, with pens widened as the PNG widens them. Drawing arcs the wrong way round, or turning shapes the wrong way, fails it.
+- **Tests:** every help example and tutorial program, and a few programs of the test's own, are exported, rendered back into pixels by resvg (which gpui already uses), and compared with the PNG. They're compared at a quarter of the size, where the two renderers' different smoothing of edges averages out, with pens widened as the PNG widens them. Drawing arcs the wrong way round, or turning shapes the wrong way, fails it.
 
 ## Consequences
 

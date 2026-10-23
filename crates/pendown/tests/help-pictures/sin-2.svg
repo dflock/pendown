@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="353.1" height="353.1" viewBox="-176.55 -176.55 353.1 353.1">
+<rect x="-176.55" y="-176.55" width="353.1" height="353.1" fill="#000000"/>
+<g fill="none" stroke-linecap="round" stroke-linejoin="round">
+<ellipse cx="129.904" cy="-75" rx="10" ry="10" stroke="#ffffff" stroke-width="4.204"/>
+<ellipse cx="75" cy="-129.904" rx="10" ry="10" stroke="#ffffff" stroke-width="4.204"/>
+<ellipse cx="0" cy="-150" rx="10" ry="10" stroke="#ffffff" stroke-width="4.204"/>
+<ellipse cx="-75" cy="-129.904" rx="10" ry="10" stroke="#ffffff" stroke-width="4.204"/>
+<ellipse cx="-129.904" cy="-75" rx="10" ry="10" stroke="#ffffff" stroke-width="4.204"/>
+<ellipse cx="-150" cy="0" rx="10" ry="10" stroke="#ffffff" stroke-width="4.204"/>
+<ellipse cx="-129.904" cy="75" rx="10" ry="10" stroke="#ffffff" stroke-width="4.204"/>
+<ellipse cx="-75" cy="129.904" rx="10" ry="10" stroke="#ffffff" stroke-width="4.204"/>
+<ellipse cx="0" cy="150" rx="10" ry="10" stroke="#ffffff" stroke-width="4.204"/>
+<ellipse cx="75" cy="129.904" rx="10" ry="10" stroke="#ffffff" stroke-width="4.204"/>
+<ellipse cx="129.904" cy="75" rx="10" ry="10" stroke="#ffffff" stroke-width="4.204"/>
+<ellipse cx="150" cy="0" rx="10" ry="10" stroke="#ffffff" stroke-width="4.204"/>
+</g>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="301.626" height="301.626" viewBox="-150.813 -150.813 301.626 301.626">
+<rect x="-150.813" y="-150.813" width="301.626" height="301.626" fill="#000000"/>
+<g fill="none" stroke-linecap="round" stroke-linejoin="round">
+<path d="M0 0 A100 100 0 0 1 100 -100" stroke="#ffffff" stroke-width="3.591"/>
+<path d="M100 -100 A100 100 0 0 1 0 0" stroke="#ffffff" stroke-width="3.591"/>
+<path d="M0 0 A100 100 0 0 1 -36.603 -136.603" stroke="#ffffff" stroke-width="3.591"/>
+<path d="M-36.603 -136.603 A100 100 0 0 1 0 0" stroke="#ffffff" stroke-width="3.591"/>
+<path d="M0 0 A100 100 0 0 1 -136.603 -36.603" stroke="#ffffff" stroke-width="3.591"/>
+<path d="M-136.603 -36.603 A100 100 0 0 1 0 0" stroke="#ffffff" stroke-width="3.591"/>
+<path d="M0 0 A100 100 0 0 1 -100 100" stroke="#ffffff" stroke-width="3.591"/>
+<path d="M-100 100 A100 100 0 0 1 0 0" stroke="#ffffff" stroke-width="3.591"/>
+<path d="M0 0 A100 100 0 0 1 36.603 136.603" stroke="#ffffff" stroke-width="3.591"/>
+<path d="M36.603 136.603 A100 100 0 0 1 0 0" stroke="#ffffff" stroke-width="3.591"/>
+<path d="M0 0 A100 100 0 0 1 136.603 36.603" stroke="#ffffff" stroke-width="3.591"/>
+<path d="M136.603 36.603 A100 100 0 0 1 0 0" stroke="#ffffff" stroke-width="3.591"/>
+</g>
+</svg>

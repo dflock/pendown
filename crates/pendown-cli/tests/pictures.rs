@@ -19,7 +19,7 @@ fn check(name: &str, program: &str, width: u32, height: u32) {
 
 /// Checks the picture, and returns what the program printed.
 fn check_output(name: &str, program: &str, width: u32, height: u32) -> String {
-    let output = render(program, Options { width, height, limit: 10_000_000, seed: Some(1), fit: false, svg: false });
+    let output = render(program, Options { width, height, limit: 10_000_000, seed: Some(1), fit: false, svg: None });
     assert_eq!(output.result, Ok(()), "{name} should run without errors");
     let printed = output.printed.clone();
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/pictures").join(format!("{name}.png"));

@@ -52,7 +52,7 @@ fn main() -> ExitCode {
     };
     let output_path = args.output.unwrap_or_else(|| args.program.with_extension("png"));
     let (width, height) = args.size;
-    let svg = output_path.extension().is_some_and(|e| e.eq_ignore_ascii_case("svg"));
+    let svg = output_path.extension().is_some_and(|e| e.eq_ignore_ascii_case("svg")).then_some(0.0);
     let output = render(&source, Options { width, height, limit: args.limit, seed: args.seed, fit: args.fit, svg });
     print!("{}", output.printed);
     if let Some(summary) = &output.summary {

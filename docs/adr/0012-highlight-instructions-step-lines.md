@@ -24,3 +24,4 @@ A headline feature is a direct visual link between what the turtle is doing and 
 
 - Spike 04 answered the open question: a second "Step instruction" button is needed as well as Step.
 - Spike 04's tests check after every Step that the interpreter has started exactly as many lines as the highlight has reached.
+- The Step button was later labelled **Step line**, to set it apart from Step instruction (2026-10-23).

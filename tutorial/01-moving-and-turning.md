@@ -35,7 +35,7 @@ FD 100
 RT 90
 ```
 
-Slow Kame down with the speed slider, and watch the highlight in the editor move from line to line as Kame goes. **Pause** stops Kame part-way, and **Step** goes one line at a time.
+Slow Kame down with the speed slider, and watch the highlight in the editor move from line to line as Kame goes. **Pause** stops Kame part-way, and **Step line** goes one line at a time.
 
 ## Backwards and left
 

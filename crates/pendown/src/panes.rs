@@ -8,6 +8,7 @@ use std::rc::Rc;
 
 use gpui_kit::component::{
     ActiveTheme, Disableable as _, Sizable,
+    Selectable as _,
     button::{Button, ButtonVariants as _},
     h_flex,
     input::{Editor, EditorState, Input, InputState, Textarea, TextareaState},
@@ -104,6 +105,8 @@ pub struct ToolbarState {
     pub running: bool,
     pub paused: bool,
     pub speed: Speed,
+    /// The side panel is open.
+    pub help: bool,
 }
 
 /// The toolbar's buttons, slider and speed. The run's status, which changes
@@ -143,7 +146,7 @@ impl ToolbarPane {
 
 impl Render for ToolbarPane {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let ToolbarState { running, paused, speed } = self.state;
+        let ToolbarState { running, paused, speed, help } = self.state;
         h_flex()
             .gap_2()
             .size_full()
@@ -172,5 +175,9 @@ impl Render for ToolbarPane {
             // Room for the knob, which overhangs the end of the track.
             .child(div().flex_none().w(px(6.)))
             .child(div().flex_none().w(px(150.)).text_sm().whitespace_nowrap().child(describe(speed)))
+            .child(div().flex_1())
+            // Shows and hides the side panel; F1 opens it on the word under
+            // the cursor (phase 5).
+            .child(self.button("help", IconName::BookOpen, "Help", |this, _, cx| this.toggle_help(cx)).ghost().selected(help))
     }
 }

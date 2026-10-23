@@ -121,6 +121,16 @@ impl Drawing {
         self.display.len()
     }
 
+    /// Everything drawn since the last `CLEAN`, to set aside and draw again
+    /// later, as the GUI does while it shows an example.
+    pub fn marks(&self) -> &[Mark] {
+        &self.display
+    }
+
+    pub fn background(&self) -> [u8; 4] {
+        self.background
+    }
+
     /// Clears the drawing, as `CLEAN` does.
     pub fn clean(&mut self) {
         self.display.clear();

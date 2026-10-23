@@ -46,6 +46,8 @@ pub struct Output {
     /// Everything the program printed.
     pub printed: String,
     pub result: Result<(), RunError>,
+    /// How many lines, arcs and shapes were drawn since the last `CLEAN`.
+    pub drawn: usize,
     /// A one-line summary of where the time went, when metrics are on
     /// (ADR 0020).
     pub summary: Option<String>,
@@ -155,7 +157,7 @@ pub fn render(source: &str, options: Options) -> Output {
                     ThreadCpu::now().since(&cpu).percentages(wall, "main"),
                 )
             });
-            Output { png, printed, result, summary }
+            Output { png, printed, result, drawn: drawing.segments(), summary }
         })
         .expect("can start the interpreter thread")
         .join()

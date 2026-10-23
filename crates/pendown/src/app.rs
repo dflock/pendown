@@ -35,7 +35,8 @@ use pendown_logo::{RunError, SourceId};
 use crate::{
     autotest::Autotest,
     canvas::{Canvas, Overlay, TURTLE_LENGTH},
-    files::{After, ExportPicture, NewFile, OpenFile, RunProgram, SaveFile, SaveFileAs, ToggleMetrics},
+    files::{After, ExportPicture, NewFile, OpenFile, RunProgram, SaveFile, SaveFileAs, ShowHelp, ToggleMetrics},
+    help_panel::HelpPanel,
     highlighter::LogoHighlighter,
     panes::{ConsolePane, EditorPane, ToolbarPane, ToolbarState},
     watching::{CountersPane, VariablesPane, Watched},
@@ -65,7 +66,7 @@ FLOWER 250
 
 /// Where a byte offset is in `text`, as the editor counts lines and
 /// columns: columns in UTF-16 units, as in LSP.
-fn position(text: &str, offset: usize) -> Position {
+pub(crate) fn position(text: &str, offset: usize) -> Position {
     let before = &text[..offset.min(text.len())];
     let line = before.matches('\n').count() as u32;
     let line_start = before.rfind('\n').map_or(0, |i| i + 1);
@@ -163,6 +164,14 @@ pub struct App {
     pub(crate) watched: Entity<Watched>,
     pub(crate) counters_pane: Entity<CountersPane>,
     pub(crate) variables_pane: Entity<VariablesPane>,
+    /// The side panel, with Help and the Tutorial (phase 5), and whether
+    /// it's open.
+    pub(crate) help_panel: Entity<HelpPanel>,
+    pub(crate) help_open: bool,
+    /// What the editor's cursor was last on, for following it.
+    pub(crate) cursor_word: Option<(String, u32)>,
+    /// The example on the canvas, with what it set aside (issue 06).
+    pub(crate) example: Option<crate::help_panel::ExampleRun>,
     console_entry: ConsoleInput,
     /// Definitions typed at the console since the last Run, which "Copy to
     /// editor" keeps.
@@ -229,11 +238,16 @@ impl App {
         let editor_pane = cx.new(|_| EditorPane::new(editor.clone(), metrics.clone()));
         let console_pane = cx.new(|_| ConsolePane::new(console_output.clone(), console_input.clone(), metrics.clone()));
         let app = cx.entity().downgrade();
-        let toolbar = ToolbarState { running: false, paused: false, speed };
+        let toolbar = ToolbarState { running: false, paused: false, speed, help: false };
         let toolbar_pane = cx.new(|_| ToolbarPane::new(app.clone(), speed_slider.clone(), toolbar));
         let watched = cx.new(|_| Watched::default());
         let counters_pane = cx.new(|_| CountersPane::new(watched.clone()));
         let variables_pane = cx.new(|_| VariablesPane::new(watched.clone()));
+        let help_panel = cx.new(|cx| HelpPanel::new(app.clone(), window, cx));
+        let mut subscriptions = subscriptions;
+        // The editor notifies when its cursor moves, which the help panel
+        // follows.
+        subscriptions.push(cx.observe(&editor, |this, _, cx| this.follow_cursor(cx)));
         window.on_window_should_close(cx, move |window, cx| {
             app.update(cx, |this, cx| this.should_close(window, cx)).unwrap_or(true)
         });
@@ -279,6 +293,10 @@ impl App {
             watched,
             counters_pane,
             variables_pane,
+            help_panel,
+            help_open: false,
+            cursor_word: None,
+            example: None,
             console_entry: ConsoleInput::default(),
             console_definitions: Vec::new(),
             defining: None,
@@ -319,6 +337,8 @@ impl App {
     /// start the editor's program from a clean slate.
     pub(crate) fn start(&mut self, channel: Channel, cx: &mut Context<Self>) {
         self.stop(cx);
+        // Run replaces an example's picture, as it would the user's.
+        self.forget_example(cx);
         let text = self.editor.read(cx).value().to_string();
         self.run_text = text.clone();
         self.canvas.borrow_mut().drawing.reset();
@@ -336,12 +356,19 @@ impl App {
     /// Runs a console entry against whatever the last run left (ADR 0006).
     fn run_console(&mut self, entry: String, cx: &mut Context<Self>) {
         self.stop(cx);
+        // The console works on what the user's program left.
+        self.back_to_my_drawing(cx);
         self.defining = defines(&entry).then(|| entry.clone());
         self.start_job(Job::Console(entry), DEFAULT_CHANNEL, cx);
     }
 
     fn start_job(&mut self, job: Job, channel: Channel, cx: &mut Context<Self>) {
         let (animator, run) = self.session.start(job, self.speed, channel);
+        self.play(animator, run, cx);
+    }
+
+    /// Starts playing a job's events: the user's, or an example's.
+    pub(crate) fn play(&mut self, animator: Animator, run: Run, cx: &mut Context<Self>) {
         self.animator = Some(animator);
         self.run = Some(run);
         self.finished_at = None;
@@ -419,7 +446,7 @@ impl App {
     /// Changes what the counters and variables panels show, and redraws
     /// them. They're cached views of `Watched`, and notifying it alone
     /// doesn't redraw them.
-    fn show_watch(&mut self, cx: &mut Context<Self>, f: impl FnOnce(&mut Watched)) {
+    pub(crate) fn show_watch(&mut self, cx: &mut Context<Self>, f: impl FnOnce(&mut Watched)) {
         self.watched.update(cx, |watched, _| f(watched));
         self.counters_pane.update(cx, |_, cx| cx.notify());
         self.variables_pane.update(cx, |_, cx| cx.notify());
@@ -441,6 +468,7 @@ impl App {
             self.stop_at = Some(Instant::now());
             self.print("Stopped.");
             self.report();
+            self.example_finished(cx);
         }
         cx.notify();
     }
@@ -533,6 +561,10 @@ impl App {
         position(&self.run_text, offset)
     }
 
+    pub(crate) fn clear_editor_highlight(&mut self, cx: &mut Context<Self>) {
+        self.highlight.set(vec![], cx);
+    }
+
     /// Shows the program's parse errors as it's typed, without running it.
     pub(crate) fn check_program(&mut self, cx: &mut Context<Self>) {
         // The last run's highlight no longer points at the right text.
@@ -555,8 +587,11 @@ impl App {
     /// editor's program also shows on the code.
     fn show_errors(&mut self, errors: Vec<pendown_logo::Error>, cx: &mut Context<Self>) {
         let mut diagnostics = Vec::new();
+        let example = self.example.is_some();
         for e in &errors {
             let where_ = match e.span {
+                // An example's spans are in its own text, not the editor's.
+                Some(s) if example => format!("In the example, line {}: ", s.line + 1),
                 Some(s) if s.source == SourceId::Editor => format!("Line {}: ", s.line + 1),
                 Some(_) => "In the console: ".to_string(),
                 None => String::new(),
@@ -567,6 +602,7 @@ impl App {
             }
             if let Some(span) = e.span
                 && span.source == SourceId::Editor
+                && !example
             {
                 let range = self.position(span.start as usize)..self.position(span.end as usize);
                 diagnostics.push(Diagnostic::new(range, e.message.clone()).with_severity(DiagnosticSeverity::Error));
@@ -579,7 +615,11 @@ impl App {
 
     /// Moves the highlight to the running instruction, scrolling the editor
     /// to keep it in view (spike 01).
-    fn show_highlight(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn show_highlight(&mut self, cx: &mut Context<Self>) {
+        if self.example.is_some() {
+            self.show_example_highlight(cx);
+            return;
+        }
         // Console entries aren't in the editor, so they aren't highlighted there.
         let Some(span) = self.animator.as_ref().and_then(|a| a.highlight).filter(|s| s.source == SourceId::Editor) else {
             self.highlight.set(vec![], cx);
@@ -656,6 +696,7 @@ impl App {
         let animator = self.animator.as_ref().expect("checked above");
         if animator.finished() && self.finished_at.is_none() && !animator.stopped {
             self.finished_at = Some(now);
+            self.example_finished(cx);
             self.report();
             let defining = self.defining.take();
             match self.run.as_ref().and_then(|r| r.result()) {
@@ -687,7 +728,8 @@ impl App {
         };
         let run = self.run.as_ref().expect("a run goes with an animator");
         let elapsed = self.finished_at.or(self.stop_at).unwrap_or_else(Instant::now) - run.started;
-        format!("{state} · {:.1} s · {} lines drawn", elapsed.as_secs_f64(), self.canvas.borrow().drawing.segments())
+        let example = if self.example.is_some() { "Example: " } else { "" };
+        format!("{example}{state} · {:.1} s · {} lines drawn", elapsed.as_secs_f64(), self.canvas.borrow().drawing.segments())
     }
 
     /// Step, or Step instruction.
@@ -742,8 +784,35 @@ impl App {
             None => Overlay { partial: None, turtle: Some((pendown_logo::Point { x: 0.0, y: 0.0 }, 0.0)) },
         };
 
-        let toolbar = ToolbarState { running, paused, speed: self.speed };
+        let toolbar = ToolbarState { running, paused, speed: self.speed, help: self.help_open };
         self.toolbar_pane.update(cx, |pane, cx| pane.set(toolbar, cx));
+
+        let canvas_area = div()
+            .relative()
+            .size_full()
+            .child(
+                gpui_kit::canvas(
+                    move |bounds, _, _| bounds,
+                    move |_, bounds, window, _| canvas.borrow_mut().paint(bounds, window, overlay.clone()),
+                )
+                .size_full(),
+            )
+            .when_some(self.overlay.as_ref(), |panel, metrics| {
+                panel.child(
+                    v_flex()
+                        .absolute()
+                        .top_2()
+                        .left_2()
+                        .p_2()
+                        .rounded_md()
+                        .bg(hsla(0.0, 0.0, 0.0, 0.7))
+                        .text_color(hsla(0.0, 0.0, 1.0, 0.9))
+                        .font_family(theme.mono_font_family.clone())
+                        .text_xs()
+                        .children(metrics.lines.iter().map(|line| div().child(line.clone()))),
+                )
+            })
+            .children(self.example_banner(cx));
 
         v_flex()
             .size_full()
@@ -754,6 +823,7 @@ impl App {
             .on_action(cx.listener(|this, _: &ExportPicture, window, cx| this.export(window, cx)))
             .on_action(cx.listener(|this, _: &RunProgram, _, cx| this.start(DEFAULT_CHANNEL, cx)))
             .on_action(cx.listener(|this, _: &ToggleMetrics, window, cx| this.toggle_metrics(window, cx)))
+            .on_action(cx.listener(|this, _: &ShowHelp, window, cx| this.show_help(window, cx)))
             .bg(theme.background)
             .text_color(theme.foreground)
             .child(
@@ -777,43 +847,23 @@ impl App {
                     ),
             )
             .child(
-                div().flex_1().min_h_0().child(
-                    h_resizable("main")
-                        .child(
+                div().flex_1().min_h_0().child({
+                    let editor = resizable_panel()
+                        .size(px(460.))
+                        .child(self.editor_pane.clone().cached(StyleRefinement::default().size_full()));
+                    let canvas = resizable_panel().child(canvas_area);
+                    // The side panel, when it's open (phase 5). Each layout
+                    // has its own id, so each remembers its sizes.
+                    if self.help_open {
+                        h_resizable("main-help").child(editor).child(canvas).child(
                             resizable_panel()
-                                .size(px(460.))
-                                .child(self.editor_pane.clone().cached(StyleRefinement::default().size_full())),
+                                .size(px(380.))
+                                .child(self.help_panel.clone().cached(StyleRefinement::default().size_full())),
                         )
-                        .child(
-                            resizable_panel().child(
-                                div()
-                                    .relative()
-                                    .size_full()
-                                    .child(
-                                        gpui_kit::canvas(
-                                            move |bounds, _, _| bounds,
-                                            move |_, bounds, window, _| canvas.borrow_mut().paint(bounds, window, overlay.clone()),
-                                        )
-                                        .size_full(),
-                                    )
-                                    .when_some(self.overlay.as_ref(), |panel, metrics| {
-                                        panel.child(
-                                            v_flex()
-                                                .absolute()
-                                                .top_2()
-                                                .left_2()
-                                                .p_2()
-                                                .rounded_md()
-                                                .bg(hsla(0.0, 0.0, 0.0, 0.7))
-                                                .text_color(hsla(0.0, 0.0, 1.0, 0.9))
-                                                .font_family(theme.mono_font_family.clone())
-                                                .text_xs()
-                                                .children(metrics.lines.iter().map(|line| div().child(line.clone()))),
-                                        )
-                                    }),
-                            ),
-                        ),
-                ),
+                    } else {
+                        h_resizable("main").child(editor).child(canvas)
+                    }
+                }),
             )
             .child(
                 div().h(px(CONSOLE_HEIGHT)).border_t_1().border_color(theme.border).child(

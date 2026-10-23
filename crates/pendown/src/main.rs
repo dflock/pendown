@@ -4,6 +4,7 @@ mod app;
 mod autotest;
 mod canvas;
 mod files;
+mod help_panel;
 mod highlighter;
 mod icons;
 mod panes;

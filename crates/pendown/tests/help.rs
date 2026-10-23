@@ -27,3 +27,15 @@ fn help_has_no_code_blocks() {
         assert!(!blocks.iter().any(|b| matches!(b, Block::Code { .. })), "{}", c.key);
     }
 }
+
+#[test]
+fn every_link_in_the_tutorial_resolves() {
+    let r = reference();
+    for (n, lesson) in pendown::tutorial::lessons().iter().enumerate() {
+        for link in markup::links(&lesson.blocks) {
+            assert!(r.find(link).is_some_and(|c| c.implemented), "lesson {}: [{link}]", n + 1);
+        }
+        assert!(lesson.programs().count() >= 3, "lesson {} has few programs", n + 1);
+    }
+    assert_eq!(pendown::tutorial::lessons().len(), 6);
+}

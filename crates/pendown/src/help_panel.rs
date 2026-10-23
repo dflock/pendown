@@ -44,12 +44,44 @@ pub enum Picture {
     Failed(String),
 }
 
-/// The example that's running, highlighted in the panel (issue 06).
+/// A program in the panel that runs on the canvas: a help example, or a
+/// tutorial lesson's.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Source {
+    Example { command: usize, example: usize },
+    Lesson { lesson: usize, program: usize },
+}
+
+impl Source {
+    pub fn code(&self) -> String {
+        match *self {
+            Source::Example { command, example } => reference().commands[command].examples[example].code.clone(),
+            Source::Lesson { lesson, program } => {
+                pendown::tutorial::lessons()[lesson].programs().nth(program).unwrap_or_default().to_string()
+            }
+        }
+    }
+
+    /// What the banner over the canvas says it is.
+    fn describe(&self) -> String {
+        match *self {
+            Source::Example { command, example } => {
+                let command = &reference().commands[command];
+                match &command.examples[example].title {
+                    Some(title) => format!("“{title}”, from {}", command.title),
+                    None => format!("From {}", command.title),
+                }
+            }
+            Source::Lesson { lesson, .. } => format!("From the lesson “{}”", pendown::tutorial::lessons()[lesson].title),
+        }
+    }
+}
+
+/// The program that's running, highlighted in the panel (issue 06).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Running {
-    pub command: usize,
-    pub example: usize,
-    /// The running instruction, in the example's code.
+    pub source: Source,
+    /// The running instruction, in the program's code.
     pub highlight: Option<Range<usize>>,
     pub finished: bool,
 }
@@ -71,6 +103,8 @@ pub struct HelpPanel {
     expanded: HashSet<String>,
     pictures: HashMap<String, Picture>,
     pub running: Option<Running>,
+    /// The tutorial's lesson, counting from 0.
+    pub lesson: usize,
     /// Enter opened a search result: the search box is emptied when the
     /// panel next draws, which has the window it needs.
     clear_search: bool,
@@ -116,6 +150,7 @@ impl HelpPanel {
             expanded: HashSet::new(),
             pictures: HashMap::new(),
             running: None,
+            lesson: 0,
             clear_search: false,
             _subscriptions: subscriptions,
         }
@@ -346,7 +381,9 @@ impl HelpPanel {
                 let id = |n: usize| SharedString::from(format!("{id}-{b}-{n}"));
                 match block {
                     Block::Paragraph(inlines) => div().mt_2().child(self.rich(id(0), inlines, cx)).into_any_element(),
-                    Block::Heading(_, inlines) => div().mt_3().font_weight(FontWeight::SEMIBOLD).child(self.rich(id(0), inlines, cx)).into_any_element(),
+                    Block::Heading(_, inlines) => {
+                        div().mt_4().text_base().font_weight(FontWeight::SEMIBOLD).child(self.rich(id(0), inlines, cx)).into_any_element()
+                    }
                     Block::Note(inlines) => div()
                         .mt_3()
                         .p_2()
@@ -529,7 +566,7 @@ impl HelpPanel {
         let theme = cx.theme().clone();
         let example = &reference().commands[i].examples[n];
         let picture = self.picture(&example.code, cx);
-        let running = self.running.as_ref().filter(|r| r.command == i && r.example == n);
+        let running = self.running.as_ref().filter(|r| r.source == Source::Example { command: i, example: n });
         let highlight = running.and_then(|r| r.highlight.clone());
         let is_running = running.is_some_and(|r| !r.finished);
         let code = example.code.clone();
@@ -909,7 +946,124 @@ impl HelpPanel {
     }
 
     fn render_tutorial(&mut self, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        div().p_3().text_color(cx.theme().muted_foreground).child("The tutorial is coming.").into_any_element()
+        let theme = cx.theme().clone();
+        let lessons = pendown::tutorial::lessons();
+        let l = self.lesson.min(lessons.len() - 1);
+        let lesson = &lessons[l];
+
+        // Which lesson, and a bar to go to any of them.
+        let progress = h_flex().mt_2().gap_1().children((0..lessons.len()).map(|i| {
+            let colour = match i.cmp(&l) {
+                std::cmp::Ordering::Less => theme.success,
+                std::cmp::Ordering::Equal => theme.foreground,
+                std::cmp::Ordering::Greater => theme.border,
+            };
+            div()
+                .id(SharedString::from(format!("lesson-{i}")))
+                .flex_1()
+                .h(px(5.))
+                .rounded_sm()
+                .bg(colour)
+                .cursor_pointer()
+                .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(lessons[i].title.clone()).build(window, cx))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.lesson = i;
+                    cx.notify();
+                }))
+        }));
+        let header = v_flex()
+            .flex_none()
+            .px_3()
+            .pt_3()
+            .pb_2()
+            .child(div().text_xs().text_color(theme.muted_foreground).child(format!("Lesson {} of {}", l + 1, lessons.len())))
+            .child(div().text_lg().font_weight(FontWeight::BOLD).child(lesson.title.clone()))
+            .child(progress);
+
+        // The lesson, with Load into editor and Run on its programs.
+        let mut body: Vec<AnyElement> = Vec::new();
+        let mut p = 0;
+        for (b, block) in lesson.blocks.iter().enumerate() {
+            match block {
+                Block::Code { code, .. } => {
+                    body.push(self.program_card(l, p, code, cx));
+                    p += 1;
+                }
+                block => body.extend(self.blocks(&format!("lesson-{l}-{b}"), std::slice::from_ref(block), cx)),
+            }
+        }
+
+        let nav = |id: &'static str, to: Option<usize>, back: bool| {
+            to.map(|i| {
+                let label = lessons[i].title.clone();
+                let button = Button::new(id).small().label(label);
+                let button = if back { button.icon(IconName::ArrowLeft) } else { button.primary() };
+                button.on_click(cx.listener(move |this, _, _, cx| {
+                    this.lesson = i;
+                    cx.notify();
+                }))
+            })
+        };
+        let footer = h_flex()
+            .flex_none()
+            .gap_2()
+            .px_3()
+            .py_2()
+            .border_t_1()
+            .border_color(theme.border)
+            .children(nav("lesson-previous", l.checked_sub(1), true))
+            .child(div().flex_1())
+            .children(nav("lesson-next", (l + 1 < lessons.len()).then_some(l + 1), false));
+
+        v_flex()
+            .flex_1()
+            .min_h_0()
+            .child(header)
+            .child(div().id(SharedString::from(format!("lesson-{l}"))).flex_1().min_h_0().overflow_y_scroll().px_3().pb_4().children(body))
+            .child(footer)
+            .into_any_element()
+    }
+
+    /// One of a lesson's programs, with Load into editor and Run.
+    fn program_card(&self, lesson: usize, program: usize, code: &str, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let source = Source::Lesson { lesson, program };
+        let running = self.running.as_ref().filter(|r| r.source == source);
+        let is_running = running.is_some_and(|r| !r.finished);
+        let highlight = running.and_then(|r| r.highlight.clone());
+        let (app_load, app_run) = (self.app.clone(), self.app.clone());
+        v_flex()
+            .mt_2()
+            .border_1()
+            .border_color(if is_running { theme.foreground } else { theme.border })
+            .rounded_md()
+            .child(div().p_2().child(code_block(code, highlight, &theme)))
+            .child(
+                h_flex()
+                    .gap_2()
+                    .p_2()
+                    .border_t_1()
+                    .border_color(theme.border)
+                    .child(Button::new(SharedString::from(format!("load-{lesson}-{program}"))).small().primary().label("Load into editor").on_click(
+                        move |_, window, cx| {
+                            app_load.update(cx, |this, cx| this.load_into_editor(lesson, program, window, cx)).ok();
+                        },
+                    ))
+                    .child(if is_running {
+                        Button::new(SharedString::from(format!("stop-lesson-{lesson}-{program}"))).small().icon(IconName::Square).label("Stop").on_click(
+                            move |_, _, cx| {
+                                app_run.update(cx, |this, cx| this.stop(cx)).ok();
+                            },
+                        )
+                    } else {
+                        Button::new(SharedString::from(format!("run-lesson-{lesson}-{program}"))).small().icon(IconName::Play).label("Run").on_click(
+                            move |_, _, cx| {
+                                app_run.update(cx, |this, cx| this.run_source(source, cx)).ok();
+                            },
+                        )
+                    }),
+            )
+            .into_any_element()
     }
 }
 
@@ -931,6 +1085,12 @@ impl PendownWindow {
         self.cursor_word = word.clone();
         self.help_panel.update(cx, |panel, cx| panel.help_for(word, window, cx));
         cx.notify();
+    }
+
+    /// Load into editor: a lesson's program as a new, untitled program,
+    /// once any unsaved changes have been dealt with, as New does.
+    pub(crate) fn load_into_editor(&mut self, lesson: usize, program: usize, window: &mut Window, cx: &mut Context<Self>) {
+        self.then(crate::files::After::Load { lesson, program }, window, cx);
     }
 
     /// Opens the panel on a page, as the console's Help button does.
@@ -989,6 +1149,10 @@ impl PendownWindow {
     /// untouched. The user's run, drawing and panels are set aside, and come
     /// back with Back to my drawing.
     pub(crate) fn run_example(&mut self, command: usize, example: usize, cx: &mut Context<Self>) {
+        self.run_source(Source::Example { command, example }, cx);
+    }
+
+    pub(crate) fn run_source(&mut self, source: Source, cx: &mut Context<Self>) {
         self.stop(cx);
         if self.example.is_none() {
             let canvas = self.canvas.borrow();
@@ -1003,19 +1167,17 @@ impl PendownWindow {
                 watch: self.watched.read(cx).watch.clone(),
             };
             drop(canvas);
-            self.example = Some(ExampleRun { command, example, saved });
+            self.example = Some(ExampleRun { source, saved });
         }
-        let example_run = self.example.as_mut().expect("set above");
-        example_run.command = command;
-        example_run.example = example;
-        let code = reference().commands[command].examples[example].code.clone();
+        self.example.as_mut().expect("set above").source = source;
+        let code = source.code();
         self.run_text = code.clone();
         self.clear_editor_highlight(cx);
         self.canvas.borrow_mut().drawing.reset();
         self.show_watch(cx, |watched| watched.set(None));
         let (animator, run) = pendown::run::start(code, self.speed, pendown::run::DEFAULT_CHANNEL);
         self.play(animator, run, cx);
-        let running = Running { command, example, highlight: None, finished: false };
+        let running = Running { source, highlight: None, finished: false };
         self.help_panel.update(cx, |panel, cx| panel.set_running(Some(running), cx));
     }
 
@@ -1054,14 +1216,14 @@ impl PendownWindow {
     pub(crate) fn show_example_highlight(&mut self, cx: &mut Context<Self>) {
         let Some(example) = &self.example else { return };
         let highlight = self.animator.as_ref().and_then(|a| a.highlight).map(|s| s.range());
-        let running = Running { command: example.command, example: example.example, highlight, finished: false };
+        let running = Running { source: example.source, highlight, finished: false };
         self.help_panel.update(cx, |panel, cx| panel.set_running(Some(running), cx));
     }
 
     /// The example has finished or been stopped: its picture stays.
     pub(crate) fn example_finished(&mut self, cx: &mut Context<Self>) {
         let Some(example) = &self.example else { return };
-        let running = Running { command: example.command, example: example.example, highlight: None, finished: true };
+        let running = Running { source: example.source, highlight: None, finished: true };
         self.help_panel.update(cx, |panel, cx| panel.set_running(Some(running), cx));
     }
 
@@ -1069,8 +1231,7 @@ impl PendownWindow {
     pub(crate) fn example_banner(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let example = self.example.as_ref()?;
         let theme = cx.theme();
-        let command = &reference().commands[example.command];
-        let title = command.examples[example.example].title.clone().unwrap_or_else(|| "an example".into());
+        let text = example.source.describe();
         Some(
             h_flex()
                 .absolute()
@@ -1085,7 +1246,7 @@ impl PendownWindow {
                 .text_color(theme.foreground)
                 .text_sm()
                 .child(div().px_1().rounded_sm().bg(theme.foreground).text_color(theme.background).text_xs().child("Example"))
-                .child(div().flex_1().min_w_0().truncate().child(format!("“{title}”, from {}", command.title)))
+                .child(div().flex_1().min_w_0().truncate().child(text))
                 .child(
                     Button::new("back-to-my-drawing")
                         .small()
@@ -1111,7 +1272,6 @@ pub struct Saved {
 
 /// The example on the canvas.
 pub struct ExampleRun {
-    pub command: usize,
-    pub example: usize,
+    pub source: Source,
     saved: Saved,
 }

@@ -152,17 +152,22 @@ pub fn links(blocks: &[Block]) -> Vec<&str> {
         .collect()
 }
 
+/// Inline parts as plain text.
+pub fn plain(inlines: &[Inline]) -> String {
+    inlines
+        .iter()
+        .map(|i| match i {
+            Inline::Text(t) | Inline::Code(t) | Inline::Bold(t) | Inline::Italic(t) | Inline::Link(t) => t.as_str(),
+        })
+        .collect()
+}
+
 /// The first sentence of some text, without its markup, for a search
 /// result: up to the first full stop followed by a space, or the end of the
 /// first paragraph.
 pub fn summary(text: &str) -> String {
     let first = text.split("\n\n").next().unwrap_or_default().replace('\n', " ");
-    let plain: String = inlines(&first)
-        .into_iter()
-        .map(|i| match i {
-            Inline::Text(t) | Inline::Code(t) | Inline::Bold(t) | Inline::Italic(t) | Inline::Link(t) => t,
-        })
-        .collect();
+    let plain = plain(&inlines(&first));
     match plain.find(". ") {
         Some(end) => plain[..=end].to_string(),
         None => plain,

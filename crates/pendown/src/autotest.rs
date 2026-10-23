@@ -165,6 +165,13 @@ enum Step {
     /// The console has a Help button for this page, and pressing it opens
     /// the panel there.
     CheckErrorHelp(&'static str),
+    /// Open the Tutorial tab at a lesson, counting from 0.
+    Lesson(usize),
+    /// Load into editor on a lesson's program, without the question about
+    /// unsaved changes.
+    LoadLesson(usize, usize),
+    /// Run on a lesson's program.
+    RunLesson(usize, usize),
     /// The metrics overlay is shown, with numbers in it, or isn't.
     CheckOverlay(bool),
     Quit,
@@ -420,6 +427,19 @@ fn script() -> Vec<Step> {
         CheckErrorHelp("EDIT"),
         Wait(ms(100)),
         Screenshot("error-help"),
+        Say("Phase 5: a lesson's programs load into the editor and run"),
+        Lesson(1),
+        LoadLesson(1, 0),
+        CheckEditor("REPEAT 4 [FD 100 RT 90]"),
+        CheckTitle("Untitled — Pendown"),
+        SetSpeed(level_speed(7)),
+        RunLesson(1, 3),
+        Wait(ms(1500)),
+        Screenshot("tutorial"),
+        SetSpeed(Speed::Instant),
+        WaitFinished,
+        CheckDrawn(32),
+        BackToMyDrawing,
         CloseHelp,
         Quit,
     ]
@@ -685,6 +705,18 @@ impl App {
                         self.open_help(i, window, cx);
                     }
                 }
+                Step::Lesson(l) => {
+                    if !self.help_open {
+                        self.toggle_help(cx);
+                    }
+                    self.help_panel.update(cx, |p, cx| {
+                        p.tab = crate::help_panel::Tab::Tutorial;
+                        p.lesson = l;
+                        cx.notify();
+                    });
+                }
+                Step::LoadLesson(lesson, program) => self.proceed(crate::files::After::Load { lesson, program }, window, cx),
+                Step::RunLesson(lesson, program) => self.run_source(crate::help_panel::Source::Lesson { lesson, program }, cx),
                 Step::CloseHelp => {
                     if self.help_open {
                         self.toggle_help(cx);

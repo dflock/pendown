@@ -1,7 +1,8 @@
-//! Examples are tests (phase 5 issue 04): every example in the help runs as
-//! its page says, and draws the picture the panel shows, which must match
-//! the saved one in `tests/help-pictures/`. What an example prints is
-//! saved beside it, as `.txt`.
+//! Examples are tests (phase 5 issue 04): every example in the help, and
+//! every program in the tutorial, runs as it should, and draws the picture
+//! the panel shows, which must match the saved one in
+//! `tests/help-pictures/`. What a program prints is saved beside it, as
+//! `.txt`.
 //!
 //! After a change that's meant to alter them, look at the pictures, then
 //! update them with `UPDATE_PICTURES=1 cargo test -p pendown --test examples`.
@@ -73,6 +74,14 @@ fn every_example_runs_and_draws_its_picture() {
         for (i, example) in command.examples.iter().enumerate() {
             let name = pendown::help::example_name(&command.key, i);
             problems.extend(check(&name, &example.code, example.fails));
+            names.push(name);
+        }
+    }
+    // And the tutorial's programs, as `tutorial-1-2` for lesson 1's second.
+    for (l, lesson) in pendown::tutorial::lessons().iter().enumerate() {
+        for (p, program) in lesson.programs().enumerate() {
+            let name = format!("tutorial-{}-{}", l + 1, p + 1);
+            problems.extend(check(&name, program, false));
             names.push(name);
         }
     }

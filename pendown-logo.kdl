@@ -17,6 +17,68 @@
 // Our changes to UCBLogo (see "Dialect and extensions" in implementation-plan.md):
 //   extension #true  A command that isn't in the manual; `source` says where the idea came from.
 //   differs "..."    How our version behaves differently from the manual's `desc`.
+// Syntax that isn't a command in the manual (it's in the manual's chapter 1,
+// which this file leaves out), for the help panel. `names` are what the
+// editor's cursor can be on.
+syntax {
+  numbers {
+    title "Numbers"
+    eg "100  -45  3.5  1e3"
+  }
+  quoted-words {
+    title "Quoted words: \"word"
+    eg "\"word"
+    names "\""
+  }
+  variables {
+    title "Variables: :name"
+    eg ":name"
+    names ":"
+  }
+  lists {
+    title "Lists: [ ]"
+    eg "[thing1 thing2 ...]"
+    names "[" "]"
+  }
+  arrays {
+    title "Arrays: { }"
+    eg """
+    {thing1 thing2 ...}
+    {thing1 thing2 ...}@origin
+    """
+    names "{" "}"
+  }
+  parentheses {
+    title "Parentheses: ( )"
+    eg """
+    (expression)
+    (PROCNAME input1 input2 input3 ...)
+    """
+    names "(" ")"
+  }
+  operators {
+    title "Operators: + - * / = < >"
+    eg """
+    num1 + num2    num1 - num2    num1 * num2    num1 / num2
+    thing1 = thing2    thing1 <> thing2
+    num1 < num2    num1 > num2    num1 <= num2    num1 >= num2
+    """
+  }
+  comments {
+    title "Comments: ;"
+    eg "; a comment, to the end of the line"
+    names ";"
+  }
+  template-slots {
+    title "Template slots: ? and ?REST"
+    eg """
+    ?  ?1  ?2  (? 3)
+    ?REST  (?REST 2)
+    """
+    names "?" "?REST"
+  }
+}
+
 logo {
   data-structure-primitives {
     constructors {
@@ -2333,6 +2395,7 @@ logo {
     procedure-definition {
       to {
         eg "TO procname :input1 :input2 ...  (special form)"
+        names "END"
         desc """
         command. Prepares Logo to accept a procedure definition. The procedure will be named procname and there must not already be a procedure by that name. The inputs will be called input1 etc. Any number of inputs are allowed, including none. Names of procedures and inputs are case-insensitive.
 
@@ -3263,6 +3326,7 @@ logo {
       }
       repcount {
         eg "REPCOUNT"
+        names "#"
         desc """
         outputs the repetition count of the innermost current REPEAT or FOREVER, starting from 1. If no REPEAT or FOREVER is active, outputs –1.
 

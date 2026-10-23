@@ -22,6 +22,7 @@ mod parse;
 mod prims;
 mod random;
 mod reader;
+pub mod reference;
 mod span;
 pub mod syntax;
 mod value;

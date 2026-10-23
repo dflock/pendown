@@ -27,6 +27,8 @@ pub enum Kind {
 pub struct Example {
     pub title: Option<String>,
     pub code: String,
+    /// It stops with an error on purpose, as `ERRACT`'s does.
+    pub fails: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -139,7 +141,8 @@ fn examples(node: &KdlNode) -> Vec<Example> {
         .filter_map(|n| {
             let code = n.entries().iter().find(|e| e.name().is_none())?.value().as_string()?.to_string();
             let title = n.get("title").and_then(|v| v.as_string()).map(str::to_string);
-            Some(Example { title, code })
+            let fails = n.get("fails").and_then(|v| v.as_bool()) == Some(true);
+            Some(Example { title, code, fails })
         })
         .collect()
 }
@@ -271,8 +274,11 @@ impl Reference {
         self.find_index(name).map(|i| &self.commands[i])
     }
 
+    /// By name, alias or operator, or failing that by the kdl's key, which
+    /// is how a link names a syntax entry, as in `[parentheses]`.
     pub fn find_index(&self, name: &str) -> Option<usize> {
-        self.index.get(&name.to_lowercase()).copied()
+        let name = name.to_lowercase();
+        self.index.get(&name).copied().or_else(|| self.commands.iter().position(|c| c.key == name))
     }
 
     /// Commands with a name starting with `query`, an exact match first,

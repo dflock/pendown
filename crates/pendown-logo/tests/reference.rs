@@ -88,3 +88,48 @@ fn extensions_are_marked() {
     assert!(!r.find("forward").unwrap().extension);
 }
 
+
+#[test]
+fn every_implemented_command_and_syntax_entry_has_help_and_an_example() {
+    let r = reference();
+    let mut missing = Vec::new();
+    for c in r.commands.iter().filter(|c| c.implemented) {
+        if c.help.as_deref().is_none_or(|h| h.trim().is_empty()) {
+            missing.push(format!("{}: help", c.key));
+        }
+        if c.examples.is_empty() {
+            missing.push(format!("{}: example", c.key));
+        }
+    }
+    assert!(missing.is_empty(), "{missing:#?}");
+}
+
+#[test]
+fn syntax_entries_are_found_by_what_the_cursor_is_on() {
+    let r = reference();
+    assert_eq!(r.find(":").unwrap().key, "variables");
+    assert_eq!(r.find("[").unwrap().key, "lists");
+    assert_eq!(r.find("?rest").unwrap().key, "template-slots");
+    assert_eq!(r.find("#").unwrap().title, "REPCOUNT");
+    assert_eq!(r.find("end").unwrap().title, "TO");
+    // And by key, as links name them.
+    assert_eq!(r.find("parentheses").unwrap().title, "Parentheses: ( )");
+    assert_eq!(r.chapters[0].title, "Syntax");
+}
+
+#[test]
+fn see_lists_name_real_pages() {
+    let r = reference();
+    for c in r.commands.iter().filter(|c| c.implemented) {
+        for name in &c.see {
+            assert!(r.find(name).is_some_and(|s| s.implemented), "{}: see {name}", c.key);
+        }
+    }
+}
+
+#[test]
+fn erract_s_example_fails_on_purpose() {
+    let r = reference();
+    assert!(r.find("erract").unwrap().examples[0].fails);
+    assert!(!r.find("forward").unwrap().examples[0].fails);
+}

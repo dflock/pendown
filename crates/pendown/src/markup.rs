@@ -26,6 +26,13 @@ pub enum Block {
     Code { language: String, code: String },
 }
 
+/// What's between `marker` at the start of `text` and the next `marker`,
+/// if there is one and it isn't empty.
+fn closed<'a>(text: &'a str, marker: &str) -> Option<&'a str> {
+    let rest = text.strip_prefix(marker)?;
+    rest.find(marker).filter(|&end| end > 0).map(|end| &rest[..end])
+}
+
 /// Splits a line of text into its inline parts. Unclosed markers are left
 /// as text.
 pub fn inlines(text: &str) -> Vec<Inline> {
@@ -43,18 +50,15 @@ pub fn inlines(text: &str) -> Vec<Inline> {
     };
     while i < bytes.len() {
         let rest = &text[i..];
-        let found = if rest.starts_with("**") {
-            rest[2..].find("**").map(|end| (Inline::Bold(rest[2..2 + end].to_string()), end + 4))
-        } else if rest.starts_with('`') {
-            rest[1..].find('`').map(|end| (Inline::Code(rest[1..1 + end].to_string()), end + 2))
-        } else if rest.starts_with('*') {
-            rest[1..].find('*').filter(|&end| end > 0).map(|end| (Inline::Italic(rest[1..1 + end].to_string()), end + 2))
-        } else if rest.starts_with('[') {
+        let found = if let Some(inner) = closed(rest, "**") {
+            Some((Inline::Bold(inner.to_string()), inner.len() + 4))
+        } else if let Some(inner) = closed(rest, "`") {
+            Some((Inline::Code(inner.to_string()), inner.len() + 2))
+        } else if let Some(inner) = closed(rest, "*").filter(|i| !i.starts_with(' ') && !i.ends_with(' ')) {
+            Some((Inline::Italic(inner.to_string()), inner.len() + 2))
+        } else if let Some(inner) = rest.strip_prefix('[').and_then(|r| r.split_once(']')).map(|(inner, _)| inner) {
             // A link is a name alone in brackets: `[1 2 3]` in prose isn't one.
-            rest[1..]
-                .find(']')
-                .filter(|&end| end > 0 && !rest[1..1 + end].contains(char::is_whitespace))
-                .map(|end| (Inline::Link(rest[1..1 + end].to_string()), end + 2))
+            (!inner.is_empty() && !inner.contains(char::is_whitespace)).then(|| (Inline::Link(inner.to_string()), inner.len() + 2))
         } else {
             None
         };
@@ -194,6 +198,7 @@ mod tests {
     #[test]
     fn unclosed_markers_and_lists_in_prose_are_text() {
         assert_eq!(inlines("2 * 3 and `oops"), [text("2 * 3 and `oops")]);
+        assert_eq!(inlines("2 * 3 = 3 * 2"), [text("2 * 3 = 3 * 2")]);
         assert_eq!(inlines("a list [1 2 3] here"), [text("a list [1 2 3] here")]);
     }
 

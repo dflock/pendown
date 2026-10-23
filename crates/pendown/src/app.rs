@@ -88,10 +88,11 @@ const OVERLAY_EVERY: Duration = Duration::from_millis(500);
 /// not on frames, so it doesn't change how often the window renders.
 const AUTOTEST_EVERY: Duration = Duration::from_millis(5);
 
-/// The toolbar's height, which its cached view needs, and the width of the
-/// status beside it.
+/// The toolbar's height, which its cached view needs.
 const TOOLBAR_HEIGHT: f32 = 41.0;
-const STATUS_WIDTH: f32 = 220.0;
+
+/// The status bar's height, at the bottom of the window.
+const STATUS_BAR_HEIGHT: f32 = 24.0;
 
 /// The console area's height, with the counters and variables beside the
 /// console.
@@ -840,18 +841,7 @@ impl App {
                     .gap_2()
                     .border_b_1()
                     .border_color(theme.border)
-                    .child(self.toolbar_pane.clone().cached(StyleRefinement::default().h_full().flex_1()))
-                    // A fixed width, so the toolbar's size doesn't change
-                    // with the status, which would redraw it.
-                    .child(
-                        div()
-                            .flex_none()
-                            .w(px(STATUS_WIDTH))
-                            .truncate()
-                            .text_sm()
-                            .text_color(theme.muted_foreground)
-                            .child(self.status()),
-                    ),
+                    .child(self.toolbar_pane.clone().cached(StyleRefinement::default().h_full().flex_1())),
             )
             .child(
                 div().flex_1().min_h_0().child({
@@ -887,6 +877,18 @@ impl App {
                                 .child(self.variables_pane.clone().cached(StyleRefinement::default().size_full())),
                         ),
                 ),
+            )
+            // The status bar: how the run is going.
+            .child(
+                h_flex()
+                    .flex_none()
+                    .h(px(STATUS_BAR_HEIGHT))
+                    .px_2()
+                    .border_t_1()
+                    .border_color(theme.border)
+                    .text_xs()
+                    .text_color(theme.muted_foreground)
+                    .child(div().truncate().child(self.status())),
             )
     }
 

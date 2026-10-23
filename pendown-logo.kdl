@@ -4401,7 +4401,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step buttons do that."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step line buttons do that."
       }
       untrace {
         eg "UNTRACE contentslist"
@@ -4409,7 +4409,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step buttons do that."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step line buttons do that."
       }
       tracedp {
         eg """
@@ -4420,7 +4420,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step buttons do that."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step line buttons do that."
       }
       step {
         eg "STEP contentslist"
@@ -4429,7 +4429,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step buttons do that."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step line buttons do that."
       }
       unstep {
         eg "UNSTEP contentslist"
@@ -4437,7 +4437,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step buttons do that."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step line buttons do that."
       }
       steppedp {
         eg """
@@ -4448,7 +4448,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step buttons do that."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step line buttons do that."
       }
       edit {
         eg """

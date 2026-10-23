@@ -163,7 +163,7 @@ impl Render for ToolbarPane {
                     .w(px(88.))
                     .disabled(!running),
             )
-            .child(self.button("step", IconName::StepForward, "Step", |this, _, cx| this.step(false, cx)).disabled(!paused))
+            .child(self.button("step", IconName::StepForward, "Step line", |this, _, cx| this.step(false, cx)).disabled(!paused))
             .child(
                 self.button("step-instruction", IconName::Footprints, "Step instruction", |this, _, cx| this.step(true, cx)).disabled(!paused),
             )

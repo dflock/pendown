@@ -439,14 +439,12 @@ impl HelpPanel {
     }
 }
 
-/// A program, in the editor's font, with the running instruction
-/// highlighted.
+/// A program, in the editor's font and colours, with the running
+/// instruction highlighted.
 fn code_block(code: &str, highlight: Option<Range<usize>>, theme: &gpui_kit::component::Theme) -> Div {
-    let text = StyledText::new(code.to_string()).with_highlights(
-        highlight
-            .filter(|r| r.end <= code.len())
-            .map(|r| (r, HighlightStyle { background_color: Some(theme.warning.opacity(0.35)), ..Default::default() })),
-    );
+    let running = HighlightStyle { background_color: Some(theme.warning.opacity(0.35)), ..Default::default() };
+    let styles = crate::highlighter::program_styles(code, &*theme.highlight_theme, highlight.map(|r| (r, running)));
+    let text = StyledText::new(code.to_string()).with_highlights(styles);
     div().p_2().rounded_md().bg(theme.muted).font_family(theme.mono_font_family.clone()).text_xs().whitespace_normal().child(text)
 }
 

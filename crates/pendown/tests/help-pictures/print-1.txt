@@ -1,0 +1,3 @@
+Hello, Kame!
+42
+Kame is 100 steps tall

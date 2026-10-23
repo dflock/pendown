@@ -6,7 +6,6 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-smallvec.workspace = true
-
-[dev-dependencies]
+# The language reference is parsed from pendown-logo.kdl (ADR 0018).
 kdl.workspace = true
+smallvec.workspace = true

@@ -32,7 +32,13 @@ pub struct Options {
     /// The seed for `RANDOM`, for a repeatable picture. Otherwise each run
     /// is different.
     pub seed: Option<u64>,
+    /// Zoom in on what's drawn, rather than showing the whole turtle area
+    /// (`Drawing::fit`).
+    pub fit: bool,
 }
+
+/// The smallest area, in turtle steps, that `fit` zooms in to.
+pub const FIT_MIN: f64 = 100.0;
 
 pub struct Output {
     /// The picture, as far as the program got.
@@ -40,6 +46,8 @@ pub struct Output {
     /// Everything the program printed.
     pub printed: String,
     pub result: Result<(), RunError>,
+    /// How many lines, arcs and shapes were drawn since the last `CLEAN`.
+    pub drawn: usize,
     /// A one-line summary of where the time went, when metrics are on
     /// (ADR 0020).
     pub summary: Option<String>,
@@ -130,6 +138,9 @@ pub fn render(source: &str, options: Options) -> Output {
             let result = it.run_program(&source);
             let instructions = it.stats.instructions;
             drop(it);
+            if options.fit {
+                drawing.borrow_mut().fit(FIT_MIN);
+            }
             let drawing = drawing.borrow();
             let png = drawing.png();
             let printed = printed.borrow().clone();
@@ -146,7 +157,7 @@ pub fn render(source: &str, options: Options) -> Output {
                     ThreadCpu::now().since(&cpu).percentages(wall, "main"),
                 )
             });
-            Output { png, printed, result, summary }
+            Output { png, printed, result, drawn: drawing.segments(), summary }
         })
         .expect("can start the interpreter thread")
         .join()

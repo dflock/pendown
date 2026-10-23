@@ -91,6 +91,13 @@ Two panels that update as the turtle goes, in step with the highlighted instruct
 
 ### Phase 5: Help, examples and tutorial (no new commands)
 
+Done: see `.scratch/phase-5/` and ADR 0023. The reference lives in `pendown-logo`, so the interpreter's errors and the GUI's panel share it. Where the result differs from the plan below:
+- An example's picture stays on the canvas when it ends, until **Back to my drawing** or Run, rather than going at once.
+- The pictures are drawn when a page shows them, the same way the examples test draws them, rather than embedded in the app.
+- Errors offer help with a button in the console's title bar, since the console's lines can't hold links.
+- The tutorial's lesson picker is a bar of the lessons, and the search results don't take ↑ and ↓.
+- The grammar is in `tree-sitter-logo/`, ready for a repository of its own, and leaves UCBLogo's optional inputs out.
+
 Two of the headline features. They come after phase 2 so they cover the complete core language, and so the commands they document have settled down.
 
 The UI design is on a canvas of mockups: https://claude.ai/artifact/Pcqcncf1iK6d3gnTQpyohp (private to the owner unless shared).

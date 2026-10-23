@@ -135,6 +135,43 @@ enum Step {
     CheckColours(&'static str),
     /// Press F12.
     ToggleMetrics,
+    /// Phase 5: put the editor's cursor one character into the first
+    /// `marker`.
+    CursorAt(&'static str),
+    /// The same, then press F1.
+    F1At(&'static str),
+    /// The help panel shows the page with this title.
+    CheckHelpPage(&'static str),
+    /// Type into the help panel's search box.
+    SearchHelp(&'static str),
+    /// The first search result is the command with this title.
+    CheckFirstResult(&'static str),
+    /// Open a help page by name, as a link does.
+    OpenHelp(&'static str),
+    /// The Contents button.
+    HelpContents,
+    /// Close the side panel, as its button does.
+    CloseHelp,
+    /// Press Run on an example: the command's name, and which example,
+    /// counting from 0.
+    RunExample(&'static str, usize),
+    /// The example's code is highlighted here, in the panel.
+    CheckExampleHighlight(&'static str),
+    BackToMyDrawing,
+    /// Press Copy to editor on an example.
+    CopyExample(&'static str, usize),
+    /// The editor's text ends with this.
+    CheckEditorEnds(&'static str),
+    /// The console has a Help button for this page, and pressing it opens
+    /// the panel there.
+    CheckErrorHelp(&'static str),
+    /// Open the Tutorial tab at a lesson, counting from 0.
+    Lesson(usize),
+    /// Load into editor on a lesson's program, without the question about
+    /// unsaved changes.
+    LoadLesson(usize, usize),
+    /// Run on a lesson's program.
+    RunLesson(usize, usize),
     /// The metrics overlay is shown, with numbers in it, or isn't.
     CheckOverlay(bool),
     Quit,
@@ -340,6 +377,73 @@ fn script() -> Vec<Step> {
         WaitFinished,
         CheckColours("PENCOLOR=orange FILLCOLOR=#40c0ff80 BACKGROUND=[20 40 80]"),
         Screenshot("colours"),
+        Say("Phase 5: help for the word under the cursor"),
+        Type(crate::app::WELCOME),
+        F1At("FD :size"),
+        Wait(ms(500)),
+        CheckHelpPage("FORWARD"),
+        Screenshot("help"),
+        CursorAt("RT 90"),
+        Wait(ms(100)),
+        CheckHelpPage("RIGHT"),
+        CursorAt(":size"),
+        Wait(ms(100)),
+        CheckHelpPage("Variables: :name"),
+        Say("Phase 5: search and contents"),
+        SearchHelp("setp"),
+        Wait(ms(100)),
+        CheckFirstResult("SETPENCOLOR"),
+        Screenshot("help-search"),
+        SearchHelp(""),
+        OpenHelp("circle"),
+        HelpContents,
+        Wait(ms(100)),
+        Screenshot("help-contents"),
+        Say("Phase 5: an example runs on the canvas, and the user's drawing comes back"),
+        Run(crate::app::WELCOME, Speed::Instant),
+        WaitFinished,
+        CheckDrawn(48),
+        OpenHelp("forward"),
+        SetSpeed(Speed::Animated(20.0)),
+        RunExample("forward", 0),
+        Wait(ms(900)),
+        CheckExampleHighlight("FD 40"),
+        Screenshot("example"),
+        SetSpeed(Speed::Instant),
+        WaitFinished,
+        CheckDrawn(8),
+        BackToMyDrawing,
+        CheckDrawn(48),
+        CopyExample("forward", 1),
+        CheckEditorEnds("FLOWER 250\n\nREPEAT 5 [FD 20 PU FD 20 PD]\n"),
+        CloseHelp,
+        Say("Phase 5: errors offer help on their command"),
+        Run("REPEAT 3 [FD]", Speed::Instant),
+        WaitFinished,
+        CheckErrorHelp("FORWARD"),
+        Run("EDIT \"square", Speed::Instant),
+        WaitFinished,
+        CheckConsole("Line 1: EDIT isn't in Pendown: it opens an external text editor, and Pendown has its own."),
+        CheckErrorHelp("EDIT"),
+        Wait(ms(100)),
+        Screenshot("error-help"),
+        Say("Phase 5: a lesson's programs load into the editor and run"),
+        Lesson(0),
+        Wait(ms(100)),
+        Screenshot("tutorial-first"),
+        Lesson(1),
+        LoadLesson(1, 0),
+        CheckEditor("REPEAT 4 [FD 100 RT 90]"),
+        CheckTitle("Untitled — Pendown"),
+        SetSpeed(level_speed(7)),
+        RunLesson(1, 3),
+        Wait(ms(1500)),
+        Screenshot("tutorial"),
+        SetSpeed(Speed::Instant),
+        WaitFinished,
+        CheckDrawn(32),
+        BackToMyDrawing,
+        CloseHelp,
         Quit,
     ]
 }
@@ -364,9 +468,16 @@ impl Autotest {
         let value = std::env::var("PENDOWN_AUTOTEST").ok()?;
         let dir = if value == "1" { PathBuf::from("target/autotest") } else { PathBuf::from(value) };
         std::fs::create_dir_all(&dir).ok();
+        let steps = script();
+        // PENDOWN_AUTOTEST_FROM="Phase 5" starts at the first section whose
+        // title has that in it.
+        let next = std::env::var("PENDOWN_AUTOTEST_FROM")
+            .ok()
+            .and_then(|from| steps.iter().position(|s| matches!(s, Step::Say(text) if text.contains(from.as_str()))))
+            .unwrap_or(0);
         Some(Autotest {
-            steps: script(),
-            next: 0,
+            steps,
+            next,
             waiting: None,
             log: String::new(),
             failures: 0,
@@ -531,6 +642,88 @@ impl App {
                 Step::ExportTo(name) => {
                     let path = self.autotest.as_ref().unwrap().dir.join(name);
                     self.export_to(&path, cx);
+                }
+                Step::CursorAt(marker) | Step::F1At(marker) => {
+                    let text = self.editor.read(cx).value().to_string();
+                    let offset = text.find(marker).map_or(0, |i| i + 1);
+                    let at = crate::app::position(&text, offset);
+                    self.editor.update(cx, |state, cx| state.set_cursor_position(at, window, cx));
+                    if matches!(step, Step::F1At(_)) {
+                        self.show_help(window, cx);
+                    }
+                }
+                Step::CheckHelpPage(expected) => {
+                    let page = self.help_panel.read(cx).page;
+                    let title = match page {
+                        crate::help_panel::Page::Command(i) => pendown_logo::reference::reference().commands[i].title.clone(),
+                        crate::help_panel::Page::Contents => "Contents".to_string(),
+                    };
+                    self.check(self.help_open && title == expected, format!("the help panel shows {title}"));
+                }
+                Step::SearchHelp(query) => {
+                    let search = self.help_panel.read(cx).search.clone();
+                    search.update(cx, |s, cx| s.set_value(query.to_string(), window, cx));
+                    self.help_panel.update(cx, |_, cx| cx.notify());
+                }
+                Step::CheckFirstResult(expected) => {
+                    let query = self.help_panel.read(cx).query(cx);
+                    let r = pendown_logo::reference::reference();
+                    let first = r.search(&query, false).first().map(|&i| r.commands[i].title.clone()).unwrap_or_default();
+                    self.check(first == expected, format!("the first result for {query:?} is {first}"));
+                }
+                Step::OpenHelp(name) => {
+                    self.help_panel.update(cx, |p, cx| p.open_name(name, window, cx));
+                }
+                Step::HelpContents => {
+                    self.help_panel.update(cx, |p, cx| p.go(crate::help_panel::Page::Contents, window, cx));
+                }
+                Step::RunExample(name, n) => {
+                    let i = pendown_logo::reference::reference().find_index(name).expect("a help page");
+                    self.run_example(i, n, cx);
+                }
+                Step::CheckExampleHighlight(expected) => {
+                    let running = self.help_panel.read(cx).running.clone();
+                    let text = running
+                        .as_ref()
+                        .and_then(|r| r.highlight.clone())
+                        .map_or(String::new(), |range| self.run_text.get(range).unwrap_or_default().to_string());
+                    self.check(text == expected, format!("the example's highlight is on {text:?}"));
+                }
+                Step::BackToMyDrawing => self.back_to_my_drawing(cx),
+                Step::CopyExample(name, n) => {
+                    let r = pendown_logo::reference::reference();
+                    let code = r.find(name).expect("a help page").examples[n].code.clone();
+                    self.copy_to_editor(&code, window, cx);
+                }
+                Step::CheckEditorEnds(expected) => {
+                    let text = self.editor.read(cx).value().to_string();
+                    let tail = &text[text.len().saturating_sub(expected.len() + 20)..];
+                    self.check(text.ends_with(expected), format!("the editor ends with {tail:?}"));
+                }
+                Step::CheckErrorHelp(expected) => {
+                    let r = pendown_logo::reference::reference();
+                    let title = self.error_help.map_or(String::new(), |i| r.commands[i].title.clone());
+                    self.check(title == expected, format!("the console offers help on {title:?}"));
+                    if let Some(i) = self.error_help {
+                        self.open_help(i, window, cx);
+                    }
+                }
+                Step::Lesson(l) => {
+                    if !self.help_open {
+                        self.toggle_help(cx);
+                    }
+                    self.help_panel.update(cx, |p, cx| {
+                        p.tab = crate::help_panel::Tab::Tutorial;
+                        p.lesson = l;
+                        cx.notify();
+                    });
+                }
+                Step::LoadLesson(lesson, program) => self.proceed(crate::files::After::Load { lesson, program }, window, cx),
+                Step::RunLesson(lesson, program) => self.run_source(crate::help_panel::Source::Lesson { lesson, program }, cx),
+                Step::CloseHelp => {
+                    if self.help_open {
+                        self.toggle_help(cx);
+                    }
                 }
                 Step::Type(text) => {
                     // Like typing: an edit the user could undo, which sends

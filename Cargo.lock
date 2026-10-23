@@ -4664,6 +4664,7 @@ version = "0.1.0"
 dependencies = [
  "gpui-kit",
  "image",
+ "pendown-cli",
  "pendown-logo",
  "pendown-render",
 ]

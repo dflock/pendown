@@ -244,3 +244,14 @@ fn colours_are_shown_as_set_with_what_they_look_like() {
         "PENCOLOR=red Some([255, 0, 0, 255]) FILLCOLOR=2 Some([0, 255, 0, 255]) BACKGROUND=[0 0 255] Some([0, 0, 255, 255])"
     );
 }
+
+#[test]
+fn the_same_palette_number_in_a_new_colour_shows() {
+    // The colours are formatted again only when they change. Pendown works
+    // out the pen's colour when SETPC runs, so after SETPALETTE, SETPC 8
+    // is the same value in a new colour, which the panel must show.
+    let events = events("SETPC 8\nFD 1\nSETPALETTE 8 [255 0 0]\nSETPC 8\nFD 1");
+    let pens: Vec<Option<[u8; 4]>> =
+        events.iter().filter_map(|e| if let Event::Watch(w) = e { Some(w.colours[0].rgba) } else { None }).collect();
+    assert_eq!(pens.last().unwrap(), &Some([255, 0, 0, 255]), "{pens:?}");
+}

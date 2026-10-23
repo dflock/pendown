@@ -8,7 +8,7 @@ use pendown::document::{Document, last_folder, remember_folder};
 
 use crate::app::App;
 
-actions!(pendown, [NewFile, OpenFile, SaveFile, SaveFileAs, ExportPicture, RunProgram, ToggleMetrics]);
+actions!(pendown, [NewFile, OpenFile, SaveFile, SaveFileAs, ExportPicture, RunProgram, ToggleMetrics, ShowHelp]);
 
 /// The usual shortcuts: Ctrl on Linux and Windows, Cmd on macOS.
 pub fn bind_keys(cx: &mut gpui_kit::App) {
@@ -21,6 +21,8 @@ pub fn bind_keys(cx: &mut gpui_kit::App) {
         KeyBinding::new("secondary-enter", RunProgram, None),
         // The metrics overlay (ADR 0020).
         KeyBinding::new("f12", ToggleMetrics, None),
+        // Help for the word under the editor's cursor (phase 5).
+        KeyBinding::new("f1", ShowHelp, None),
     ]);
 }
 
@@ -31,6 +33,9 @@ pub enum After {
     NewFile,
     OpenFile,
     Close,
+    /// Load into editor: a tutorial lesson's program, by lesson and which
+    /// program in it.
+    Load { lesson: usize, program: usize },
 }
 
 impl App {
@@ -83,7 +88,7 @@ impl App {
         .detach();
     }
 
-    fn proceed(&mut self, after: After, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn proceed(&mut self, after: After, window: &mut Window, cx: &mut Context<Self>) {
         match after {
             After::Nothing => {}
             After::NewFile => {
@@ -110,6 +115,14 @@ impl App {
             After::Close => {
                 self.closing = true;
                 window.remove_window();
+            }
+            After::Load { lesson, program } => {
+                self.stop(cx);
+                let code = crate::help_panel::Source::Lesson { lesson, program }.code();
+                // Like New, so Save can't write a lesson over the user's file.
+                self.document = Document::new(&code);
+                self.editor.update(cx, |state, cx| state.set_value(code, window, cx));
+                self.check_program(cx);
             }
         }
     }

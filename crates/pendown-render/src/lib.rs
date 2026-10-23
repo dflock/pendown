@@ -121,6 +121,16 @@ impl Drawing {
         self.display.len()
     }
 
+    /// Everything drawn since the last `CLEAN`, to set aside and draw again
+    /// later, as the GUI does while it shows an example.
+    pub fn marks(&self) -> &[Mark] {
+        &self.display
+    }
+
+    pub fn background(&self) -> [u8; 4] {
+        self.background
+    }
+
     /// Clears the drawing, as `CLEAN` does.
     pub fn clean(&mut self) {
         self.display.clear();
@@ -164,6 +174,24 @@ impl Drawing {
         let (w, h) = (self.width, self.height);
         self.width = 0;
         self.resize(w, h);
+    }
+
+    /// Zooms in on what's drawn: the turtle area becomes the smallest
+    /// square, centred on `[0 0]`, that holds everything since the last
+    /// `CLEAN` with a margin, but no smaller than `min` steps across and no
+    /// larger than the usual area. For pictures of small drawings, such as
+    /// the help panel's.
+    pub fn fit(&mut self, min: f64) {
+        let extent = self
+            .display
+            .iter()
+            .flat_map(|m| {
+                let half_pen = if m.pen().down { m.pen().size / 2.0 } else { 0.0 };
+                m.outline(1.0).into_iter().map(move |p| p.x.abs().max(p.y.abs()) + half_pen)
+            })
+            .fold(0.0, f64::max);
+        let area = (extent * 2.0 * 1.1).clamp(min, TURTLE_AREA);
+        self.set_area(area, area);
     }
 
     /// Device pixels per turtle step.

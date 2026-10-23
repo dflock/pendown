@@ -23,6 +23,20 @@ pub enum Value {
     Array(Rc<Array>),
 }
 
+impl Value {
+    /// Whether two values are certainly the same without looking inside:
+    /// equal numbers, or the same word or list. An array can change in
+    /// place, so it's never the same.
+    pub fn same(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Num(a), Value::Num(b)) => a == b,
+            (Value::Word(a), Value::Word(b)) => Rc::ptr_eq(a, b),
+            (Value::List(a), Value::List(b)) => Rc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+}
+
 /// An array's members, numbered from `origin`.
 pub struct Array {
     pub items: RefCell<Vec<Value>>,

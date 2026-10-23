@@ -55,7 +55,7 @@ mod tests {
     }
 
     fn error(calls: Vec<CallSite>) -> Error {
-        Error { message: "oops".into(), span: None, calls }
+        Error { message: "oops".into(), span: None, calls, command: None }
     }
 
     #[test]

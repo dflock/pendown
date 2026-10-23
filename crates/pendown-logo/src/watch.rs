@@ -3,6 +3,8 @@
 //! can see. The interpreter thread formats the values, since a `Value` can't
 //! leave it.
 
+use std::sync::Arc;
+
 /// The panels' contents, sent as `Event::Watch`.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Watch {
@@ -13,7 +15,8 @@ pub struct Watch {
     pub scopes: Vec<Scope>,
     /// The pen, fill and background colours, which aren't variables but
     /// change as the program runs.
-    pub colours: Vec<Colour>,
+    /// Shared, since they rarely change from one `Watch` to the next.
+    pub colours: Arc<[Colour]>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -18,7 +18,7 @@ impl Args<'_> {
     pub fn colour(&self, it: &Interpreter, i: usize) -> Result<Rgba, Flow> {
         colour::parse_with(&self.vals[i], &it.palette).map_err(|e| match e.message() {
             None => self.doesnt_like(i),
-            Some(message) => Flow::Error(Box::new(Error::new(message, Some(self.call.args[i].span())))),
+            Some(message) => Flow::Error(Box::new(Error::new(message, Some(self.call.args[i].span())).about(&self.call.name))),
         })
     }
 }

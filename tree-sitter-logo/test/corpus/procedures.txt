@@ -1,0 +1,64 @@
+================================================================================
+A procedure over several lines
+================================================================================
+
+TO BOX :size
+  REPEAT 4 [FD :size RT 90]
+END
+BOX 50
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (procedure_definition
+    name: (name)
+    input: (parameter)
+    body: (body
+      (word)
+      (number)
+      (list
+        (word)
+        (variable)
+        (word)
+        (number))))
+  (word)
+  (number))
+
+================================================================================
+A procedure on one line, in lower case
+================================================================================
+
+to tri :n repeat 3 [fd :n rt 120] end
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (procedure_definition
+    name: (name)
+    input: (parameter)
+    body: (body
+      (word)
+      (number)
+      (list
+        (word)
+        (variable)
+        (word)
+        (number)))))
+
+================================================================================
+A procedure with no inputs, and a default number of inputs
+================================================================================
+
+TO GO 2
+  FD 10
+END
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (procedure_definition
+    name: (name)
+    input: (number)
+    body: (body
+      (word)
+      (number))))

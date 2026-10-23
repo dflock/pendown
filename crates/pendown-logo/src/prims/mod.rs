@@ -274,7 +274,7 @@ pub struct Args<'a> {
 
 impl Args<'_> {
     pub fn error(&self, message: String) -> Flow {
-        Flow::Error(Box::new(Error::new(message, Some(self.call.span))))
+        Flow::Error(Box::new(Error::new(message, Some(self.call.span)).about(&self.call.name)))
     }
 
     pub fn doesnt_like(&self, i: usize) -> Flow {
@@ -283,7 +283,7 @@ impl Args<'_> {
             v => v.show(),
         };
         let message = format!("{} doesn't like {shown} as input", self.call.name.to_uppercase());
-        Flow::Error(Box::new(Error::new(message, Some(self.call.args[i].span()))))
+        Flow::Error(Box::new(Error::new(message, Some(self.call.args[i].span())).about(&self.call.name)))
     }
 
     pub fn num(&self, i: usize) -> Result<f64, Flow> {

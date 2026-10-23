@@ -2,6 +2,7 @@
 //! trampolining, and a limit on calls that aren't tail calls (ADR 0007).
 
 use std::{
+    cell::RefCell,
     rc::Rc,
     sync::{
         Arc,
@@ -26,6 +27,10 @@ use crate::{
     span::{SourceId, Span},
     value::{List, Style, Value},
 };
+
+/// The pen, fill and background colours' values, and the colours formatted
+/// from them for a `Watch`.
+type ColoursShown = ([Value; 3], Arc<[watch::Colour]>);
 
 /// How the evaluator leaves an instruction other than by finishing it.
 pub enum Flow {
@@ -251,6 +256,10 @@ pub struct Interpreter {
     job_start: u64,
     /// The last `Watch` sent, so an unchanged one isn't sent again.
     last_watch: Option<Arc<Watch>>,
+    /// The colours `watch` last formatted, and what they were made from, so
+    /// they're formatted again only when they change: a `Watch` is built for
+    /// every instruction in lockstep.
+    colours_shown: RefCell<Option<ColoursShown>>,
 }
 
 /// The address of something on the stack, for measuring how much is used.
@@ -322,6 +331,7 @@ impl Interpreter {
             stats: Stats::default(),
             job_start: 0,
             last_watch: None,
+            colours_shown: RefCell::new(None),
         };
         it.grow();
         it.set_specials();
@@ -519,11 +529,11 @@ impl Interpreter {
                 Err(Flow::Throw { tag, .. }) if tag.eq_ignore_ascii_case("toplevel") => return Ok(()),
                 Err(Flow::Throw { tag, value, span }) => return Err(RunError::Runtime(uncaught(&tag, value, span))),
                 Err(Flow::Stop(span)) => {
-                    let e = Error::new("STOP can only be used inside a procedure", Some(span));
+                    let e = Error::new("STOP can only be used inside a procedure", Some(span)).about("STOP");
                     return Err(RunError::Runtime(e));
                 }
                 Err(Flow::Output(_, span)) => {
-                    let e = Error::new("OUTPUT can only be used inside a procedure", Some(span));
+                    let e = Error::new("OUTPUT can only be used inside a procedure", Some(span)).about("OUTPUT");
                     return Err(RunError::Runtime(e));
                 }
             }
@@ -662,12 +672,26 @@ impl Interpreter {
         globals.sort_by_cached_key(|v| v.name.to_lowercase());
         scopes.push(Scope { kind: ScopeKind::Globals, name: String::new(), variables: globals });
         scopes.reverse();
-        let colour = |name: &str, value: &Value, rgba| watch::Colour { name: name.into(), value: value.show_styled(style), rgba };
-        let colours = vec![
-            colour("PENCOLOR", &self.turtle.pen_colour, Some(self.turtle.pen.color)),
-            colour("FILLCOLOR", &self.turtle.fill_colour, self.turtle.fill),
-            colour("BACKGROUND", &self.background.1, Some(self.background.0)),
-        ];
+        let sources = [self.turtle.pen_colour.clone(), self.turtle.fill_colour.clone(), self.background.1.clone()];
+        // A palette number can look different with the same value, after
+        // SETPALETTE, so the colours themselves are compared too.
+        let rgbas = [Some(self.turtle.pen.color), self.turtle.fill, Some(self.background.0)];
+        let mut shown = self.colours_shown.borrow_mut();
+        let colours = match shown.as_ref() {
+            Some((old, colours))
+                if old.iter().zip(&sources).all(|(a, b)| a.same(b)) && colours.iter().zip(&rgbas).all(|(c, rgba)| c.rgba == *rgba) =>
+            {
+                colours.clone()
+            }
+            _ => {
+                let names = ["PENCOLOR", "FILLCOLOR", "BACKGROUND"];
+                let colours: Arc<[watch::Colour]> = (0..3)
+                    .map(|i| watch::Colour { name: names[i].into(), value: sources[i].show_styled(style), rgba: rgbas[i] })
+                    .collect();
+                *shown = Some((sources, colours.clone()));
+                colours
+            }
+        };
         Watch { counters, scopes, colours }
     }
 
@@ -1149,7 +1173,7 @@ impl Interpreter {
     fn lookup(&self, sym: Sym, call: &Call) -> Result<Rc<Proc>, Flow> {
         match &self.procs[sym as usize] {
             Some(proc) => Ok(proc.clone()),
-            None => Err(Error::new(format!("I don't know how to {}", call.name.to_uppercase()), Some(call.span)).into()),
+            None => Err(Error::unknown(&call.name, Some(call.span)).into()),
         }
     }
 

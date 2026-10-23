@@ -1,0 +1,64 @@
+# Colours and shapes
+
+Kame's pen starts out white. [SETPENCOLOR], or `SETPC`, changes it. You can give a colour's name, like `"orange` or `"skyblue`, a palette number from 0 to 15, or a list of how much red, green and blue to mix, each from 0 to 255.
+
+```logo
+SETPC "orange
+REPEAT 4 [FD 100 RT 90]
+RT 45
+SETPC [80 160 255]
+REPEAT 4 [FD 100 RT 90]
+```
+
+[SETPENSIZE] makes the lines thicker, and [SETBACKGROUND], or `SETBG`, changes the colour behind the drawing.
+
+```logo
+SETBG "midnightblue
+SETPC "gold
+SETPENSIZE 4
+REPEAT 5 [FD 200 RT 144]
+```
+
+The variables panel shows the colours Kame is using, with a square of each.
+
+## A rainbow
+
+A list can hold the colours, and [ITEM] picks one by its position. With [REPCOUNT] as the position, each time round has the next colour.
+
+```logo
+MAKE "colours [red orange yellow green blue purple]
+SETPENSIZE 6
+REPEAT 6 [
+  SETPC ITEM REPCOUNT :colours
+  REPEAT 6 [FD 80 RT 60]
+  RT 60
+]
+```
+
+## Shapes
+
+Kame can draw whole shapes at once, centred on where it stands: [CIRCLE], [ELLIPSE], [SQUARE] and [RECTANGLE]. Kame doesn't move while it draws them.
+
+```logo
+CIRCLE 150
+SQUARE 200
+ELLIPSE 60 120
+```
+
+[SETFILLCOLOR], or `SETFC`, fills the shapes with a colour. With the pen up, a shape has no outline, only its fill.
+
+```logo
+SETFC "gold
+CIRCLE 120
+SETFC "orangered
+PU
+CIRCLE 70
+SETFC "white
+CIRCLE 20
+```
+
+> **Try this:** draw a snowman: three white circles, one above the other, getting smaller. Use `PU`, `FD` and `PD` to move between them.
+
+## What next?
+
+That's the tutorial. You know enough to draw almost anything. The Help tab has every command Kame knows, each with examples you can run: press its **Run**, and Kame draws it right here.

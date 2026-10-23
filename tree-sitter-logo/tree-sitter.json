@@ -1,0 +1,18 @@
+{
+  "grammars": [
+    {
+      "name": "logo",
+      "camelcase": "Logo",
+      "scope": "source.logo",
+      "path": ".",
+      "file-types": ["logo"],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "description": "Logo grammar for tree-sitter: UCBLogo, as Pendown speaks it",
+    "authors": [{ "name": "Duncan Lock" }],
+    "links": { "repository": "https://github.com/dflock/tree-sitter-logo" }
+  }
+}

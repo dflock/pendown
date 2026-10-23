@@ -562,7 +562,7 @@ impl Parser<'_, '_, '_> {
                 for _ in 0..arity.default {
                     if matches!(self.peek(), None | Some(Tok::RParen)) {
                         let message = format!("Not enough inputs to {}", name.to_uppercase());
-                        return Err(Error::new(message, Some(span)));
+                        return Err(Error::new(message, Some(span)).about(&name));
                     }
                     args.push(self.expr(1)?);
                 }
@@ -595,10 +595,10 @@ impl Parser<'_, '_, '_> {
             self.pos += 1;
             let upper = name.to_uppercase();
             if args.len() < arity.min {
-                return Err(Error::new(format!("Not enough inputs to {upper}"), Some(name_span)));
+                return Err(Error::new(format!("Not enough inputs to {upper}"), Some(name_span)).about(&name));
             }
             if arity.max.is_some_and(|max| args.len() > max) {
-                return Err(Error::new(format!("Too many inputs to {upper}"), Some(open.to(close))));
+                return Err(Error::new(format!("Too many inputs to {upper}"), Some(open.to(close))).about(&name));
             }
             return Ok(Expr::Call(Box::new(Call { target, name, args, span: open.to(close) })));
         }
@@ -623,7 +623,7 @@ impl Parser<'_, '_, '_> {
         let sym = self.cx.names.intern(name);
         match self.cx.arity(sym) {
             Some(arity) => Ok((Target::User(sym), arity)),
-            None => Err(Error::new(format!("I don't know how to {}", name.to_uppercase()), Some(span))),
+            None => Err(Error::unknown(name, Some(span))),
         }
     }
 }

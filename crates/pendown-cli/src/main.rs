@@ -31,6 +31,10 @@ struct Args {
     /// picture every time. Without it, each run is different.
     #[arg(long)]
     seed: Option<u64>,
+
+    /// Zoom in on the drawing, rather than showing the whole turtle area.
+    #[arg(long)]
+    fit: bool,
 }
 
 fn main() -> ExitCode {
@@ -45,7 +49,7 @@ fn main() -> ExitCode {
     };
     let output_path = args.output.unwrap_or_else(|| args.program.with_extension("png"));
     let (width, height) = args.size;
-    let output = render(&source, Options { width, height, limit: args.limit, seed: args.seed });
+    let output = render(&source, Options { width, height, limit: args.limit, seed: args.seed, fit: args.fit });
     print!("{}", output.printed);
     if let Some(summary) = &output.summary {
         eprintln!("{summary}");

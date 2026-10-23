@@ -24,5 +24,6 @@ The interpreter runs on its own thread, ahead of the animator by up to a channel
 ## Consequences
 
 - A `Watch` is built for every instruction in lockstep, and compared with the last one sent. In `perf`, 5,000 lines in lockstep are about 7% slower; at Instant without being asked, the cost is two atomic loads an instruction.
+- The colours are formatted only when they change, and shared between `Watch`es: formatting them for every one made 5,000 lines in lockstep 25% slower, found in phase 5's check.
 - The CLI turns off instruction events, and with them every `Watch`.
 - The panels are cached views. gpui doesn't redraw a cached view when an entity it read is notified during a draw, so the window notifies the panels themselves when a `Watch` arrives, and asks for one more frame so they redraw even when paused.

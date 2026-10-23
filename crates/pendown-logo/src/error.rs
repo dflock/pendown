@@ -10,6 +10,9 @@ pub struct Error {
     /// The procedure calls the error happened inside, innermost first. Tail
     /// calls replace their caller, so they leave no entry.
     pub calls: Vec<CallSite>,
+    /// The command the error is about, as it was called, such as `FD`, for
+    /// help on it.
+    pub command: Option<String>,
 }
 
 /// One step of an error's call chain: `procedure` was called at `span`.
@@ -21,7 +24,23 @@ pub struct CallSite {
 
 impl Error {
     pub fn new(message: impl Into<String>, span: Option<Span>) -> Error {
-        Error { message: message.into(), span, calls: Vec::new() }
+        Error { message: message.into(), span, calls: Vec::new(), command: None }
+    }
+
+    /// The error is about this command.
+    pub fn about(mut self, command: &str) -> Error {
+        self.command = Some(command.to_uppercase());
+        self
+    }
+
+    /// For a name that isn't a procedure: why, if it's an obsolete command,
+    /// and otherwise "I don't know how to".
+    pub fn unknown(name: &str, span: Option<Span>) -> Error {
+        let upper = name.to_uppercase();
+        match crate::reference::reference().obsolete_reason(name) {
+            Some(reason) => Error::new(format!("{upper} isn't in Pendown: {reason}"), span).about(name),
+            None => Error::new(format!("I don't know how to {upper}"), span),
+        }
     }
 }
 

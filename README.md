@@ -10,8 +10,9 @@ Pendown speaks [UCBLogo](https://people.eecs.berkeley.edu/~bh/logo.html), the mo
 - **Shapes:** `CIRCLE`, `ELLIPSE`, `SQUARE` and `RECTANGLE`, outlined and filled.
 - **An `ARC` that does what you'd expect:** the turtle walks along it.
 - **The whole core language:** words, lists and arrays, `FOR` and `WHILE`, `MAP`, `FILTER` and `FOREACH` with templates, and `CATCH` and `THROW`.
-- **Help built in:** every command is documented in the app, with examples you can run.
+- **Help built in:** every command is documented in the app, with examples you can run on the canvas. Press F1 for help on the word under the cursor.
 - **A tutorial,** where Kame the turtle teaches you Logo one step at a time.
+- **Errors that help:** an obsolete UCBLogo command says why it isn't here, and an error offers help on its command.
 
 ## A taste of Logo
 
@@ -49,11 +50,19 @@ cargo run --release -p pendown
 
 Run the tests with `cargo test`. Debug builds work too, but drawing is much faster in release.
 
-`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, stepping, stopping, the console, files, errors, filled shapes, how often the window redraws, and the counters and variables panels. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
+`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, stepping, stopping, the console, files, errors, filled shapes, how often the window redraws, the counters and variables panels, and the help panel and tutorial. `PENDOWN_AUTOTEST_FROM="Phase 5"` starts it at the first section with that in its title. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
 
 Type a program in the editor and press **Run**. Use the speed slider to choose how fast the turtle draws. Try the console too: after a run, it knows every procedure your program defined, so you can type `FLOWER 80` and watch.
 
 While a program runs, the **Repeat counters** panel shows every `REPEAT`, `FOREVER`, `FOR` and `FOREACH` running, outermost first, such as `REPEAT 3 of 12`, and marks the one `REPCOUNT` would give. The **Variables** panel shows the globals, then each procedure in the call chain with its inputs and locals; a variable hidden by a later one with the same name is greyed out. Below them are the pen, fill and background colours, as they were set, each with a square of the colour. At animated speeds, and when paused or stepping, they show exactly what the highlighted instruction sees. At Instant they keep up as best they can.
+
+### Help and the tutorial
+
+The **Help** button, or **F1**, opens a panel beside the canvas. Help follows the editor's cursor: put it on `FD`, or on `:size`, and the panel explains it. Each page has our description, examples with a picture of what they draw, and links to the rest. **Run** plays an example on the canvas, with its code highlighted in the panel, and **Back to my drawing** brings yours back. **Copy to editor** adds it to your program. Browse the contents by chapter, search by name, and tick **Show obsolete commands** to see the UCBLogo commands Pendown leaves out, and why.
+
+The **Tutorial** tab has six lessons with Kame: moving and turning, `REPEAT`, procedures, inputs and variables, recursion, and colours and shapes. Each program in them loads into the editor or runs on the canvas.
+
+The help comes from `pendown-logo.kdl`, and the lessons are markdown files in `tutorial/`. Every example and every lesson's program is a test: it must run, and draw the picture saved in `crates/pendown/tests/help-pictures/`.
 
 ### The CLI
 
@@ -62,6 +71,8 @@ While a program runs, the **Repeat counters** panel shows every `REPEAT`, `FOREV
 ```sh
 cargo run --release -p pendown-cli -- flower.logo --output flower.png --size 800x600
 ```
+
+`--fit` zooms in on the drawing, rather than showing the whole turtle area.
 
 ### Performance
 
@@ -103,3 +114,4 @@ The crates are in `crates/`. `spikes/` holds the experiments made before phase 1
 - `examples/phase-1/` and `examples/phase-2/` have programs that between them use every command Pendown supports so far.
 - `pendown-logo.kdl` lists every Logo command, which ones Pendown supports, and how ours differ from UCBLogo.
 - `docs/adr/` records the design decisions and why we made them.
+- `tree-sitter-logo/` is a tree-sitter grammar for Logo, with a Zed extension, ready to become a repository of its own.

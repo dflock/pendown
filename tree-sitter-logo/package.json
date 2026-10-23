@@ -1,0 +1,9 @@
+{
+  "name": "tree-sitter-logo",
+  "version": "0.1.0",
+  "description": "Logo grammar for tree-sitter: UCBLogo, as Pendown speaks it",
+  "main": "grammar.js",
+  "keywords": ["tree-sitter", "logo", "ucblogo", "turtle"],
+  "devDependencies": { "tree-sitter-cli": "0.25.10" },
+  "scripts": { "generate": "tree-sitter generate", "test": "tree-sitter test" }
+}

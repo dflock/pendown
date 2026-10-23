@@ -1,0 +1,24 @@
+; a flower
+; <- comment
+TO BOX :size
+; <- keyword
+;  ^ function
+;      ^ variable.parameter
+  REPEAT 4 [FD :size RT 90]
+  ; ^ function.builtin
+  ;      ^ number
+  ;        ^ punctuation.bracket
+  ;         ^ function.builtin
+  ;            ^ variable
+  ;                  ^ function.builtin
+END
+; <- keyword
+SETPC "orange
+; <- function.builtin
+;      ^ string
+MAKE "caseignoredp "false
+PRINT :caseignoredp
+;      ^ variable.builtin
+FLOWER 3 + 4
+; <- function.call
+;        ^ operator

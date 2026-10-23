@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- The turtle's body, facing up: head, legs, tail and shell. The turtle's
+       position is the middle, (50, 50). Painted in one colour, under
+       turtle-shell.svg. -->
+  <ellipse cx="50" cy="13" rx="11" ry="12"/>
+  <ellipse cx="27" cy="31" rx="11" ry="5.5" transform="rotate(-35 27 31)"/>
+  <ellipse cx="73" cy="31" rx="11" ry="5.5" transform="rotate(35 73 31)"/>
+  <ellipse cx="29" cy="73" rx="10" ry="5" transform="rotate(35 29 73)"/>
+  <ellipse cx="71" cy="73" rx="10" ry="5" transform="rotate(-35 71 73)"/>
+  <path d="M45 80 L50 96 L55 80 Z"/>
+  <ellipse cx="50" cy="52" rx="27" ry="32"/>
+</svg>

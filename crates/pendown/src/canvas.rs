@@ -109,15 +109,7 @@ impl Canvas {
         }
         if let Some((pos, heading)) = overlay.turtle {
             let centre = to_window(pos);
-            let half = px(TURTLE_SIZE / 2.);
-            let turtle = Bounds::new(point(centre.x - half, centre.y - half), size(px(TURTLE_SIZE), px(TURTLE_SIZE)));
-            // Turned clockwise by its heading, about its centre, as gpui's
-            // `svg()` does, in device pixels.
-            let (x, y) = (centre.x.as_f32() * per_device, centre.y.as_f32() * per_device);
-            let turn = TransformationMatrix::unit()
-                .translate(point(ScaledPixels(x), ScaledPixels(y)))
-                .rotate(Radians(heading.to_radians() as f32))
-                .translate(point(ScaledPixels(-x), ScaledPixels(-y)));
+            let (turtle, turn) = turtle_placement(centre.x.as_f32() * per_device, centre.y.as_f32() * per_device, heading, per_device);
             for (path, svg, colour) in TURTLE {
                 window.paint_svg(turtle, path.into(), Some(svg), turn, rgb(colour).into(), cx).ok();
             }
@@ -139,6 +131,51 @@ impl Canvas {
         if gap_y > 0.5 {
             window.paint_quad(fill(Bounds::new(o, size(px(w), px(gap_y))), shade));
             window.paint_quad(fill(Bounds::new(point(o.x, o.y + px(h - gap_y)), size(px(w), px(gap_y))), shade));
+        }
+    }
+}
+
+/// Where to paint the turtle's pictures, centred on `(x, y)` in device
+/// pixels, and how to turn them by `heading`. gpui puts an SVG on whole
+/// device pixels, so a turtle placed directly would move a pixel at a time
+/// while its line moves smoothly, and jitter against it. So the pictures go
+/// on whole pixels, and the turn, which gpui doesn't round, moves them the
+/// rest of the way.
+fn turtle_placement(x: f32, y: f32, heading: f64, per_device: f32) -> (Bounds<Pixels>, TransformationMatrix) {
+    let (whole_x, whole_y) = (x.round(), y.round());
+    let half = (TURTLE_SIZE * per_device / 2.).round();
+    let logical = |device: f32| px(device / per_device);
+    let bounds = Bounds::new(point(logical(whole_x - half), logical(whole_y - half)), size(logical(2. * half), logical(2. * half)));
+    // Clockwise about the centre, as gpui's `svg()` turns, then on to `(x, y)`.
+    let turn = TransformationMatrix::unit()
+        .translate(point(ScaledPixels(x), ScaledPixels(y)))
+        .rotate(Radians(heading.to_radians() as f32))
+        .translate(point(ScaledPixels(-whole_x), ScaledPixels(-whole_y)));
+    (bounds, turn)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::turtle_placement;
+
+    #[test]
+    fn the_turtle_is_on_whole_pixels_and_turned_onto_its_position() {
+        for per_device in [1.0, 1.5, 2.0] {
+            for (x, y) in [(100.0, 50.0), (100.3, 50.5), (100.7, 49.49)] {
+                let (bounds, turn) = turtle_placement(x, y, 30.0, per_device);
+                // gpui's rounding leaves the pictures where they are.
+                for edge in [bounds.left(), bounds.top(), bounds.right(), bounds.bottom()] {
+                    let device = edge.as_f32() * per_device;
+                    assert!((device - device.round()).abs() < 1e-3, "{device} at {per_device}x");
+                }
+                // The turn takes their centre to the turtle's position.
+                let c = bounds.center();
+                let [[a, b], [cc, d]] = turn.rotation_scale;
+                let [tx, ty] = turn.translation;
+                let (cx, cy) = (c.x.as_f32() * per_device, c.y.as_f32() * per_device);
+                let (mx, my) = (a * cx + b * cy + tx, cc * cx + d * cy + ty);
+                assert!((mx - x).abs() < 1e-3 && (my - y).abs() < 1e-3, "({mx}, {my}) for ({x}, {y}) at {per_device}x");
+            }
         }
     }
 }

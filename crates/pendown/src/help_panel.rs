@@ -318,10 +318,32 @@ fn tab(id: &'static str, label: &'static str, active: bool, cx: &App) -> Statefu
         .child(label)
 }
 
-/// Kame's picture, for the top of each lesson.
-fn kame() -> Arc<Image> {
-    static KAME: std::sync::OnceLock<Arc<Image>> = std::sync::OnceLock::new();
-    KAME.get_or_init(|| Arc::new(Image::from_bytes(ImageFormat::Svg, pendown::tutorial::KAME.to_vec()))).clone()
+/// Kame's picture, `width` by `height` logical pixels. It's rendered at
+/// exactly that size in device pixels: an SVG image is otherwise rendered
+/// at its own size, about 800 pixels wide, and shrunk on the GPU, which
+/// leaves it jagged.
+fn kame(width: f32, height: f32) -> impl IntoElement {
+    thread_local! {
+        static RENDERED: std::cell::RefCell<HashMap<(i32, i32), Arc<RenderImage>>> = Default::default();
+    }
+    let source = ImageSource::Custom(Arc::new(move |window: &mut Window, cx: &mut App| {
+        let scale = window.scale_factor();
+        let device = ((width * scale).round() as i32, (height * scale).round() as i32);
+        let image = RENDERED.with_borrow_mut(|rendered| {
+            if let Some(image) = rendered.get(&device) {
+                return Ok(image.clone());
+            }
+            let renderer = cx.svg_renderer();
+            let svg = renderer.parse_svg(pendown::tutorial::KAME).map_err(|e| ImageCacheError::Asset(e.to_string().into()))?;
+            let image = renderer
+                .render_parsed(&svg, SvgSize::Size(size(DevicePixels(device.0), DevicePixels(device.1))))
+                .map_err(|e| ImageCacheError::Asset(e.to_string().into()))?;
+            rendered.insert(device, image.clone());
+            Ok(image)
+        });
+        Some(image)
+    }));
+    img(source).w(px(width)).h(px(height)).flex_none()
 }
 
 /// A heading for a part of a page, such as Examples.
@@ -999,7 +1021,7 @@ impl HelpPanel {
                             .child(div().text_lg().font_weight(FontWeight::BOLD).child(lesson.title.clone())),
                     )
                     // The first lesson has Kame beside its introduction instead.
-                    .when(l > 0, |h| h.child(img(ImageSource::Image(kame())).h(px(44.)).w(px(66.)).flex_none())),
+                    .when(l > 0, |h| h.child(kame(66., 44.))),
             )
             .child(progress);
 
@@ -1017,7 +1039,7 @@ impl HelpPanel {
                     h_flex()
                         .gap_3()
                         .items_center()
-                        .child(img(ImageSource::Image(kame())).h(px(64.)).w(px(96.)).flex_none().mt_2())
+                        .child(div().mt_2().child(kame(96., 64.)))
                         .child(div().flex_1().min_w_0().children(self.blocks(&format!("lesson-{l}-{b}"), std::slice::from_ref(block), cx)))
                         .into_any_element(),
                 ),

@@ -32,7 +32,13 @@ pub struct Options {
     /// The seed for `RANDOM`, for a repeatable picture. Otherwise each run
     /// is different.
     pub seed: Option<u64>,
+    /// Zoom in on what's drawn, rather than showing the whole turtle area
+    /// (`Drawing::fit`).
+    pub fit: bool,
 }
+
+/// The smallest area, in turtle steps, that `fit` zooms in to.
+pub const FIT_MIN: f64 = 100.0;
 
 pub struct Output {
     /// The picture, as far as the program got.
@@ -130,6 +136,9 @@ pub fn render(source: &str, options: Options) -> Output {
             let result = it.run_program(&source);
             let instructions = it.stats.instructions;
             drop(it);
+            if options.fit {
+                drawing.borrow_mut().fit(FIT_MIN);
+            }
             let drawing = drawing.borrow();
             let png = drawing.png();
             let printed = printed.borrow().clone();

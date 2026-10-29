@@ -26,8 +26,9 @@ fn dir() -> PathBuf {
 }
 
 /// Every example and lesson program: its name, as `forward-1` for
-/// FORWARD's first example and `tutorial-1-2` for lesson 1's second
-/// program, its code, and whether it should stop with an error.
+/// FORWARD's first example, `tutorial-1-2` for lesson 1's second
+/// program and `tutorial-4-picture-1` for lesson 4's first picture, its
+/// code, and whether it should stop with an error.
 fn programs() -> Vec<(String, String, bool)> {
     let mut out = Vec::new();
     for command in reference().commands.iter().filter(|c| c.implemented) {
@@ -44,6 +45,13 @@ fn programs() -> Vec<(String, String, bool)> {
             out.push((
                 format!("tutorial-{}-{}", l + 1, p + 1),
                 program.to_string(),
+                false,
+            ));
+        }
+        for (p, picture) in lesson.pictures().enumerate() {
+            out.push((
+                format!("tutorial-{}-picture-{}", l + 1, p + 1),
+                picture.to_string(),
                 false,
             ));
         }

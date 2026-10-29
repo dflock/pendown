@@ -416,6 +416,10 @@ fn tab(id: &'static str, label: &'static str, active: bool, cx: &App) -> Statefu
 }
 
 /// Pictures of an SVG already rendered, by their size in device pixels.
+/// A lesson's pictures are this many logical pixels square, bigger than
+/// Help's, since they're the point of the paragraph.
+const LESSON_PICTURE: f32 = 160.;
+
 pub(crate) type Rendered = Arc<Mutex<HashMap<(i32, i32), Arc<RenderImage>>>>;
 
 /// An SVG, `width` by `height` logical pixels. It's rendered at exactly
@@ -1503,6 +1507,9 @@ impl HelpPanel {
         let mut p = 0;
         for (b, block) in lesson.blocks.iter().enumerate() {
             match block {
+                Block::Code { language, code } if language == pendown::tutorial::PICTURE => {
+                    body.push(self.lesson_picture(code, cx));
+                }
                 Block::Code { code, .. } => {
                     body.push(self.program_card(l, p, code, cx));
                     p += 1;
@@ -1584,6 +1591,36 @@ impl HelpPanel {
     }
 
     /// One of a lesson's programs, with Load into editor and Run.
+    /// A lesson's picture: what its program draws, with no code, Load or
+    /// Run, drawn as Help's example pictures are.
+    fn lesson_picture(&mut self, code: &str, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let size = LESSON_PICTURE;
+        let picture = match self.picture(code, cx) {
+            Some(Picture::Drawing(svg, rendered)) => svg_image(svg, rendered, size, size)
+                .rounded_md()
+                .into_any_element(),
+            // Being drawn, or drew nothing: a blank square.
+            _ => div()
+                .size(px(size))
+                .rounded_md()
+                .bg(black())
+                .into_any_element(),
+        };
+        v_flex()
+            .mt_2()
+            .items_center()
+            .gap_1()
+            .child(picture)
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(theme.muted_foreground)
+                    .child("What Kame meant to draw"),
+            )
+            .into_any_element()
+    }
+
     fn program_card(
         &self,
         lesson: usize,

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && cargo fmt --all 2>/dev/null || true",
+            "statusMessage": "Running cargo fmt"
+          }
+        ]
+      }
+    ]
+  }
+}

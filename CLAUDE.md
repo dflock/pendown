@@ -1,3 +1,7 @@
+## Conventions
+
+Run `cargo fmt --all` after changing Rust code. A Stop hook in `.claude/settings.json` also does this automatically at the end of each turn.
+
 ## Agent skills
 
 ### Issue tracker

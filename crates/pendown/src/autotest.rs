@@ -109,6 +109,14 @@ enum Step {
     UndoConsole,
     /// The console's input line holds exactly this.
     CheckConsoleTyped(&'static str),
+    /// Press the console's Teach Kame button.
+    OpenTeach,
+    /// Type the new word's name in Teach Kame's dialog.
+    TeachName(&'static str),
+    /// Tick or untick an entry in the dialog, with Shift if asked.
+    TeachToggle(usize, bool),
+    /// Press the dialog's Teach Kame button.
+    PressTeach,
     /// How many lines, arcs and shapes are drawn.
     CheckDrawn(usize),
     /// Where the turtle sprite is, and its heading.
@@ -553,6 +561,41 @@ fn script() -> Vec<Step> {
         CheckDrawn(3),
         CheckTurtle(100.0, 0.0, 180.0),
         SetSpeed(Speed::Instant),
+        Say("Teach Kame: the entries since the last Run become a procedure"),
+        Console("FD"),
+        WaitFinished,
+        OpenTeach,
+        Wait(ms(300)),
+        TeachName("fd"),
+        Wait(ms(100)),
+        Screenshot("teach-name-taken"),
+        TeachName("house"),
+        // Untick the second and fourth, then Shift-click the second: the
+        // second to the fourth are ticked again. The error stays unticked.
+        TeachToggle(1, false),
+        TeachToggle(3, false),
+        TeachToggle(1, true),
+        Wait(ms(500)),
+        Screenshot("teach"),
+        PressTeach,
+        Wait(ms(300)),
+        WaitFinished,
+        CheckEditor("TO HOUSE\n  FD 100\n  RT 90\n  FD 100\n  RT 90\n  FD 100\nEND\n"),
+        CheckConsole("Kame knows HOUSE now. It's at the end of your program."),
+        CheckTurtle(100.0, 0.0, 180.0),
+        Console("RT 45"),
+        WaitFinished,
+        Console("HOUSE"),
+        WaitFinished,
+        CheckDrawn(6),
+        Screenshot("taught"),
+        Say("Teach Kame: Undo goes back past the definition"),
+        UndoConsole,
+        WaitFinished,
+        UndoConsole,
+        WaitFinished,
+        CheckDrawn(3),
+        CheckTurtle(100.0, 0.0, 180.0),
         Quit,
     ]
 }
@@ -809,6 +852,27 @@ impl App {
                 }
                 Step::ConsoleKeys(keys) => self.press_in_console(keys, window, cx),
                 Step::UndoConsole => self.undo_console(cx),
+                Step::OpenTeach => self.open_teach(window, cx),
+                Step::TeachName(name) => {
+                    if let Some(dialog) = self.teach_dialog.clone() {
+                        let input = dialog.read(cx).name.clone();
+                        input.update(cx, |input, cx| input.set_value(name, window, cx));
+                        dialog.update(cx, |_, cx| cx.notify());
+                    }
+                }
+                Step::TeachToggle(i, shift) => {
+                    if let Some(dialog) = self.teach_dialog.clone() {
+                        dialog.update(cx, |dialog, cx| dialog.toggle(i, shift, cx));
+                    }
+                }
+                Step::PressTeach => {
+                    if let Some(dialog) = self.teach_dialog.clone() {
+                        // After this update, since teaching updates the window.
+                        window.defer(cx, move |window, cx| {
+                            dialog.update(cx, |dialog, cx| dialog.teach(window, cx));
+                        });
+                    }
+                }
                 Step::CheckConsoleTyped(expected) => {
                     let typed = self.console_typed(cx);
                     self.check(

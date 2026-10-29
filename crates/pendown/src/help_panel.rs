@@ -370,13 +370,13 @@ fn tab(id: &'static str, label: &'static str, active: bool, cx: &App) -> Statefu
 }
 
 /// Pictures of an SVG already rendered, by their size in device pixels.
-type Rendered = Arc<Mutex<HashMap<(i32, i32), Arc<RenderImage>>>>;
+pub(crate) type Rendered = Arc<Mutex<HashMap<(i32, i32), Arc<RenderImage>>>>;
 
 /// An SVG, `width` by `height` logical pixels. It's rendered at exactly
 /// that size in device pixels, once for each size, in `rendered`: an SVG
 /// image is otherwise rendered at its own size and shrunk on the GPU,
 /// which leaves it jagged or blurred.
-fn svg_image(svg: Arc<[u8]>, rendered: Rendered, width: f32, height: f32) -> Img {
+pub(crate) fn svg_image(svg: Arc<[u8]>, rendered: Rendered, width: f32, height: f32) -> Img {
     let source = ImageSource::Custom(Arc::new(move |window: &mut Window, cx: &mut App| {
         let scale = window.scale_factor();
         let device = (
@@ -405,7 +405,7 @@ fn svg_image(svg: Arc<[u8]>, rendered: Rendered, width: f32, height: f32) -> Img
 }
 
 /// Kame's picture, `width` by `height` logical pixels.
-fn kame(width: f32, height: f32) -> impl IntoElement {
+pub(crate) fn kame(width: f32, height: f32) -> impl IntoElement {
     static KAME: OnceLock<(Arc<[u8]>, Rendered)> = OnceLock::new();
     let (svg, rendered) =
         KAME.get_or_init(|| (Arc::from(pendown::tutorial::KAME), Rendered::default()));
@@ -546,7 +546,7 @@ impl HelpPanel {
 
 /// A program, in the editor's font and colours, with the running
 /// instruction highlighted.
-fn code_block(
+pub(crate) fn code_block(
     code: &str,
     highlight: Option<Range<usize>>,
     theme: &gpui_kit::component::Theme,

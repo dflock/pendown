@@ -484,9 +484,16 @@ impl Interpreter {
     /// Kame and the background are saved first, even for an entry that
     /// doesn't parse, so each entry has one for Undo to take back.
     pub fn run_console(&mut self, text: &str) -> Result<(), RunError> {
-        self.console_entries += 1;
         self.before_entries
             .push((self.turtle.clone(), self.background.clone()));
+        self.define_console(text)
+    }
+
+    /// Runs `text` at the console without saving Kame for Undo: for what
+    /// Pendown types there itself, such as Teach Kame's procedure, which
+    /// isn't one of the user's entries.
+    pub fn define_console(&mut self, text: &str) -> Result<(), RunError> {
+        self.console_entries += 1;
         self.run_source(text, SourceId::Console(self.console_entries))
     }
 

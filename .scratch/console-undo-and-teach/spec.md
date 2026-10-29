@@ -23,8 +23,8 @@ There are no new Logo commands. The UI design is on a canvas of mockups: https:/
   - **All** and **None** buttons; Shift-click ticks or unticks a range;
   - a name field, with a reason under it when the name can't be used;
   - a preview of the procedure as it'll go in the editor, with the code highlighted, and a picture of what it draws from the centre, facing up;
-  - **Teach Kame SQUARE** (the name as typed) puts `TO SQUARE … END` at the end of the editor's program, and defines it at the console too, so `SQUARE` works straight away. The editor's Undo takes it out again, as with Copy to editor;
-  - the console prints `Kame knows SQUARE now. It's at the end of your program.`.
+  - **Teach Kame BOX** (the name as typed) puts `TO BOX … END` at the end of the editor's program, and defines it at the console too, so `BOX` works straight away. The editor's Undo takes it out again, as with Copy to editor;
+  - the console prints `Kame knows BOX now. It's at the end of your program.`.
 
 ## Decisions
 
@@ -36,10 +36,10 @@ There are no new Logo commands. The UI design is on a canvas of mockups: https:/
 - **No redo button.** Up brings the entry back, and Enter runs it again.
 - **Teach Kame uses what was typed, as it was typed.** It doesn't turn four `FD 100 RT 90`s into a `REPEAT`: seeing that is the learner's next idea, not Pendown's. Each entry goes on its own line, indented two spaces; a multi-line entry keeps its lines.
 - **No inputs yet.** The procedure has no `:size`. Adding an input is something to do in the editor, and a later improvement could offer it.
-- **Names:** one word, starting with a letter, of letters, digits, `.`, `_` and `?`. Not a primitive's name or alias (`FD is already a Logo word`), and not a procedure already defined in the editor's program or at the console (`SQUARE is already in your program. Choose another name, or change it in the editor.`). Case doesn't matter (ADR 0004). The name is shown in capitals in the button and the code.
-- **The picture is drawn as Help's are**, headless on a background thread with `pendown_cli::render`, fitted to the drawing, from a clean slate. It's redrawn when the ticks change, and the newest one wins. The procedures defined at the console and in the last run are included, so an entry that called `BOX` draws.
+- **Names:** one word, starting with a letter, of letters, digits, `.`, `_` and `?`. Not a primitive's name or alias (`FD is already a Logo word`, and `SQUARE` too, which is a Pendown command), and not a procedure already defined in the editor's program or at the console (`BOX is already in your program. Choose another name, or change it in the editor.`). Case doesn't matter (ADR 0004). The name is shown in capitals in the button and the code.
+- **The picture is drawn as Help's are**, headless on a background thread with `pendown_cli::render`, fitted to the drawing, from a clean slate. It's redrawn when the ticks change, and the newest one wins. The procedures defined at the console and in the last run are included, so an entry that called `TRI` draws.
 - **The dialog is a gpui-kit `Dialog`**, modal over the window. Escape closes it and nothing changes.
-- **An entry that calls a procedure defined only at the console** is ticked as usual, with a note under it: `Uses BOX, so BOX has to be in your program too`. Copy to editor puts it there.
+- **An entry that calls a procedure defined only at the console** is ticked as usual, with a note under it: `Uses TRI, so TRI has to be in your program too`. Copy to editor puts it there.
 - **The console is still plain text.** Lines like `Undid: RT 45` can't be greyed, as the mockups show them, without making the console's output a styled list. That's left for later.
 - **Teaching defines the procedure at the console** by running the `TO … END` as a console entry of its own, which isn't recorded as an entry or a console definition (so it's not offered to Copy to editor, since it's already in the editor).
 

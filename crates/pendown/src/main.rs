@@ -8,6 +8,7 @@ mod help_panel;
 mod highlighter;
 mod icons;
 mod panes;
+mod teach_dialog;
 mod watching;
 
 use std::borrow::Cow;

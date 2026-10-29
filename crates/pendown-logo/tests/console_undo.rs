@@ -136,3 +136,23 @@ fn undo_sends_a_watch_with_the_colours() {
     let pen = watch.colours.iter().find(|c| c.name == "PENCOLOR").unwrap();
     assert_eq!(pen.value, "7");
 }
+
+#[test]
+fn a_definition_pendown_makes_isnt_an_entry() {
+    let mut c = Console::new("");
+    c.enter("FD 10");
+    c.it.define_console("TO HOUSE\nFD 20\nEND").unwrap();
+    c.enter("HOUSE");
+    c.undo();
+    c.undo();
+    assert_eq!(
+        c.enter("SHOW POS"),
+        "[0 0]\n",
+        "two undos, back past both entries"
+    );
+    assert_eq!(
+        c.enter("HOUSE SHOW POS"),
+        "[0 20]\n",
+        "and HOUSE is still defined"
+    );
+}

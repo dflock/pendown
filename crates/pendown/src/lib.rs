@@ -11,4 +11,5 @@ pub mod markup;
 pub mod metrics;
 pub mod run;
 pub mod speed;
+pub mod teach;
 pub mod tutorial;

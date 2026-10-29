@@ -1,5 +1,5 @@
 //! The window's icons: gpui-kit's default set, which its components use,
-//! and the toolbar's and help panel's, which aren't in it. Only these are embedded, not the
+//! and the toolbar's, help panel's and console's, which aren't in it. Only these are embedded, not the
 //! whole Lucide catalogue.
 
 use std::borrow::Cow;
@@ -18,7 +18,8 @@ gpui_kit::assets::icon_assets!(
         StepForward,
         Footprints,
         Square,
-        PencilLine
+        PencilLine,
+        MessageSquarePlus
     ]
 );
 

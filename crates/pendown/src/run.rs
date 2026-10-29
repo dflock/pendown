@@ -41,6 +41,9 @@ pub enum Job {
     Console(String),
     /// Undo at the console (ADR 0025): Kame back as the last entry found it.
     Undo,
+    /// Defines Teach Kame's procedure at the console, without saving Kame
+    /// for Undo, since it isn't one of the user's entries.
+    Define(String),
 }
 
 /// One job's progress, as the GUI sees it.
@@ -114,6 +117,7 @@ impl Session {
                         Job::Program(text) => it.run_program(text),
                         Job::Console(text) => it.run_console(text),
                         Job::Undo => it.undo_console(),
+                        Job::Define(text) => it.define_console(text),
                     };
                     // Dropping the sender tells the animator the job is over.
                     it.set_output(Box::new(Discard), Arc::default());

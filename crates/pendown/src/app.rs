@@ -2,13 +2,13 @@
 //! 0011 and 0012).
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     rc::Rc,
     time::{Duration, Instant},
 };
 
 use gpui_kit::component::{
-    ActiveTheme, Disableable as _, Sizable,
+    ActiveTheme, Disableable as _, Sizable, WindowExt as _,
     button::{Button, ButtonVariants as _},
     h_flex,
     highlighter::{Diagnostic, DiagnosticSeverity},
@@ -29,6 +29,7 @@ use pendown::{
     metrics::{Snapshot, WindowMetrics},
     run::{Channel, DEFAULT_CHANNEL, Job, Run, Session},
     speed::{INSTANT_LEVEL, level_speed, speed_level},
+    teach,
 };
 use pendown_logo::{Point, RunError, SourceId};
 use pendown_render::Mark;
@@ -43,6 +44,7 @@ use crate::{
     help_panel::HelpPanel,
     highlighter::LogoHighlighter,
     panes::{ConsolePane, EditorPane, ToolbarPane, ToolbarState},
+    teach_dialog::{self, TeachKame},
     watching::{CountersPane, VariablesPane, Watched},
 };
 
@@ -205,6 +207,8 @@ pub struct App {
     console_before: Vec<Before>,
     /// The job running is a console entry.
     console_job: bool,
+    /// Teach Kame's dialog, while it's open.
+    pub(crate) teach_dialog: Option<Entity<TeachKame>>,
     /// Definitions typed at the console since the last Run, which "Copy to
     /// editor" keeps.
     console_definitions: Vec<String>,
@@ -366,6 +370,7 @@ impl App {
             console_entry: ConsoleInput::default(),
             console_before: Vec::new(),
             console_job: false,
+            teach_dialog: None,
             console_definitions: Vec::new(),
             defining: None,
             definitions_cleared: false,
@@ -708,19 +713,110 @@ impl App {
 
     /// Appends the definitions typed at the console to the editor's program.
     fn copy_definitions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let definitions = std::mem::take(&mut self.console_definitions);
+        self.append_to_program(&definitions, window, cx);
+        self.print("Copied the console's definitions to the editor.");
+    }
+
+    /// Adds definitions to the end of the editor's program, each after a
+    /// blank line, as one step for the editor's Undo.
+    fn append_to_program(
+        &mut self,
+        definitions: &[String],
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let mut text = self.editor.read(cx).value().to_string();
-        for definition in self.console_definitions.drain(..) {
-            if !text.ends_with('\n') && !text.is_empty() {
+        for definition in definitions {
+            if !text.is_empty() {
+                if !text.ends_with('\n') {
+                    text.push('\n');
+                }
                 text.push('\n');
             }
-            text.push('\n');
-            text.push_str(&definition);
+            text.push_str(definition.trim_end());
             text.push('\n');
         }
         self.editor
             .update(cx, |state, cx| state.set_value(text, window, cx));
         self.check_program(cx);
-        self.print("Copied the console's definitions to the editor.");
+    }
+
+    /// Whether Teach Kame has something to offer: an entry since the last
+    /// Run that isn't a definition, with nothing running.
+    fn can_teach(&self) -> bool {
+        !self.running() && self.console_entry.teachable().any(|e| !defines(&e.text))
+    }
+
+    /// Opens Teach Kame's dialog on the entries since the last Run.
+    pub(crate) fn open_teach(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.can_teach() {
+            return;
+        }
+        let program = self.editor.read(cx).value().to_string();
+        let in_program = teach::defined(&program);
+        // The console's definitions, unless a Run has cleared them all.
+        let console = if self.definitions_cleared {
+            Vec::new()
+        } else {
+            self.console_definitions.clone()
+        };
+        let at_console = teach::defined(&console.join("\n"));
+        // The picture uses the program's procedures, and the console's that
+        // aren't in it.
+        let mut definitions = teach::definitions(&program);
+        for definition in &console {
+            if teach::defined(definition)
+                .iter()
+                .all(|name| !in_program.contains(name))
+            {
+                definitions.push_str(definition);
+                definitions.push('\n');
+            }
+        }
+        let entries = self.console_entry.teachable().cloned().collect();
+        let app = cx.entity().downgrade();
+        let view = cx.new(|cx| {
+            TeachKame::new(
+                app,
+                entries,
+                in_program,
+                at_console,
+                definitions,
+                window,
+                cx,
+            )
+        });
+        self.teach_dialog = Some(view.clone());
+        let focus_name = Cell::new(true);
+        window.open_dialog(cx, move |dialog, window, cx| {
+            if focus_name.replace(false) {
+                let name = view.read(cx).name.focus_handle(cx);
+                window.focus(&name, cx);
+            }
+            dialog.w(teach_dialog::width()).child(view.clone())
+        });
+    }
+
+    /// Teach Kame (from its dialog): the procedure goes at the end of the
+    /// program, and is defined at the console, so `name` works straight
+    /// away. Defining it isn't an entry, so Undo goes past it.
+    pub(crate) fn teach(
+        &mut self,
+        name: &str,
+        procedure: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.teach_dialog = None;
+        self.append_to_program(std::slice::from_ref(&procedure), window, cx);
+        self.back_to_my_drawing(cx);
+        let left = self.animator.as_ref().map(|a| (a.pos, a.heading, a.shown));
+        self.start_job(Job::Define(procedure), DEFAULT_CHANNEL, cx);
+        self.put_kame(left);
+        self.print(format!(
+            "Kame knows {name} now. It's at the end of your program."
+        ));
     }
 
     /// Puts new console lines into the text area, scrolled to the newest.
@@ -1261,6 +1357,18 @@ impl App {
                             .disabled(undo.is_none())
                             .on_click(cx.listener(|this, _, _, cx| this.undo_console(cx)))
                     })
+                    .child(
+                        Button::new("teach-kame")
+                            .xsmall()
+                            .ghost()
+                            .icon(IconName::MessageSquarePlus)
+                            .label("Teach Kame")
+                            .tooltip("Make a procedure from what you typed")
+                            .disabled(!self.can_teach())
+                            .on_click(
+                                cx.listener(|this, _, window, cx| this.open_teach(window, cx)),
+                            ),
+                    )
                     .when(!self.console_definitions.is_empty(), |row| {
                         row.child(
                             Button::new("copy-definitions")

@@ -148,6 +148,12 @@ enum Step {
     WaitDriven,
     /// Driving is on, or not.
     CheckDriving(bool),
+    /// Choose driving's steps for moves and turns.
+    DriveSteps(f64, f64),
+    /// How many presses are waiting to play.
+    CheckDriveQueue(usize),
+    /// What Kame is thinking about while driving, as `thinking()` gives it.
+    CheckDriveThinking(&'static str),
     /// Scroll the help page this far down, in logical pixels.
     ScrollHelp(f32),
     /// Type in the Colours page's R, G, B, A or hex field, counting from 0.
@@ -887,6 +893,39 @@ fn script() -> Vec<Step> {
         Run("FD 1", Speed::Instant),
         WaitFinished,
         CheckDriving(false),
+        Say("Drive Kame: the steps, and presses waiting their turn"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        Drive(true),
+        DriveSteps(50.0, 90.0),
+        DriveKeys(&["up", "up", "up"]),
+        CheckDriveQueue(2),
+        WaitDriven,
+        CheckDriveQueue(0),
+        CheckConsole("> FD 150"),
+        CheckTurtle(0.0, 150.0, 0.0),
+        DriveKeys(&["right"]),
+        WaitDriven,
+        CheckConsole("> RT 90"),
+        Screenshot("driving-steps"),
+        Say("Drive Kame: typing at the console ends a driven entry"),
+        DriveSteps(10.0, 15.0),
+        DriveKeys(&["up"]),
+        WaitDriven,
+        Console("PRINT 1"),
+        WaitFinished,
+        DriveKeys(&["up"]),
+        WaitDriven,
+        CheckUndoLabel("FD 10"),
+        CheckTurtle(20.0, 150.0, 90.0),
+        Say("Drive Kame: the last entry's thought fades as the next starts"),
+        DriveKeys(&["right"]),
+        // Before its first frame, the turn hasn't started; the move fades.
+        CheckDriveThinking("nothing, fading move 10"),
+        WaitDriven,
+        Wait(ms(500)),
+        CheckDriveThinking("turn 15"),
+        DriveKeys(&["escape"]),
         Quit,
     ]
 }
@@ -1226,6 +1265,17 @@ impl App {
                         };
                         self.drive(input, cx);
                     }
+                }
+                Step::DriveSteps(moves, turns) => {
+                    self.drive_steps = pendown::drive::Steps { moves, turns };
+                }
+                Step::CheckDriveQueue(expected) => {
+                    let found = self.driving.as_ref().map_or(0, |d| d.queue.len());
+                    self.check(found == expected, format!("{found} presses waiting"));
+                }
+                Step::CheckDriveThinking(expected) => {
+                    let found = self.thinking_described();
+                    self.check(found == expected, format!("Kame is thinking: {found}"));
                 }
                 Step::CheckDriving(expected) => {
                     let found = self.driving.is_some();

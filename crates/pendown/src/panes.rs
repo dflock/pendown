@@ -213,6 +213,9 @@ impl ToolbarPane {
             .ghost()
             .icon(IconName::ImageDown)
             .tooltip("Export")
+            // An icon-only button is a fixed square, which cuts off the
+            // caret: an empty child sizes it as a button with content.
+            .child(div())
             .dropdown_caret(true)
             .dropdown_menu(move |menu, _, _| {
                 menu.item(item("PNG picture", Picture::Png))

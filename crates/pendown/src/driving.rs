@@ -249,6 +249,31 @@ impl App {
         Thinking { current, fading }
     }
 
+    /// For the scripted session: what Kame is thinking about while
+    /// driving, in words: `turn 15`, or just `turn from 90` while it's still
+    /// starting, with `, fading move 10` for the last entry fading.
+    pub(crate) fn thinking_described(&mut self) -> String {
+        let now = self
+            .animator
+            .as_ref()
+            .map(|a| a.thinking())
+            .unwrap_or_default();
+        let thinking = self.drive_thinking(now);
+        let words = |thought: Thought| match thought {
+            Thought::Turn { by, done: true, .. } => format!("turn {}", number(by.abs().round())),
+            Thought::Turn { from, .. } => format!("turn from {}", number(from.round())),
+            Thought::Move {
+                length, done: true, ..
+            } => format!("move {}", number(length.round())),
+            Thought::Move { .. } => "move".to_string(),
+        };
+        let mut text = thinking.current.map_or("nothing".to_string(), words);
+        if let Some((fading, _)) = thinking.fading {
+            text.push_str(&format!(", fading {}", words(fading)));
+        }
+        text
+    }
+
     /// Whether the last entry's thought is still fading, which needs frames.
     pub(crate) fn drive_fading(&self) -> bool {
         self.driving.as_ref().is_some_and(|d| d.fading.is_some())

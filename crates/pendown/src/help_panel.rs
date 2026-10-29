@@ -1440,13 +1440,15 @@ impl HelpPanel {
         let l = self.lesson.min(lessons.len() - 1);
         let lesson = &lessons[l];
 
-        // Which lesson, and a bar to go to any of them.
+        // Which lesson, and a bar to go to any of them. It shows where the
+        // lesson is in the order, not what's been done: earlier lessons are
+        // grey, not a "passed" green (ADR 0027).
         let progress = h_flex()
             .mt_2()
             .gap_1()
             .children((0..lessons.len()).map(|i| {
                 let colour = match i.cmp(&l) {
-                    std::cmp::Ordering::Less => theme.success,
+                    std::cmp::Ordering::Less => theme.muted_foreground,
                     std::cmp::Ordering::Equal => theme.foreground,
                     std::cmp::Ordering::Greater => theme.border,
                 };

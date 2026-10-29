@@ -22,7 +22,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{assets::IconName, prelude::FluentBuilder as _, *};
 use pendown::{
-    animator::{Animator, MAX_FRAME_GAP, Mode, Speed},
+    animator::{Animator, MAX_FRAME_GAP, Mode, Speed, Thinking},
     console::{ConsoleInput, Ending, Submit, defines, label},
     document::Document,
     errors,
@@ -207,6 +207,8 @@ pub struct App {
     console_before: Vec<Before>,
     /// The job running is a console entry.
     console_job: bool,
+    /// Show Kame thinking: arcs on turns and rulers on moves.
+    pub(crate) show_thinking: bool,
     /// Teach Kame's dialog, while it's open.
     pub(crate) teach_dialog: Option<Entity<TeachKame>>,
     /// Definitions typed at the console since the last Run, which "Copy to
@@ -306,6 +308,7 @@ impl App {
             paused: false,
             speed,
             help: false,
+            thinking: false,
         };
         let toolbar_pane = cx.new(|_| ToolbarPane::new(app.clone(), speed_slider.clone(), toolbar));
         let watched = cx.new(|_| Watched::default());
@@ -371,6 +374,7 @@ impl App {
             console_before: Vec::new(),
             console_job: false,
             teach_dialog: None,
+            show_thinking: false,
             console_definitions: Vec::new(),
             defining: None,
             definitions_cleared: false,
@@ -400,6 +404,12 @@ impl App {
             self.speed_slider
                 .update(cx, |s, cx| s.set_value(level as f32, window, cx));
         }
+        cx.notify();
+    }
+
+    /// The toolbar's Show thinking.
+    pub(crate) fn toggle_thinking(&mut self, cx: &mut Context<Self>) {
+        self.show_thinking = !self.show_thinking;
         cx.notify();
     }
 
@@ -1188,11 +1198,17 @@ impl App {
                 Overlay {
                     partial: a.partial(tolerance),
                     turtle: a.shown.then_some((a.pos, a.heading)),
+                    thinking: if self.show_thinking {
+                        a.thinking()
+                    } else {
+                        Thinking::default()
+                    },
                 }
             }
             None => Overlay {
                 partial: None,
                 turtle: Some((pendown_logo::Point { x: 0.0, y: 0.0 }, 0.0)),
+                thinking: Thinking::default(),
             },
         };
 
@@ -1201,6 +1217,7 @@ impl App {
             paused,
             speed: self.speed,
             help: self.help_open,
+            thinking: self.show_thinking,
         };
         self.toolbar_pane
             .update(cx, |pane, cx| pane.set(toolbar, cx));

@@ -58,10 +58,23 @@ pub const FADE: f64 = 1.0 / 3.0;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Thought {
     /// Turning `at` a point, from heading `from`, by `by` degrees so far:
-    /// positive for right, and past 360 for more than a whole turn.
-    Turn { at: Point, from: f64, by: f64 },
-    /// Moving `from` a point, to where it's got `to`, `length` steps so far.
-    Move { from: Point, to: Point, length: f64 },
+    /// positive for right, and past 360 for more than a whole turn. `done`
+    /// once it's turned all the way.
+    Turn {
+        at: Point,
+        from: f64,
+        by: f64,
+        done: bool,
+    },
+    /// Moving `from` a point, to where it's got `to`, `length` steps so far,
+    /// facing `heading`: backwards for `BK`. `done` once it's got there.
+    Move {
+        from: Point,
+        to: Point,
+        length: f64,
+        heading: f64,
+        done: bool,
+    },
 }
 
 /// What to show of Kame thinking in a frame.
@@ -485,6 +498,8 @@ impl Animator {
                             from,
                             to: from,
                             length: 0.0,
+                            heading: self.heading,
+                            done: false,
                         });
                     }
                     self.current = Some(Current::Move {
@@ -501,6 +516,7 @@ impl Animator {
                             at: self.pos,
                             from,
                             by: 0.0,
+                            done: false,
                         });
                     }
                     self.current = Some(Current::Turn {
@@ -672,7 +688,7 @@ impl Animator {
                 let done = (done + progress(length - done, rate)).min(length);
                 if done >= length {
                     self.pos = to;
-                    self.thought_moved(done);
+                    self.thought_moved(done, true);
                     if pen.down {
                         out.marks.push(Segment { from, to, pen }.into());
                     }
@@ -683,7 +699,7 @@ impl Animator {
                     x: from.x + (to.x - from.x) * t,
                     y: from.y + (to.y - from.y) * t,
                 };
-                self.thought_moved(done);
+                self.thought_moved(done, false);
                 self.current = Some(Current::Move {
                     from,
                     to,
@@ -721,8 +737,14 @@ impl Animator {
                 let done = done + progress(by.abs() - done, rate.map(|r| r * DEGREES_PER_STEP));
                 let done = done.min(by.abs());
                 self.heading = (from + by.signum() * done).rem_euclid(360.0);
-                if let Some(Thought::Turn { by: so_far, .. }) = &mut self.thought {
+                if let Some(Thought::Turn {
+                    by: so_far,
+                    done: finished,
+                    ..
+                }) = &mut self.thought
+                {
                     *so_far = by.signum() * done;
+                    *finished = done >= by.abs();
                 }
                 if done >= by.abs() {
                     return true;
@@ -756,9 +778,15 @@ impl Animator {
 
     /// The move Kame is thinking about has got to where Kame is, `done`
     /// steps along.
-    fn thought_moved(&mut self, done: f64) {
-        if let Some(Thought::Move { to, length, .. }) = &mut self.thought {
-            (*to, *length) = (self.pos, done);
+    fn thought_moved(&mut self, done: f64, there: bool) {
+        if let Some(Thought::Move {
+            to,
+            length,
+            done: finished,
+            ..
+        }) = &mut self.thought
+        {
+            (*to, *length, *finished) = (self.pos, done, there);
         }
     }
 

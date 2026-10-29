@@ -126,6 +126,8 @@ pub struct ToolbarState {
     pub speed: Speed,
     /// The side panel is open.
     pub help: bool,
+    /// Show Kame thinking is on.
+    pub thinking: bool,
 }
 
 /// The toolbar's buttons, slider and speed. The run's status, which changes
@@ -204,6 +206,7 @@ impl Render for ToolbarPane {
             paused,
             speed,
             help,
+            thinking,
         } = self.state;
         h_flex()
             .gap_2()
@@ -290,6 +293,17 @@ impl Render for ToolbarPane {
                     .text_sm()
                     .whitespace_nowrap()
                     .child(describe(speed)),
+            )
+            .child(div().flex_none().w(px(6.)))
+            // Arcs on turns and rulers on moves, over the canvas.
+            .child(
+                self.button(
+                    "thinking",
+                    IconName::Lightbulb,
+                    "Thinking",
+                    |this, _, cx| this.toggle_thinking(cx),
+                )
+                .selected(thinking),
             )
             .child(div().flex_1())
             // Shows and hides the side panel; F1 opens it on the word under

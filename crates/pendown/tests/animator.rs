@@ -758,7 +758,9 @@ fn kame_thinks_about_the_move_so_far() {
     let moves: Vec<(f64, f64)> = seen
         .iter()
         .filter_map(|t| match t.current {
-            Some(Thought::Move { from, to, length }) => {
+            Some(Thought::Move {
+                from, to, length, ..
+            }) => {
                 assert_eq!((from.x, from.y), (0.0, 0.0));
                 Some((to.x, length))
             }
@@ -814,12 +816,20 @@ fn more_than_a_whole_turn_and_turning_left() {
     let seen = thoughts("RT 450", Speed::Animated(2000.0));
     assert!(matches!(
         seen.last().unwrap().current,
-        Some(Thought::Turn { by: 450.0, .. })
+        Some(Thought::Turn {
+            by: 450.0,
+            done: true,
+            ..
+        })
     ));
     let seen = thoughts("LT 30", Speed::Animated(100.0));
     assert!(matches!(
         seen.last().unwrap().current,
-        Some(Thought::Turn { by: -30.0, .. })
+        Some(Thought::Turn {
+            by: -30.0,
+            done: true,
+            ..
+        })
     ));
 }
 

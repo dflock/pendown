@@ -19,7 +19,8 @@ gpui_kit::assets::icon_assets!(
         Footprints,
         Square,
         PencilLine,
-        MessageSquarePlus
+        MessageSquarePlus,
+        Lightbulb
     ]
 );
 

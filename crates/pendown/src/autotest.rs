@@ -138,6 +138,8 @@ enum Step {
     CopyDefinitions,
     /// Open the side panel, if it isn't.
     ShowPanel,
+    /// Turn Show thinking on or off.
+    SetThinking(bool),
     /// Scroll the help page this far down, in logical pixels.
     ScrollHelp(f32),
     /// Type in the Colours page's R, G, B, A or hex field, counting from 0.
@@ -811,6 +813,23 @@ fn script() -> Vec<Step> {
         CheckColours("PENCOLOR=tomato FILLCOLOR=none BACKGROUND=0"),
         Screenshot("colours-copied"),
         CloseHelp,
+        Say("Show thinking: an arc on a turn, and a ruler on a move"),
+        SetThinking(true),
+        // At 80 steps a second, FD 100 takes 1.25 s and RT 120 0.5 s.
+        Run("FD 100 RT 120 FD 100", Speed::Animated(80.0)),
+        Wait(ms(1500)),
+        Screenshot("thinking-turn"),
+        Wait(ms(900)),
+        Screenshot("thinking-move"),
+        SetSpeed(Speed::Instant),
+        WaitFinished,
+        // On a light background it's dark amber, so it still shows.
+        Run("SETBG 7 SETPC 0 FD 100 RT 120", Speed::Animated(80.0)),
+        Wait(ms(1500)),
+        Screenshot("thinking-light"),
+        SetSpeed(Speed::Instant),
+        WaitFinished,
+        SetThinking(false),
         Quit,
     ]
 }
@@ -1119,6 +1138,11 @@ impl App {
                         p.page_scroll.set_offset(point(px(0.), px(-y)));
                         cx.notify();
                     });
+                }
+                Step::SetThinking(on) => {
+                    if self.show_thinking != on {
+                        self.toggle_thinking(cx);
+                    }
                 }
                 Step::ShowPanel => {
                     if !self.help_open {

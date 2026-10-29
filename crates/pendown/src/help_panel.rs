@@ -23,7 +23,7 @@ use pendown::{
 };
 use pendown_logo::reference::{Command, Kind, reference};
 
-use crate::app::App as PendownWindow;
+use crate::{app::App as PendownWindow, colours_page::ColoursPage};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Tab {
@@ -120,6 +120,12 @@ pub struct HelpPanel {
     /// Enter opened a search result: the search box is emptied when the
     /// panel next draws, which has the window it needs.
     clear_search: bool,
+    /// The Colours page's picker and swatches, once it's been shown.
+    pub colours: Option<Entity<ColoursPage>>,
+    /// The user's program is running, so Copy to editor is off.
+    program_running: bool,
+    /// Scrolls the help page, for the scripted session.
+    pub page_scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -178,6 +184,9 @@ impl HelpPanel {
             running: None,
             lesson: 0,
             clear_search: false,
+            colours: None,
+            program_running: false,
+            page_scroll: ScrollHandle::new(),
             _subscriptions: subscriptions,
         }
     }
@@ -262,7 +271,9 @@ impl HelpPanel {
     /// pinned or searching, the panel shows its page, without adding to the
     /// history.
     pub fn follow(&mut self, word: Option<(String, u32)>, cx: &mut Context<Self>) {
-        if self.pinned || self.tab != Tab::Help || !self.query(cx).is_empty() {
+        // The Colours page stays while the cursor moves, since it copies to
+        // wherever the cursor is.
+        if self.pinned || self.tab != Tab::Help || !self.query(cx).is_empty() || self.on_colours() {
             return;
         }
         let Some((name, line)) = word else { return };
@@ -335,6 +346,41 @@ impl HelpPanel {
         })
         .detach();
         None
+    }
+
+    /// Whether the user's program is running, which turns Copy to editor
+    /// off on the Colours page.
+    pub fn set_program_running(&mut self, running: bool, cx: &mut Context<Self>) {
+        if self.program_running != running {
+            self.program_running = running;
+            cx.notify();
+        }
+    }
+
+    /// Whether the page shows the Colours entry.
+    fn on_colours(&self) -> bool {
+        matches!(self.page, Page::Command(i) if reference().commands[i].key == "colours")
+    }
+
+    /// Makes the Colours page's picker the first time it's shown, at Kame's
+    /// pen colour.
+    fn ensure_colours(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.colours.is_some() || !self.on_colours() {
+            return;
+        }
+        let pen = self
+            .app
+            .upgrade()
+            .and_then(|app| {
+                let watch = app.read(cx).watched.read(cx).watch.clone()?;
+                watch.colours.iter().find(|c| c.name == "PENCOLOR")?.rgba
+            })
+            .unwrap_or([255, 255, 255, 255]);
+        let app = self.app.clone();
+        let page = cx.new(|cx| ColoursPage::new(app, pen, window, cx));
+        self._subscriptions
+            .push(cx.observe(&page, |_, _, cx| cx.notify()));
+        self.colours = Some(page);
     }
 
     pub fn set_running(&mut self, running: Option<Running>, cx: &mut Context<Self>) {
@@ -639,6 +685,11 @@ impl HelpPanel {
                     .names
                     .iter()
                     .skip(if command.kind == Kind::Syntax { 0 } else { 1 })
+                    // A syntax entry's words, such as COLOR, are only for
+                    // search: its badges are what the cursor can be on.
+                    .filter(|alias| {
+                        command.kind != Kind::Syntax || !alias.chars().any(char::is_alphabetic)
+                    })
                     .map(|alias| {
                         div()
                             .px_1()
@@ -716,6 +767,25 @@ impl HelpPanel {
                     .into_any_element(),
             ),
             None => {}
+        }
+
+        // The Colours page's forms, picker and swatches.
+        if command.key == "colours"
+            && let Some(page) = self.colours.clone()
+        {
+            out.push(part("The forms", cx).into_any_element());
+            out.push(page.update(cx, |page, cx| page.forms_table(cx)));
+            out.push(part("Find a colour", cx).into_any_element());
+            out.push(page.update(cx, |page, cx| page.picker(cx)));
+            out.push(part("Palette", cx).into_any_element());
+            out.push(page.update(cx, |page, cx| page.palette(cx)));
+            out.extend(self.blocks(
+                "colours-palette",
+                &markup::parse("[SETPALETTE] can change 8 to 15. Run puts them back."),
+                cx,
+            ));
+            out.push(part("Names", cx).into_any_element());
+            out.push(page.update(cx, |page, cx| page.names(cx)));
         }
 
         if !command.examples.is_empty() {
@@ -1161,6 +1231,7 @@ impl Render for HelpPanel {
         if std::mem::take(&mut self.clear_search) {
             self.search.update(cx, |s, cx| s.set_value("", window, cx));
         }
+        self.ensure_colours(window, cx);
         let theme = cx.theme().clone();
         let query = self.query(cx);
         let app = self.app.clone();
@@ -1260,7 +1331,7 @@ impl HelpPanel {
 
         // What the page is following, or that it's pinned.
         let strip = match (&self.page, query.is_empty()) {
-            (Page::Command(_), true) => {
+            (Page::Command(_), true) if !self.on_colours() => {
                 let (text, button) = match (&self.following, self.pinned) {
                     (_, true) => (
                         "Pinned: the page stays as the cursor moves".to_string(),
@@ -1344,6 +1415,7 @@ impl HelpPanel {
             .child(
                 div()
                     .id(SharedString::from(id))
+                    .track_scroll(&self.page_scroll)
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
@@ -1351,7 +1423,14 @@ impl HelpPanel {
                     .pb_4()
                     .children(content),
             )
-            .child(footer)
+            .map(|el| match self.colours.clone() {
+                // The current colour, always in view on the Colours page.
+                Some(page) if query.is_empty() && self.on_colours() => {
+                    let running = self.program_running;
+                    el.child(page.update(cx, |page, cx| page.bar(running, cx)))
+                }
+                _ => el.child(footer),
+            })
             .into_any_element()
     }
 
@@ -1635,6 +1714,27 @@ impl PendownWindow {
             self.help_panel
                 .update(cx, |panel, cx| panel.follow(word, cx));
         }
+    }
+
+    /// The Colours page's Copy to editor: puts `text` at the editor's
+    /// cursor, in place of any selection, as one edit that Undo takes back,
+    /// with a space before it if it needs one. Not while a program runs.
+    pub(crate) fn insert_at_cursor(
+        &mut self,
+        text: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.running() {
+            return;
+        }
+        self.editor.update(cx, |state, cx| {
+            let start = state.selected_range().start;
+            let before = state.value()[..start].chars().last();
+            state.replace(pendown::colours::insertion(before, text), window, cx);
+            state.focus(window, cx);
+        });
+        self.check_program(cx);
     }
 
     /// Copy to editor: adds an example to the end of the program, as one

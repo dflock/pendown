@@ -3,6 +3,7 @@
 //! modules it declares are the window.
 
 pub mod animator;
+pub mod colours;
 pub mod console;
 pub mod document;
 pub mod errors;

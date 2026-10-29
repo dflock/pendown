@@ -1174,6 +1174,8 @@ impl App {
             .update(cx, |pane, cx| pane.set_readonly(running, cx));
         self.console_pane
             .update(cx, |pane, cx| pane.set_disabled(running, cx));
+        self.help_panel
+            .update(cx, |panel, cx| panel.set_program_running(running, cx));
         let paused = self
             .animator
             .as_ref()

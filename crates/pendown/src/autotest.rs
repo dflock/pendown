@@ -136,6 +136,27 @@ enum Step {
     EditorKeys(&'static str),
     /// Press the console's Copy to editor.
     CopyDefinitions,
+    /// Open the side panel, if it isn't.
+    ShowPanel,
+    /// Scroll the help page this far down, in logical pixels.
+    ScrollHelp(f32),
+    /// Type in the Colours page's R, G, B, A or hex field, counting from 0.
+    ColourField(usize, &'static str),
+    /// Click on the Colours page's wheel, from 0 to 1 across and down.
+    WheelAt(f64, f64),
+    /// Click a palette swatch, or a name.
+    PickPalette(u8),
+    PickName(&'static str),
+    /// Choose the form to copy in, by its button's label.
+    ChooseForm(&'static str),
+    /// Press the Colours page's Copy to editor.
+    CopyColour,
+    /// What Copy to editor would put in.
+    CheckCurrentColour(&'static str),
+    /// Why a field doesn't make sense, or "" if they all do.
+    CheckColourProblem(&'static str),
+    /// Type in the names' filter.
+    FilterNames(&'static str),
     /// The drawing's background, as RGBA.
     CheckBackground([u8; 4]),
     /// How many lines, arcs and shapes are drawn.
@@ -732,6 +753,64 @@ fn script() -> Vec<Step> {
         EditorKeys("secondary-z"),
         Wait(ms(300)),
         CheckEditor("; mine"),
+        Say("Colours: the page, found by searching for color"),
+        Run("FD 100", Speed::Instant),
+        WaitFinished,
+        Type("SETPC\nFD 100"),
+        ShowPanel,
+        SearchHelp("color"),
+        Wait(ms(100)),
+        CheckFirstResult("Colours"),
+        SearchHelp(""),
+        OpenHelp("colours"),
+        Wait(ms(500)),
+        CheckCurrentColour("\"#ffffff"),
+        Screenshot("colours"),
+        Say("Colours: the fields set the colour, and Copy to editor puts it at the cursor"),
+        ColourField(4, "#ff9a26"),
+        Wait(ms(100)),
+        CheckCurrentColour("\"#ff9a26"),
+        CursorAt("C\n"),
+        CopyColour,
+        Wait(ms(200)),
+        CheckEditor("SETPC \"#ff9a26\nFD 100"),
+        EditorKeys("secondary-z"),
+        Wait(ms(300)),
+        CheckEditor("SETPC\nFD 100"),
+        ChooseForm("RGBA"),
+        CheckCurrentColour("[255 154 38 255]"),
+        Say("Colours: a field that doesn't make sense leaves the colour as it was"),
+        ColourField(0, "300"),
+        Wait(ms(100)),
+        CheckColourProblem("R goes from 0 to 255."),
+        CheckCurrentColour("[255 154 38 255]"),
+        ScrollHelp(380.),
+        Wait(ms(200)),
+        Screenshot("colours-problem"),
+        ColourField(0, "64"),
+        Wait(ms(100)),
+        CheckColourProblem(""),
+        CheckCurrentColour("[64 154 38 255]"),
+        Say("Colours: the wheel, the palette and the names"),
+        WheelAt(0.5, 0.0),
+        CheckCurrentColour("[154 0 0 255]"),
+        PickPalette(4),
+        CheckCurrentColour("4"),
+        PickName("tomato"),
+        CheckCurrentColour("\"tomato"),
+        FilterNames("red"),
+        ScrollHelp(1000.),
+        Wait(ms(200)),
+        Screenshot("colours-names"),
+        CursorAt("C\n"),
+        CopyColour,
+        Wait(ms(200)),
+        CheckEditor("SETPC \"tomato\nFD 100"),
+        Run("SETPC \"tomato\nFD 100", Speed::Instant),
+        WaitFinished,
+        CheckColours("PENCOLOR=tomato FILLCOLOR=none BACKGROUND=0"),
+        Screenshot("colours-copied"),
+        CloseHelp,
         Quit,
     ]
 }
@@ -1035,6 +1114,95 @@ impl App {
                     self.check(found == expected, format!("Teach Kame is enabled: {found}"));
                 }
                 Step::Keys(keys) => self.press(keys, window, cx),
+                Step::ScrollHelp(y) => {
+                    self.help_panel.update(cx, |p, cx| {
+                        p.page_scroll.set_offset(point(px(0.), px(-y)));
+                        cx.notify();
+                    });
+                }
+                Step::ShowPanel => {
+                    if !self.help_open {
+                        self.toggle_help(cx);
+                    }
+                }
+                Step::ColourField(i, value) => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        let field = page.read(cx).fields[i].clone();
+                        field.update(cx, |f, cx| f.set_value(value.to_string(), window, cx));
+                        // Setting a field's text isn't typing, so say it was.
+                        page.update(cx, |p, cx| p.typed(i, window, cx));
+                    }
+                }
+                Step::WheelAt(x, y) => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        page.update(cx, |p, cx| p.pick_on_wheel(x, y, window, cx));
+                    }
+                }
+                Step::PickPalette(n) => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        page.update(cx, |p, cx| p.pick_palette(n, window, cx));
+                    }
+                }
+                Step::PickName(name) => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        let found = pendown::colours::names_matching(name)
+                            .into_iter()
+                            .find(|(n, _)| *n == name);
+                        if let Some((name, rgba)) = found {
+                            page.update(cx, |p, cx| p.pick_name(name, rgba, window, cx));
+                        }
+                    }
+                }
+                Step::ChooseForm(label) => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        page.update(cx, |p, cx| {
+                            let form = pendown::colours::forms(p.rgba())
+                                .into_iter()
+                                .find(|f| f.label() == label);
+                            if let Some(form) = form {
+                                p.choose(form, cx);
+                            }
+                        });
+                    }
+                }
+                Step::CopyColour => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        // After this update, since copying updates the window.
+                        window.defer(cx, move |window, cx| {
+                            page.update(cx, |p, cx| p.copy(window, cx));
+                        });
+                    }
+                }
+                Step::CheckCurrentColour(expected) => {
+                    let found = self
+                        .help_panel
+                        .read(cx)
+                        .colours
+                        .as_ref()
+                        .map(|p| p.read(cx).text())
+                        .unwrap_or_default();
+                    self.check(found == expected, format!("the current colour is {found}"));
+                }
+                Step::CheckColourProblem(expected) => {
+                    let found = self
+                        .help_panel
+                        .read(cx)
+                        .colours
+                        .as_ref()
+                        .and_then(|p| p.read(cx).problem.clone())
+                        .map(|(_, why)| why)
+                        .unwrap_or_default();
+                    self.check(
+                        found == expected,
+                        format!("the fields' problem is {found:?}"),
+                    );
+                }
+                Step::FilterNames(text) => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        let filter = page.read(cx).filter.clone();
+                        filter.update(cx, |f, cx| f.set_value(text.to_string(), window, cx));
+                    }
+                }
                 Step::CopyDefinitions => self.copy_definitions(window, cx),
                 Step::EditorKeys(keys) => self.press_in_editor(keys, window, cx),
                 Step::CheckBackground(expected) => {

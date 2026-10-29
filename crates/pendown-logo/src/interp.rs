@@ -135,6 +135,7 @@ pub struct Stats {
     pub max_stack: usize,
 }
 
+#[derive(Clone)]
 pub struct Turtle {
     pub pos: Point,
     /// Degrees clockwise from north.
@@ -267,6 +268,9 @@ pub struct Interpreter {
     control: Arc<Control>,
     last_line: Option<(SourceId, u32)>,
     console_entries: u32,
+    /// Kame and the background as each console entry since the last Run
+    /// found them, newest last, for Undo (ADR 0025).
+    before_entries: Vec<(Turtle, (Rgba, Value))>,
     stack_base: usize,
     true_word: Value,
     false_word: Value,
@@ -354,6 +358,7 @@ impl Interpreter {
             control,
             last_line: None,
             console_entries: 0,
+            before_entries: Vec::new(),
             stack_base: 0,
             true_word: Value::word("true"),
             false_word: Value::word("false"),
@@ -471,13 +476,34 @@ impl Interpreter {
         self.random = Random::new(self.seed.unwrap_or_else(Random::fresh_seed));
         self.last_line = None;
         self.console_entries = 0;
+        self.before_entries.clear();
         self.run_source(text, SourceId::Editor)
     }
 
     /// A console entry, which runs against whatever the last run left.
+    /// Kame and the background are saved first, even for an entry that
+    /// doesn't parse, so each entry has one for Undo to take back.
     pub fn run_console(&mut self, text: &str) -> Result<(), RunError> {
         self.console_entries += 1;
+        self.before_entries
+            .push((self.turtle.clone(), self.background.clone()));
         self.run_source(text, SourceId::Console(self.console_entries))
+    }
+
+    /// Undo at the console (ADR 0025): puts Kame and the background back as
+    /// the newest console entry not yet undone found them. Variables and
+    /// procedures stay as they are. With nothing to undo, nothing changes.
+    /// Like a job, it ends with a `Watch`, so the colours panel follows.
+    pub fn undo_console(&mut self) -> Result<(), RunError> {
+        if let Some((turtle, background)) = self.before_entries.pop() {
+            self.turtle = turtle;
+            self.background = background;
+        }
+        self.last_watch = None;
+        if self.limits.instruction_events {
+            let _ = self.send_watch();
+        }
+        self.sink.flush().map_err(|_| RunError::Halted)
     }
 
     /// Makes every Run use this seed for `RANDOM`, so its drawings repeat:

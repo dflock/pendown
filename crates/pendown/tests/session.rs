@@ -78,3 +78,30 @@ fn a_stopped_job_doesnt_stop_the_next() {
     let (run, marks) = finish(&session, Job::Console("FD 10".into()));
     assert_eq!((run.result(), marks), (Some(Ok(())), 1));
 }
+
+#[test]
+fn undo_runs_on_the_interpreter_thread() {
+    let session = Session::new();
+    finish(&session, Job::Program(String::new()));
+    finish(&session, Job::Console("FD 40 RT 90".into()));
+    let (run, marks) = finish(&session, Job::Undo);
+    assert_eq!((run.result(), marks), (Some(Ok(())), 0));
+    let (mut animator, run) = session.start(
+        Job::Console("PRINT (LIST POS HEADING)".into()),
+        Speed::Instant,
+        DEFAULT_CHANNEL,
+    );
+    let mut printed = Vec::new();
+    while !animator.finished() {
+        printed.extend(
+            animator
+                .frame(Duration::from_millis(16), usize::MAX)
+                .printed,
+        );
+        thread::sleep(Duration::from_micros(200));
+    }
+    while run.result().is_none() {
+        thread::sleep(Duration::from_micros(200));
+    }
+    assert_eq!(printed.concat(), "[0 0] 0\n");
+}

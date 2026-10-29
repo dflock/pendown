@@ -39,6 +39,8 @@ pub enum Job {
     Program(String),
     /// A console entry, against what the last run left.
     Console(String),
+    /// Undo at the console (ADR 0025): Kame back as the last entry found it.
+    Undo,
 }
 
 /// One job's progress, as the GUI sees it.
@@ -111,6 +113,7 @@ impl Session {
                     let result = match &command.job {
                         Job::Program(text) => it.run_program(text),
                         Job::Console(text) => it.run_console(text),
+                        Job::Undo => it.undo_console(),
                     };
                     // Dropping the sender tells the animator the job is over.
                     it.set_output(Box::new(Discard), Arc::default());

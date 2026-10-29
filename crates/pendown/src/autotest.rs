@@ -103,6 +103,12 @@ enum Step {
     CheckConsole(&'static str),
     /// Type a line into the console and press Enter.
     Console(&'static str),
+    /// Press keys in the console's input line, as `Keystroke::parse` reads them.
+    ConsoleKeys(&'static str),
+    /// Press the console's Undo button.
+    UndoConsole,
+    /// The console's input line holds exactly this.
+    CheckConsoleTyped(&'static str),
     /// How many lines, arcs and shapes are drawn.
     CheckDrawn(usize),
     /// Where the turtle sprite is, and its heading.
@@ -484,6 +490,69 @@ fn script() -> Vec<Step> {
         CheckDrawn(32),
         BackToMyDrawing,
         CloseHelp,
+        Say("Console undo: an oops at the console, taken back"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        Console("FD 100"),
+        WaitFinished,
+        Console("RT 90"),
+        WaitFinished,
+        Console("FD 100"),
+        WaitFinished,
+        Console("RT 45"),
+        WaitFinished,
+        CheckTurtle(100.0, 100.0, 135.0),
+        Screenshot("undo-before"),
+        UndoConsole,
+        WaitFinished,
+        CheckTurtle(100.0, 100.0, 90.0),
+        CheckDrawn(2),
+        CheckConsole("Undid: RT 45"),
+        Console("RT 90"),
+        WaitFinished,
+        Console("FD 100"),
+        WaitFinished,
+        CheckDrawn(3),
+        Screenshot("undo-after"),
+        Say("Console undo: Ctrl+Z with nothing typed, back past a CLEAN and a colour"),
+        Console("SETPC \"orange CLEAN FD 50 RT 90 FD 50"),
+        WaitFinished,
+        CheckDrawn(2),
+        CheckColours("PENCOLOR=orange FILLCOLOR=none BACKGROUND=0"),
+        ConsoleKeys("secondary-z"),
+        Wait(ms(200)),
+        WaitFinished,
+        CheckDrawn(3),
+        CheckTurtle(100.0, 0.0, 180.0),
+        CheckColours("PENCOLOR=7 FILLCOLOR=none BACKGROUND=0"),
+        CheckConsole("Undid: SETPC \"orange CLEAN FD 50 RT 90 FD 50"),
+        Say("Console undo: an entry that stopped with an error"),
+        Console("FD 30 FD \"far"),
+        WaitFinished,
+        CheckDrawn(4),
+        CheckTurtle(100.0, -30.0, 180.0),
+        UndoConsole,
+        WaitFinished,
+        CheckDrawn(3),
+        CheckTurtle(100.0, 0.0, 180.0),
+        Say("Console undo: with something typed, Ctrl+Z undoes the typing"),
+        ConsoleKeys("x"),
+        Wait(ms(100)),
+        CheckConsoleTyped("x"),
+        ConsoleKeys("secondary-z"),
+        Wait(ms(200)),
+        CheckDrawn(3),
+        CheckConsoleTyped(""),
+        Say("Console undo: an entry that was stopped"),
+        SetSpeed(Speed::Animated(50.0)),
+        Console("FOREVER [FD 1 RT 1]"),
+        Wait(ms(500)),
+        Stop,
+        UndoConsole,
+        WaitFinished,
+        CheckDrawn(3),
+        CheckTurtle(100.0, 0.0, 180.0),
+        SetSpeed(Speed::Instant),
         Quit,
     ]
 }
@@ -737,6 +806,15 @@ impl App {
                 }
                 Step::Console(line) => {
                     self.type_into_console(line, window, cx);
+                }
+                Step::ConsoleKeys(keys) => self.press_in_console(keys, window, cx),
+                Step::UndoConsole => self.undo_console(cx),
+                Step::CheckConsoleTyped(expected) => {
+                    let typed = self.console_typed(cx);
+                    self.check(
+                        typed == expected,
+                        format!("the console's line holds {typed:?}"),
+                    );
                 }
                 Step::SaveTo(name) => {
                     let path = self.autotest.as_ref().unwrap().dir.join(name);

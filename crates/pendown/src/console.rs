@@ -71,6 +71,19 @@ pub fn defines(text: &str) -> bool {
     })
 }
 
+/// An entry as the Undo button names it: its first line, cut to `LABEL`
+/// characters with `…` if it's longer, or has more lines.
+pub fn label(text: &str) -> String {
+    const LABEL: usize = 24;
+    let first = text.lines().next().unwrap_or_default().trim_end();
+    let more = first.chars().count() > LABEL || text.trim_end().contains('\n');
+    if !more {
+        return first.to_string();
+    }
+    let cut: String = first.chars().take(LABEL - 1).collect();
+    format!("{}…", cut.trim_end())
+}
+
 impl ConsoleInput {
     pub fn submit(&mut self, line: &str) -> Submit {
         self.recalling = None;
@@ -249,6 +262,17 @@ mod tests {
         assert_eq!(c.to_undo(), None);
         assert_eq!(c.teachable().count(), 0);
         assert_eq!(c.older(), Some("FD 10"));
+    }
+
+    #[test]
+    fn labels() {
+        assert_eq!(label("RT 45"), "RT 45");
+        assert_eq!(label("to box :n\n  fd :n\nend"), "to box :n…");
+        assert_eq!(
+            label("REPEAT 36 [FD 10 RT 10 FD 5]"),
+            "REPEAT 36 [FD 10 RT 10…"
+        );
+        assert_eq!(label("REPEAT 4 [FD 100 RT 90]"), "REPEAT 4 [FD 100 RT 90]");
     }
 
     #[test]

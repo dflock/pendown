@@ -163,6 +163,22 @@ impl Drawing {
         self.display = display;
     }
 
+    /// Takes back everything drawn after the first `n` marks, as Undo at the
+    /// console does (ADR 0025), and draws the rest again.
+    pub fn truncate(&mut self, n: usize) {
+        if n >= self.display.len() {
+            return;
+        }
+        self.display.truncate(n);
+        self.pending.clear();
+        self.fill_background();
+        let display = std::mem::take(&mut self.display);
+        let started = self.metrics.rerenders.start();
+        self.draw(&display);
+        self.metrics.rerenders.stop(started);
+        self.display = display;
+    }
+
     /// Adds finished lines, arcs and shapes. They're drawn by the next
     /// `draw_pending`. Marks drawn with the pen up are left out.
     pub fn push(&mut self, marks: &[Mark]) {
@@ -616,6 +632,33 @@ mod tests {
             "about half way to red: {:?}",
             [r, g, b, a]
         );
+    }
+
+    #[test]
+    fn truncate_takes_back_the_newest_marks() {
+        let mut d = Drawing::new();
+        d.resize(1000, 1000);
+        let line = |y| {
+            Mark::from(Segment {
+                from: p(-200.0, y),
+                to: p(200.0, y),
+                pen: RED,
+            })
+        };
+        d.push(&[line(0.0)]);
+        d.draw_pending();
+        d.push(&[line(100.0)]);
+        d.draw_pending();
+        // Not drawn yet: truncating draws what's left anyway.
+        d.push(&[line(200.0)]);
+        d.truncate(1);
+        assert_eq!(d.segments(), 1);
+        assert_eq!(d.pixel(500, 500), [255, 0, 0, 255], "the first line stays");
+        assert_eq!(d.pixel(500, 400), BACKGROUND, "the second has gone");
+        d.draw_pending();
+        assert_eq!(d.pixel(500, 300), BACKGROUND, "the third was never drawn");
+        d.truncate(5);
+        assert_eq!(d.segments(), 1, "nothing to take back");
     }
 
     #[test]

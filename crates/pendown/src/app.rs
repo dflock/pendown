@@ -14,7 +14,7 @@ use gpui_kit::component::{
     highlighter::{Diagnostic, DiagnosticSeverity},
     input::{
         EditorState, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position,
-        RangeDecoration, RangeDecorationCollection, RangeDecorationStyle, TextareaState,
+        RangeDecoration, RangeDecorationCollection, RangeDecorationStyle, TextareaState, Undo,
     },
     resizable::{h_resizable, resizable_panel},
     slider::{SliderEvent, SliderState},
@@ -23,14 +23,15 @@ use gpui_kit::component::{
 use gpui_kit::{assets::IconName, prelude::FluentBuilder as _, *};
 use pendown::{
     animator::{Animator, MAX_FRAME_GAP, Mode, Speed},
-    console::{ConsoleInput, Submit, defines},
+    console::{ConsoleInput, Ending, Submit, defines, label},
     document::Document,
     errors,
     metrics::{Snapshot, WindowMetrics},
     run::{Channel, DEFAULT_CHANNEL, Job, Run, Session},
     speed::{INSTANT_LEVEL, level_speed, speed_level},
 };
-use pendown_logo::{RunError, SourceId};
+use pendown_logo::{Point, RunError, SourceId};
+use pendown_render::Mark;
 
 use crate::{
     autotest::Autotest,
@@ -96,6 +97,24 @@ const TOOLBAR_HEIGHT: f32 = 41.0;
 
 /// The status bar's height, at the bottom of the window.
 const STATUS_BAR_HEIGHT: f32 = 24.0;
+
+/// The console's Undo button's tooltip.
+const UNDO_TOOLTIP: &str = if cfg!(target_os = "macos") {
+    "Undo (Cmd+Z)"
+} else {
+    "Undo (Ctrl+Z)"
+};
+
+/// What a console entry found, so Undo can put it back (ADR 0025).
+struct Before {
+    /// How many marks the drawing had.
+    marks: usize,
+    background: [u8; 4],
+    /// Kame's position, heading and whether it was shown, if a job had run.
+    kame: Option<(Point, f64, bool)>,
+    /// The marks the entry's first `CLEAN` threw away.
+    cleaned: Option<Vec<Mark>>,
+}
 
 /// The console area's height, with the counters and variables beside the
 /// console.
@@ -181,6 +200,11 @@ pub struct App {
     /// button (issue 07).
     pub(crate) error_help: Option<usize>,
     console_entry: ConsoleInput,
+    /// What each console entry not undone yet found, oldest first: one for
+    /// each in `console_entry`'s record.
+    console_before: Vec<Before>,
+    /// The job running is a console entry.
+    console_job: bool,
     /// Definitions typed at the console since the last Run, which "Copy to
     /// editor" keeps.
     console_definitions: Vec<String>,
@@ -340,6 +364,8 @@ impl App {
             example: None,
             error_help: None,
             console_entry: ConsoleInput::default(),
+            console_before: Vec::new(),
+            console_job: false,
             console_definitions: Vec::new(),
             defining: None,
             definitions_cleared: false,
@@ -387,6 +413,9 @@ impl App {
         self.canvas.borrow_mut().drawing.reset();
         self.console.clear();
         self.console_dirty = true;
+        // Run starts again with nothing to undo (ADR 0025).
+        self.console_entry.clear_entries();
+        self.console_before.clear();
         if !self.console_definitions.is_empty()
             && !std::mem::replace(&mut self.definitions_cleared, true)
         {
@@ -408,10 +437,66 @@ impl App {
         // say where the turtle is: so carry on from where the last one left
         // it.
         let left = self.animator.as_ref().map(|a| (a.pos, a.heading, a.shown));
+        let canvas = self.canvas.borrow();
+        self.console_before.push(Before {
+            marks: canvas.drawing.segments(),
+            background: canvas.drawing.background(),
+            kame: left,
+            cleaned: None,
+        });
+        drop(canvas);
         self.start_job(Job::Console(entry), DEFAULT_CHANNEL, cx);
-        if let (Some((pos, heading, shown)), Some(animator)) = (left, &mut self.animator) {
+        self.console_job = true;
+        self.put_kame(left);
+    }
+
+    /// Puts the new animator's Kame where `kame` says, if it says.
+    fn put_kame(&mut self, kame: Option<(Point, f64, bool)>) {
+        if let (Some((pos, heading, shown)), Some(animator)) = (kame, &mut self.animator) {
             (animator.pos, animator.heading, animator.shown) = (pos, heading, shown);
         }
+    }
+
+    /// The console entry Undo would take back, if it can now.
+    fn to_undo(&self) -> Option<&str> {
+        if self.running() {
+            return None;
+        }
+        self.console_entry.to_undo().map(|e| e.text.as_str())
+    }
+
+    /// Undo at the console (ADR 0025): takes back the newest entry not
+    /// undone yet, putting the drawing and Kame back as it found them.
+    pub(crate) fn undo_console(&mut self, cx: &mut Context<Self>) {
+        if self.running() {
+            return;
+        }
+        let Some(text) = self.console_entry.undo().map(|e| e.text.clone()) else {
+            return;
+        };
+        let before = self
+            .console_before
+            .pop()
+            .expect("one for each console entry");
+        self.back_to_my_drawing(cx);
+        let mut canvas = self.canvas.borrow_mut();
+        match before.cleaned {
+            Some(marks) => {
+                canvas.drawing.clean();
+                canvas.drawing.push(&marks[..before.marks.min(marks.len())]);
+            }
+            None => canvas.drawing.truncate(before.marks),
+        }
+        if canvas.drawing.background() != before.background {
+            canvas.drawing.set_background(before.background);
+        }
+        drop(canvas);
+        // The interpreter puts Kame's pen and colours back, and the panels
+        // follow; the window puts back where it is.
+        self.start_job(Job::Undo, DEFAULT_CHANNEL, cx);
+        self.put_kame(before.kame);
+        self.print(format!("Undid: {}", text.replace('\n', " ")));
+        cx.notify();
     }
 
     fn start_job(&mut self, job: Job, channel: Channel, cx: &mut Context<Self>) {
@@ -422,6 +507,7 @@ impl App {
     /// Starts playing a job's events: the user's, or an example's.
     pub(crate) fn play(&mut self, animator: Animator, run: Run, cx: &mut Context<Self>) {
         self.error_help = None;
+        self.console_job = false;
         self.animator = Some(animator);
         self.run = Some(run);
         self.finished_at = None;
@@ -528,6 +614,9 @@ impl App {
             && !animator.finished()
         {
             animator.stop();
+            if self.console_job {
+                self.console_entry.finish(Ending::Stopped);
+            }
             self.show_watch(cx, Watched::stopped);
             self.stop_at = Some(Instant::now());
             self.print("Stopped.");
@@ -545,6 +634,28 @@ impl App {
             self.console.drain(..self.console.len() - 2000);
         }
         self.console_dirty = true;
+    }
+
+    /// For the scripted session: what's typed in the console's input line.
+    pub(crate) fn console_typed(&self, cx: &Context<Self>) -> String {
+        self.console_input.read(cx).value().to_string()
+    }
+
+    /// For the scripted session: presses `keys` in the console's input line,
+    /// as `Keystroke::parse` reads them.
+    pub(crate) fn press_in_console(
+        &mut self,
+        keys: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let focus = self.console_input.read(cx).focus_handle(cx);
+        window.focus(&focus, cx);
+        let keystroke = Keystroke::parse(keys).expect("a keystroke");
+        // After this update, since the key's actions update the window.
+        window.defer(cx, move |window, cx| {
+            window.dispatch_keystroke(keystroke, cx);
+        });
     }
 
     /// For the scripted session: as if the user typed `line` and pressed Enter.
@@ -794,6 +905,12 @@ impl App {
 
             let mut canvas = self.canvas.borrow_mut();
             if frame.cleaned {
+                // Undo brings back what a console entry's first CLEAN took.
+                if let Some(before) = self.console_before.last_mut().filter(|_| self.console_job)
+                    && before.cleaned.is_none()
+                {
+                    before.cleaned = Some(canvas.drawing.marks().to_vec());
+                }
                 canvas.drawing.clean();
             }
             if let Some(color) = frame.background {
@@ -822,7 +939,21 @@ impl App {
             self.example_finished(cx);
             self.report();
             let defining = self.defining.take();
-            match self.run.as_ref().and_then(|r| r.result()) {
+            let result = self.run.as_ref().and_then(|r| r.result());
+            if self.console_job {
+                self.console_entry.finish(match &result {
+                    Some(Ok(())) => Ending::Ran,
+                    Some(Err(RunError::Parse(errors))) => Ending::Error(
+                        errors
+                            .first()
+                            .map(|e| e.message.clone())
+                            .unwrap_or_default(),
+                    ),
+                    Some(Err(RunError::Runtime(e))) => Ending::Error(e.message.clone()),
+                    _ => Ending::Stopped,
+                });
+            }
+            match result {
                 Some(Err(RunError::Parse(errors))) => self.show_errors(errors, cx),
                 Some(Err(RunError::Runtime(e))) => self.show_errors(vec![e], cx),
                 Some(Ok(())) => {
@@ -1116,6 +1247,20 @@ impl App {
                                 })),
                         )
                     })
+                    .child({
+                        let undo = self.to_undo().map(label);
+                        Button::new("undo-entry")
+                            .xsmall()
+                            .ghost()
+                            .icon(IconName::Undo2)
+                            .label(match &undo {
+                                Some(entry) => format!("Undo {entry}"),
+                                None => "Undo".to_string(),
+                            })
+                            .tooltip(UNDO_TOOLTIP)
+                            .disabled(undo.is_none())
+                            .on_click(cx.listener(|this, _, _, cx| this.undo_console(cx)))
+                    })
                     .when(!self.console_definitions.is_empty(), |row| {
                         row.child(
                             Button::new("copy-definitions")
@@ -1143,6 +1288,16 @@ impl App {
                 div()
                     .flex_1()
                     .min_h_0()
+                    // Ctrl+Z with nothing typed takes back the last entry;
+                    // with something typed, it undoes the typing.
+                    .capture_action(cx.listener(|this, _: &Undo, _, cx| {
+                        if this.console_input.read(cx).value().is_empty()
+                            && this.to_undo().is_some()
+                        {
+                            this.undo_console(cx);
+                            cx.stop_propagation();
+                        }
+                    }))
                     .capture_action(cx.listener(|this, _: &MoveUp, window, cx| {
                         this.recall(true, window, cx);
                         cx.stop_propagation();

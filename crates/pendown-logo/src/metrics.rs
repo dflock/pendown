@@ -34,9 +34,15 @@ pub fn enabled() -> bool {
         1 => false,
         2 => true,
         _ => {
-            let on = from_env(std::env::var("PENDOWN_METRICS").ok().as_deref()).unwrap_or(cfg!(debug_assertions));
+            let on = from_env(std::env::var("PENDOWN_METRICS").ok().as_deref())
+                .unwrap_or(cfg!(debug_assertions));
             // Another thread may have decided first, perhaps by `set_enabled`.
-            let _ = ENABLED.compare_exchange(0, if on { 2 } else { 1 }, Ordering::Relaxed, Ordering::Relaxed);
+            let _ = ENABLED.compare_exchange(
+                0,
+                if on { 2 } else { 1 },
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            );
             ENABLED.load(Ordering::Relaxed) == 2
         }
     }
@@ -91,7 +97,10 @@ impl Timer {
     /// The time now, if metrics are on, to pass to `stop` later.
     pub fn start(&self) -> Option<Instant> {
         let now = enabled().then(Instant::now)?;
-        self.open.store(now.duration_since(epoch()).as_nanos() as u64 + 1, Ordering::Relaxed);
+        self.open.store(
+            now.duration_since(epoch()).as_nanos() as u64 + 1,
+            Ordering::Relaxed,
+        );
         Some(now)
     }
 
@@ -138,7 +147,9 @@ impl Timer {
 
     /// The average time each, or zero if there were none.
     pub fn mean(&self) -> Duration {
-        self.total().checked_div(self.count().max(1) as u32).unwrap_or_default()
+        self.total()
+            .checked_div(self.count().max(1) as u32)
+            .unwrap_or_default()
     }
 }
 
@@ -175,10 +186,15 @@ impl ThreadCpu {
         #[cfg(target_os = "linux")]
         {
             let pid = std::process::id().to_string();
-            let Ok(tasks) = std::fs::read_dir("/proc/self/task") else { return cpu };
+            let Ok(tasks) = std::fs::read_dir("/proc/self/task") else {
+                return cpu;
+            };
             for task in tasks.flatten() {
                 let path = task.path();
-                let Some(used) = std::fs::read_to_string(path.join("schedstat")).ok().and_then(|s| schedstat(&s)) else {
+                let Some(used) = std::fs::read_to_string(path.join("schedstat"))
+                    .ok()
+                    .and_then(|s| schedstat(&s))
+                else {
                     continue;
                 };
                 let name = std::fs::read_to_string(path.join("comm")).unwrap_or_default();
@@ -221,7 +237,9 @@ impl ThreadCpu {
 pub fn this_thread_cpu() -> Option<Duration> {
     #[cfg(target_os = "linux")]
     {
-        std::fs::read_to_string("/proc/thread-self/schedstat").ok().and_then(|s| schedstat(&s))
+        std::fs::read_to_string("/proc/thread-self/schedstat")
+            .ok()
+            .and_then(|s| schedstat(&s))
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -231,7 +249,11 @@ pub fn this_thread_cpu() -> Option<Duration> {
 
 /// `schedstat`'s first field: nanoseconds spent running.
 fn schedstat(text: &str) -> Option<Duration> {
-    text.split_whitespace().next()?.parse().ok().map(Duration::from_nanos)
+    text.split_whitespace()
+        .next()?
+        .parse()
+        .ok()
+        .map(Duration::from_nanos)
 }
 
 #[cfg(test)]
@@ -257,7 +279,10 @@ mod tests {
         let timer = Timer::default();
         timer.record(Duration::from_millis(2));
         timer.record(Duration::from_millis(4));
-        assert_eq!((timer.total(), timer.count(), timer.mean()), (Duration::from_millis(6), 2, Duration::from_millis(3)));
+        assert_eq!(
+            (timer.total(), timer.count(), timer.mean()),
+            (Duration::from_millis(6), 2, Duration::from_millis(3))
+        );
         assert_eq!(timer.time(|| 7), 7);
         assert_eq!(timer.count(), 3);
 
@@ -273,7 +298,10 @@ mod tests {
 
     #[test]
     fn schedstat_is_read_in_nanoseconds() {
-        assert_eq!(schedstat("123456789 2000 15\n"), Some(Duration::from_nanos(123_456_789)));
+        assert_eq!(
+            schedstat("123456789 2000 15\n"),
+            Some(Duration::from_nanos(123_456_789))
+        );
         assert_eq!(schedstat(""), None);
     }
 
@@ -294,11 +322,17 @@ mod tests {
 
         // A thread named `interpreter` is counted as one.
         let start = ThreadCpu::now();
-        let worker = std::thread::Builder::new().name("interpreter".into()).spawn(move || {
-            busy(Instant::now() + Duration::from_millis(30));
-            ThreadCpu::now()
-        });
+        let worker = std::thread::Builder::new()
+            .name("interpreter".into())
+            .spawn(move || {
+                busy(Instant::now() + Duration::from_millis(30));
+                ThreadCpu::now()
+            });
         let during = worker.unwrap().join().unwrap();
-        assert!(during.since(&start).interpreter >= Duration::from_millis(20), "{:?}", during.since(&start));
+        assert!(
+            during.since(&start).interpreter >= Duration::from_millis(20),
+            "{:?}",
+            during.since(&start)
+        );
     }
 }

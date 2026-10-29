@@ -23,14 +23,19 @@ pub enum Block {
     Note(Vec<Inline>),
     /// A fenced code block: a program, with the language after the fence,
     /// if any.
-    Code { language: String, code: String },
+    Code {
+        language: String,
+        code: String,
+    },
 }
 
 /// What's between `marker` at the start of `text` and the next `marker`,
 /// if there is one and it isn't empty.
 fn closed<'a>(text: &'a str, marker: &str) -> Option<&'a str> {
     let rest = text.strip_prefix(marker)?;
-    rest.find(marker).filter(|&end| end > 0).map(|end| &rest[..end])
+    rest.find(marker)
+        .filter(|&end| end > 0)
+        .map(|end| &rest[..end])
 }
 
 /// Splits a line of text into its inline parts. Unclosed markers are left
@@ -54,11 +59,18 @@ pub fn inlines(text: &str) -> Vec<Inline> {
             Some((Inline::Bold(inner.to_string()), inner.len() + 4))
         } else if let Some(inner) = closed(rest, "`") {
             Some((Inline::Code(inner.to_string()), inner.len() + 2))
-        } else if let Some(inner) = closed(rest, "*").filter(|i| !i.starts_with(' ') && !i.ends_with(' ')) {
+        } else if let Some(inner) =
+            closed(rest, "*").filter(|i| !i.starts_with(' ') && !i.ends_with(' '))
+        {
             Some((Inline::Italic(inner.to_string()), inner.len() + 2))
-        } else if let Some(inner) = rest.strip_prefix('[').and_then(|r| r.split_once(']')).map(|(inner, _)| inner) {
+        } else if let Some(inner) = rest
+            .strip_prefix('[')
+            .and_then(|r| r.split_once(']'))
+            .map(|(inner, _)| inner)
+        {
             // A link is a name alone in brackets: `[1 2 3]` in prose isn't one.
-            (!inner.is_empty() && !inner.contains(char::is_whitespace)).then(|| (Inline::Link(inner.to_string()), inner.len() + 2))
+            (!inner.is_empty() && !inner.contains(char::is_whitespace))
+                .then(|| (Inline::Link(inner.to_string()), inner.len() + 2))
         } else {
             None
         };
@@ -98,7 +110,10 @@ pub fn parse(text: &str) -> Vec<Block> {
                 }
                 code.push(line);
             }
-            blocks.push(Block::Code { language: language.trim().to_string(), code: code.join("\n") });
+            blocks.push(Block::Code {
+                language: language.trim().to_string(),
+                code: code.join("\n"),
+            });
         } else if trimmed.is_empty() {
             end_paragraph(&mut paragraph, &mut blocks);
         } else if let Some(item) = trimmed.strip_prefix("- ") {
@@ -107,7 +122,11 @@ pub fn parse(text: &str) -> Vec<Block> {
             while let Some(next) = lines.peek().map(|l| l.trim()) {
                 if let Some(item) = next.strip_prefix("- ") {
                     items.push(item.to_string());
-                } else if !next.is_empty() && !next.starts_with("```") && !next.starts_with('#') && !next.starts_with('>') {
+                } else if !next.is_empty()
+                    && !next.starts_with("```")
+                    && !next.starts_with('#')
+                    && !next.starts_with('>')
+                {
                     let last = items.last_mut().expect("there's at least one");
                     last.push(' ');
                     last.push_str(next);
@@ -128,7 +147,10 @@ pub fn parse(text: &str) -> Vec<Block> {
         } else if trimmed.starts_with('#') {
             end_paragraph(&mut paragraph, &mut blocks);
             let level = trimmed.chars().take_while(|&c| c == '#').count();
-            blocks.push(Block::Heading(level as u8, inlines(trimmed[level..].trim())));
+            blocks.push(Block::Heading(
+                level as u8,
+                inlines(trimmed[level..].trim()),
+            ));
         } else {
             paragraph.push(trimmed);
         }
@@ -140,7 +162,16 @@ pub fn parse(text: &str) -> Vec<Block> {
 /// Every link's name in some blocks.
 pub fn links(blocks: &[Block]) -> Vec<&str> {
     fn inline_links(inlines: &[Inline]) -> Vec<&str> {
-        inlines.iter().filter_map(|i| if let Inline::Link(name) = i { Some(name.as_str()) } else { None }).collect()
+        inlines
+            .iter()
+            .filter_map(|i| {
+                if let Inline::Link(name) = i {
+                    Some(name.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
     blocks
         .iter()
@@ -157,7 +188,11 @@ pub fn plain(inlines: &[Inline]) -> String {
     inlines
         .iter()
         .map(|i| match i {
-            Inline::Text(t) | Inline::Code(t) | Inline::Bold(t) | Inline::Italic(t) | Inline::Link(t) => t.as_str(),
+            Inline::Text(t)
+            | Inline::Code(t)
+            | Inline::Bold(t)
+            | Inline::Italic(t)
+            | Inline::Link(t) => t.as_str(),
         })
         .collect()
 }
@@ -166,7 +201,11 @@ pub fn plain(inlines: &[Inline]) -> String {
 /// result: up to the first full stop followed by a space, or the end of the
 /// first paragraph.
 pub fn summary(text: &str) -> String {
-    let first = text.split("\n\n").next().unwrap_or_default().replace('\n', " ");
+    let first = text
+        .split("\n\n")
+        .next()
+        .unwrap_or_default()
+        .replace('\n', " ");
     let plain = plain(&inlines(&first));
     match plain.find(". ") {
         Some(end) => plain[..=end].to_string(),
@@ -204,12 +243,17 @@ mod tests {
     fn unclosed_markers_and_lists_in_prose_are_text() {
         assert_eq!(inlines("2 * 3 and `oops"), [text("2 * 3 and `oops")]);
         assert_eq!(inlines("2 * 3 = 3 * 2"), [text("2 * 3 = 3 * 2")]);
-        assert_eq!(inlines("a list [1 2 3] here"), [text("a list [1 2 3] here")]);
+        assert_eq!(
+            inlines("a list [1 2 3] here"),
+            [text("a list [1 2 3] here")]
+        );
     }
 
     #[test]
     fn blocks() {
-        let blocks = parse("# Moving\n\nOne\nparagraph.\n\n- first\n- second\n  more\n\n> Try this\n\n```logo\nFD 10\nRT 90\n```\nAfter.");
+        let blocks = parse(
+            "# Moving\n\nOne\nparagraph.\n\n- first\n- second\n  more\n\n> Try this\n\n```logo\nFD 10\nRT 90\n```\nAfter.",
+        );
         assert_eq!(
             blocks,
             [
@@ -217,7 +261,10 @@ mod tests {
                 Block::Paragraph(vec![text("One paragraph.")]),
                 Block::List(vec![vec![text("first")], vec![text("second more")]]),
                 Block::Note(vec![text("Try this")]),
-                Block::Code { language: "logo".into(), code: "FD 10\nRT 90".into() },
+                Block::Code {
+                    language: "logo".into(),
+                    code: "FD 10\nRT 90".into()
+                },
                 Block::Paragraph(vec![text("After.")]),
             ]
         );
@@ -231,8 +278,17 @@ mod tests {
 
     #[test]
     fn summaries() {
-        assert_eq!(summary("Kame moves forward. If the pen is down, it draws."), "Kame moves forward.");
-        assert_eq!(summary("Outputs `TRUE` if so, and `FALSE` if not.\n\nMore."), "Outputs TRUE if so, and FALSE if not.");
-        assert_eq!(summary("Sets the colour. A colour can be:\n- red"), "Sets the colour.");
+        assert_eq!(
+            summary("Kame moves forward. If the pen is down, it draws."),
+            "Kame moves forward."
+        );
+        assert_eq!(
+            summary("Outputs `TRUE` if so, and `FALSE` if not.\n\nMore."),
+            "Outputs TRUE if so, and FALSE if not."
+        );
+        assert_eq!(
+            summary("Sets the colour. A colour can be:\n- red"),
+            "Sets the colour."
+        );
     }
 }

@@ -8,7 +8,19 @@ use pendown::document::{Document, last_folder, remember_folder};
 
 use crate::app::App;
 
-actions!(pendown, [NewFile, OpenFile, SaveFile, SaveFileAs, ExportPicture, RunProgram, ToggleMetrics, ShowHelp]);
+actions!(
+    pendown,
+    [
+        NewFile,
+        OpenFile,
+        SaveFile,
+        SaveFileAs,
+        ExportPicture,
+        RunProgram,
+        ToggleMetrics,
+        ShowHelp
+    ]
+);
 
 /// What the drawing can be exported as.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -51,7 +63,10 @@ pub enum After {
     Close,
     /// Load into editor: a tutorial lesson's program, by lesson and which
     /// program in it.
-    Load { lesson: usize, program: usize },
+    Load {
+        lesson: usize,
+        program: usize,
+    },
 }
 
 impl App {
@@ -110,7 +125,8 @@ impl App {
             After::NewFile => {
                 self.stop(cx);
                 self.document = Document::new("");
-                self.editor.update(cx, |state, cx| state.set_value("", window, cx));
+                self.editor
+                    .update(cx, |state, cx| state.set_value("", window, cx));
                 self.check_program(cx);
             }
             After::OpenFile => {
@@ -122,9 +138,14 @@ impl App {
                 };
                 let paths = cx.prompt_for_paths(options);
                 cx.spawn_in(window, async move |this, cx| {
-                    let Ok(Ok(Some(paths))) = paths.await else { return };
-                    let Some(path) = paths.into_iter().next() else { return };
-                    this.update_in(cx, |this, window, cx| this.open_path(&path, window, cx)).ok();
+                    let Ok(Ok(Some(paths))) = paths.await else {
+                        return;
+                    };
+                    let Some(path) = paths.into_iter().next() else {
+                        return;
+                    };
+                    this.update_in(cx, |this, window, cx| this.open_path(&path, window, cx))
+                        .ok();
                 })
                 .detach();
             }
@@ -137,7 +158,8 @@ impl App {
                 let code = crate::help_panel::Source::Lesson { lesson, program }.code();
                 // Like New, so Save can't write a lesson over the user's file.
                 self.document = Document::new(&code);
-                self.editor.update(cx, |state, cx| state.set_value(code, window, cx));
+                self.editor
+                    .update(cx, |state, cx| state.set_value(code, window, cx));
                 self.check_program(cx);
             }
         }
@@ -148,7 +170,8 @@ impl App {
             Ok((document, text)) => {
                 self.stop(cx);
                 self.document = document;
-                self.editor.update(cx, |state, cx| state.set_value(text, window, cx));
+                self.editor
+                    .update(cx, |state, cx| state.set_value(text, window, cx));
                 // Setting the text sends no change event, so check it here.
                 self.check_program(cx);
                 remember_folder(path);
@@ -173,9 +196,12 @@ impl App {
     }
 
     pub(crate) fn save_as(&mut self, after: After, window: &mut Window, cx: &mut Context<Self>) {
-        let path = cx.prompt_for_new_path(&self.folder(), Some(&self.document.suggested_name("logo")));
+        let path =
+            cx.prompt_for_new_path(&self.folder(), Some(&self.document.suggested_name("logo")));
         cx.spawn_in(window, async move |this, cx| {
-            let Ok(Ok(Some(path))) = path.await else { return };
+            let Ok(Ok(Some(path))) = path.await else {
+                return;
+            };
             this.update_in(cx, |this, window, cx| {
                 if this.save_to(&path, cx) {
                     this.proceed(after, window, cx);
@@ -207,10 +233,16 @@ impl App {
     /// Saves the drawing, without the turtle: as a PNG at the canvas's
     /// resolution (ADR 0010), or as an SVG of the whole turtle area.
     pub(crate) fn export(&mut self, picture: Picture, window: &mut Window, cx: &mut Context<Self>) {
-        let path = cx.prompt_for_new_path(&self.folder(), Some(&self.document.suggested_name(picture.extension())));
+        let path = cx.prompt_for_new_path(
+            &self.folder(),
+            Some(&self.document.suggested_name(picture.extension())),
+        );
         cx.spawn_in(window, async move |this, cx| {
-            let Ok(Ok(Some(path))) = path.await else { return };
-            this.update_in(cx, |this, _, cx| this.export_to(&path, picture, cx)).ok();
+            let Ok(Ok(Some(path))) = path.await else {
+                return;
+            };
+            this.update_in(cx, |this, _, cx| this.export_to(&path, picture, cx))
+                .ok();
         })
         .detach();
     }
@@ -218,12 +250,21 @@ impl App {
     /// Saves the drawing to `path`. A name ending `.png` or `.svg` says
     /// which, whatever `picture` asked for.
     pub(crate) fn export_to(&mut self, path: &Path, picture: Picture, cx: &mut Context<Self>) {
-        let picture = match path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
+        let picture = match path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+        {
             Some("png") => Picture::Png,
             Some("svg") => Picture::Svg,
             _ => picture,
         };
-        let path = if path.extension().is_none() { path.with_extension(picture.extension()) } else { path.to_path_buf() };
+        let path = if path.extension().is_none() {
+            path.with_extension(picture.extension())
+        } else {
+            path.to_path_buf()
+        };
         let bytes = {
             let mut canvas = self.canvas.borrow_mut();
             match picture {
@@ -241,7 +282,10 @@ impl App {
                 remember_folder(&path);
                 self.print(format!("Saved the drawing to {}", path.display()));
             }
-            Err(e) => self.print(format!("Couldn't save the drawing to {}: {e}", path.display())),
+            Err(e) => self.print(format!(
+                "Couldn't save the drawing to {}: {e}",
+                path.display()
+            )),
         }
         cx.notify();
     }

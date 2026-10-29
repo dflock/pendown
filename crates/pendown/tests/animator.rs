@@ -6,11 +6,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use pendown_logo::RunError;
 use pendown::{
-    animator::{Animator, Mode, Speed},
+    animator::{Animator, FADE, Mode, Speed, Thinking, Thought},
     run::{self, DEFAULT_CHANNEL, Run},
 };
+use pendown_logo::RunError;
 
 const FRAME: Duration = Duration::from_millis(16);
 
@@ -19,16 +19,39 @@ fn start(src: &str, speed: Speed) -> (Animator, Run) {
 }
 
 /// Plays one frame. If nothing was ready, gives the interpreter a moment,
-/// so the tests don't depend on how fast it starts.
+/// so the tests don't depend on how fast it starts. A frame that produced
+/// anything is kept, even with no new events: the last frame of a shape
+/// gives its mark, and the interpreter may not have finished yet when the
+/// machine is busy, so throwing that frame away would lose the mark.
 fn frame(animator: &mut Animator, dt: Duration) -> pendown::animator::Frame {
     for _ in 0..200 {
         let out = animator.frame(dt, usize::MAX);
-        if out.events > 0 || !animator.wants_frames() || animator.in_progress() {
+        let produced = !out.marks.is_empty()
+            || !out.printed.is_empty()
+            || out.cleaned
+            || out.background.is_some()
+            || out.speed.is_some()
+            || out.highlight_changed
+            || out.watch_changed;
+        if out.events > 0 || produced || !animator.wants_frames() || animator.in_progress() {
             return out;
         }
         thread::sleep(Duration::from_micros(500));
     }
     animator.frame(dt, usize::MAX)
+}
+
+/// Plays tiny frames until a move or turn is under way: its event can come
+/// a frame or two after its highlight when the machine is busy, so a test
+/// that measures it starts here.
+fn until_started(animator: &mut Animator) {
+    for _ in 0..1000 {
+        if animator.in_progress() && animator.highlight.is_some() {
+            return;
+        }
+        frame(animator, Duration::from_millis(1));
+    }
+    panic!("nothing started");
 }
 
 fn highlighted<'a>(src: &'a str, animator: &Animator) -> &'a str {
@@ -38,7 +61,10 @@ fn highlighted<'a>(src: &'a str, animator: &Animator) -> &'a str {
 fn wait_for_exit(run: &Run) -> Duration {
     let start = Instant::now();
     while run.exited().is_none() {
-        assert!(start.elapsed() < Duration::from_secs(2), "the interpreter didn't stop");
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "the interpreter didn't stop"
+        );
         thread::sleep(Duration::from_micros(100));
     }
     run.exited().unwrap().saturating_duration_since(start)
@@ -61,10 +87,16 @@ fn highlight_follows_the_turtle() {
         }
     }
     let order: Vec<_> = seen.iter().map(|(t, ..)| t.as_str()).collect();
-    assert_eq!(order, ["REPEAT 2 [FD 50 RT 90]", "FD 50", "RT 90", "FD 50", "RT 90"]);
+    assert_eq!(
+        order,
+        ["REPEAT 2 [FD 50 RT 90]", "FD 50", "RT 90", "FD 50", "RT 90"]
+    );
     // 2 moves of 0.5 s, 2 turns of 0.3 s and REPEAT's dwell of 0.1 s.
     let expected = (2.0 * 0.5 + 2.0 * 0.3 + 0.1) / FRAME.as_secs_f64();
-    assert!((frames as f64 - expected).abs() <= 3.0, "{frames} frames, expected about {expected:.0}");
+    assert!(
+        (frames as f64 - expected).abs() <= 3.0,
+        "{frames} frames, expected about {expected:.0}"
+    );
 }
 
 #[test]
@@ -90,6 +122,13 @@ fn highlight_is_on_the_move_while_the_turtle_moves() {
 fn speed_changes_mid_move() {
     let (mut animator, _run) = start("WINDOW FD 1000", Speed::Animated(100.0));
     let dt = Duration::from_millis(100);
+    // Until the line is being drawn, past WINDOW's moment on show.
+    for _ in 0..1000 {
+        if animator.partial(0.1).is_some() {
+            break;
+        }
+        frame(&mut animator, Duration::from_millis(1));
+    }
     let mut ys = Vec::new();
     for i in 0..10 {
         if i == 5 {
@@ -99,10 +138,17 @@ fn speed_changes_mid_move() {
         ys.push(animator.pos.y);
     }
     let steps: Vec<_> = ys.windows(2).map(|w| (w[1] - w[0]).round()).collect();
-    assert_eq!(steps, [10.0, 10.0, 10.0, 10.0, 40.0, 40.0, 40.0, 40.0, 40.0]);
+    assert_eq!(
+        steps,
+        [10.0, 10.0, 10.0, 10.0, 40.0, 40.0, 40.0, 40.0, 40.0]
+    );
     animator.set_speed(Speed::Instant);
     frame(&mut animator, dt);
-    assert_eq!(animator.pos.y.round(), 1000.0, "Instant finishes the move at once");
+    assert_eq!(
+        animator.pos.y.round(),
+        1000.0,
+        "Instant finishes the move at once"
+    );
 }
 
 const STEPPER: &str = "MAKE \"n 0
@@ -139,8 +185,21 @@ fn step_runs_one_line_and_nothing_ahead() {
         let printed = until_paused(&mut animator);
         // Give the interpreter every chance to run ahead, if it could.
         thread::sleep(Duration::from_millis(20));
-        assert_eq!(animator.lines_ahead(), 0, "at {:?}", highlighted(src, &animator));
-        steps.push(format!("{}{}", highlighted(src, &animator), if printed.is_empty() { String::new() } else { format!(" | printed {printed:?}") }));
+        assert_eq!(
+            animator.lines_ahead(),
+            0,
+            "at {:?}",
+            highlighted(src, &animator)
+        );
+        steps.push(format!(
+            "{}{}",
+            highlighted(src, &animator),
+            if printed.is_empty() {
+                String::new()
+            } else {
+                format!(" | printed {printed:?}")
+            }
+        ));
     }
     let expected = [
         "MAKE \"n 0",
@@ -169,13 +228,30 @@ fn step_instruction_goes_inside_a_line() {
         until_paused(&mut animator);
         order.push(highlighted(src, &animator).to_string());
     }
-    assert_eq!(order, ["REPEAT 2 [FD 10 RT 90]", "FD 10", "RT 90", "FD 10", "RT 90", "PRINT \"done", "PRINT \"done"]);
+    assert_eq!(
+        order,
+        [
+            "REPEAT 2 [FD 10 RT 90]",
+            "FD 10",
+            "RT 90",
+            "FD 10",
+            "RT 90",
+            "PRINT \"done",
+            "PRINT \"done"
+        ]
+    );
 }
 
 /// The panels' contents, in short: the counters, then the variables.
 fn watched(animator: &Animator) -> String {
-    let Some(w) = &animator.watch else { return String::new() };
-    let mut parts: Vec<String> = w.counters.iter().map(|c| format!("{} {}", c.name, c.count)).collect();
+    let Some(w) = &animator.watch else {
+        return String::new();
+    };
+    let mut parts: Vec<String> = w
+        .counters
+        .iter()
+        .map(|c| format!("{} {}", c.name, c.count))
+        .collect();
     for scope in &w.scopes {
         for v in &scope.variables {
             parts.push(format!("{}={}", v.name, v.value.as_deref().unwrap_or("-")));
@@ -196,7 +272,11 @@ fn the_panels_keep_in_step_with_the_highlight() {
         animator.step_instruction();
         until_paused(&mut animator);
         thread::sleep(Duration::from_millis(5));
-        seen.push(format!("{} | {}", highlighted(src, &animator), watched(&animator)));
+        seen.push(format!(
+            "{} | {}",
+            highlighted(src, &animator),
+            watched(&animator)
+        ));
     }
     assert_eq!(
         seen,
@@ -227,7 +307,15 @@ fn the_panels_follow_a_running_program() {
             seen.push(now);
         }
     }
-    assert_eq!(seen, ["MAKE \"x 1 | ", "FD 20 | x=1", "MAKE \"x 2 | x=1", "FD 20 | x=2"]);
+    assert_eq!(
+        seen,
+        [
+            "MAKE \"x 1 | ",
+            "FD 20 | x=1",
+            "MAKE \"x 2 | x=1",
+            "FD 20 | x=2"
+        ]
+    );
 }
 
 #[test]
@@ -342,7 +430,10 @@ TREE 200 14";
     }
     assert_eq!(run.result(), Some(Ok(())));
     assert_eq!(segments, 2 * (2usize.pow(14) - 1));
-    eprintln!("{segments} segments in {:?}, not drawing them", started.elapsed());
+    eprintln!(
+        "{segments} segments in {:?}, not drawing them",
+        started.elapsed()
+    );
 }
 
 #[test]
@@ -373,16 +464,30 @@ fn arcs_carry_the_turtle_along_them() {
         frame(&mut animator, FRAME);
         frames += 1;
         if frames == 48 {
-            halfway = Some((animator.pos, animator.heading, animator.partial(0.1).map(|(p, _)| p.len())));
+            halfway = Some((
+                animator.pos,
+                animator.heading,
+                animator.partial(0.1).map(|(p, _)| p.len()),
+            ));
         }
     }
-    assert!((frames as f64 - 157.0 / 100.0 / FRAME.as_secs_f64()).abs() <= 3.0, "{frames} frames");
+    assert!(
+        (frames as f64 - 157.0 / 100.0 / FRAME.as_secs_f64()).abs() <= 3.0,
+        "{frames} frames"
+    );
     let (pos, heading, partial) = halfway.unwrap();
     // Half way round, the turtle is 45 degrees along, on the circle.
     assert!((heading - 45.0).abs() < 2.0, "heading {heading}");
     assert!((((pos.x - 100.0).powi(2) + pos.y.powi(2)).sqrt() - 100.0).abs() < 1e-6);
     assert!(partial.unwrap() > 2, "the arc so far is drawn as a curve");
-    assert_eq!((animator.pos.x.round(), animator.pos.y.round(), animator.heading.round()), (100.0, 100.0, 90.0));
+    assert_eq!(
+        (
+            animator.pos.x.round(),
+            animator.pos.y.round(),
+            animator.heading.round()
+        ),
+        (100.0, 100.0, 90.0)
+    );
 }
 
 #[test]
@@ -395,11 +500,18 @@ fn shapes_sweep_round_and_pen_up_shapes_take_no_time() {
         if frames == 10 {
             let (points, _) = animator.partial(0.1).expect("sweeping");
             assert_eq!(points[0].y.round(), 50.0, "starting straight ahead");
-            assert_eq!((animator.pos.x, animator.pos.y), (0.0, 0.0), "the turtle stays put");
+            assert_eq!(
+                (animator.pos.x, animator.pos.y),
+                (0.0, 0.0),
+                "the turtle stays put"
+            );
         }
     }
     // 314 steps round at 100 a second.
-    assert!((frames as f64 - std::f64::consts::PI / FRAME.as_secs_f64()).abs() <= 3.0, "{frames} frames");
+    assert!(
+        (frames as f64 - std::f64::consts::PI / FRAME.as_secs_f64()).abs() <= 3.0,
+        "{frames} frames"
+    );
     let (mut animator, _run) = start("PU CIRCLE 50 SQUARE 80", Speed::Animated(100.0));
     let mut frames = 0;
     while !animator.finished() && frames < 1000 {
@@ -472,7 +584,11 @@ fn setspeed_changes_the_speed_where_it_runs() {
             changed = Some(speed);
         }
     }
-    assert_eq!(changed, Some(Speed::Animated(20.0)), "level 3 is 20 steps a second");
+    assert_eq!(
+        changed,
+        Some(Speed::Animated(20.0)),
+        "level 3 is 20 steps a second"
+    );
     assert_eq!(animator.speed(), Speed::Animated(20.0));
 }
 
@@ -487,14 +603,22 @@ fn metrics_count_frames_and_events() {
         frames += 1;
     }
     let m = &animator.metrics;
-    assert!(m.frames.count() >= frames, "every frame is timed: {} of {frames}", m.frames.count());
+    assert!(
+        m.frames.count() >= frames,
+        "every frame is timed: {} of {frames}",
+        m.frames.count()
+    );
     // REPEAT, then two each of FD and RT with their Instruction and Move or
     // Turn, and a Sync at the start of the one line. Four Watches: at
     // REPEAT, at each FD as the counter moves on, and at the end.
     assert_eq!(m.events.get(), 14);
     let interp = &run.control.metrics;
     assert_eq!(interp.lockstep.count(), 1, "one line, one Sync");
-    assert_eq!(interp.instructions.get(), 7, "REPEAT, its 2 passes, and 2 each of FD and RT");
+    assert_eq!(
+        interp.instructions.get(),
+        7,
+        "REPEAT, its 2 passes, and 2 each of FD and RT"
+    );
 }
 
 /// Issue 08: the window skips frames that would look the same.
@@ -506,8 +630,7 @@ fn next_change_is_when_the_picture_moves_a_pixel() {
     // At 20 steps a second and 0.5 pixels a step, the line grows a pixel
     // every 100 ms, the most the window waits.
     let (mut animator, _run) = start("FD 300", Speed::Animated(20.0));
-    frame(&mut animator, FRAME);
-    assert!(animator.in_progress());
+    until_started(&mut animator);
     assert_eq!(animator.next_change(0.5, 18.0), MAX_FRAME_GAP);
     // At 2 pixels a step, every 25 ms.
     assert!((ms(animator.next_change(2.0, 18.0)) - 25.0).abs() < 0.01);
@@ -515,9 +638,12 @@ fn next_change_is_when_the_picture_moves_a_pixel() {
     // A turn moves the turtle's tip: 18 pixels long, turning 60 degrees a
     // second, it moves about 19 pixels a second.
     let (mut animator, _run) = start("RT 90", Speed::Animated(20.0));
-    frame(&mut animator, FRAME);
+    until_started(&mut animator);
     let gap = ms(animator.next_change(1.0, 18.0));
-    assert!((gap - 1000.0 / (18.0 * 60.0f64.to_radians())).abs() < 0.01, "{gap}");
+    assert!(
+        (gap - 1000.0 / (18.0 * 60.0f64.to_radians())).abs() < 0.01,
+        "{gap}"
+    );
 
     // A hidden turtle turning shows nothing until the turn is done.
     let (mut animator, _run) = start("HT\nRT 3", Speed::Animated(20.0));
@@ -603,7 +729,11 @@ mod budgets {
         animator.pause();
         assert!(!animator.wants_frames());
         let out = animator.frame(FRAME, usize::MAX);
-        assert_eq!((out.events, out.marks.len()), (0, 0), "a paused frame takes nothing");
+        assert_eq!(
+            (out.events, out.marks.len()),
+            (0, 0),
+            "a paused frame takes nothing"
+        );
         animator.resume();
         while !animator.finished() {
             frame(&mut animator, MAX_FRAME_GAP);
@@ -611,4 +741,129 @@ mod budgets {
         assert!(!animator.wants_frames());
         assert_eq!(animator.frame(FRAME, usize::MAX).events, 0);
     }
+}
+
+/// Plays frames until the program has finished, keeping what Kame thought
+/// about in each.
+fn thoughts(src: &str, speed: Speed) -> Vec<Thinking> {
+    let (mut animator, _run) = start(src, speed);
+    let mut seen = Vec::new();
+    for _ in 0..1000 {
+        if animator.finished() {
+            break;
+        }
+        frame(&mut animator, FRAME);
+        seen.push(animator.thinking());
+    }
+    assert!(animator.finished());
+    seen
+}
+
+#[test]
+fn kame_thinks_about_the_turn_as_it_turns() {
+    let seen = thoughts("RT 90", Speed::Animated(100.0));
+    let turned: Vec<f64> = seen
+        .iter()
+        .filter_map(|t| match t.current {
+            Some(Thought::Turn { from, by, .. }) => {
+                assert_eq!(from, 0.0);
+                Some(by)
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(turned.len() > 5, "{turned:?}");
+    assert!(
+        turned.windows(2).all(|w| w[0] <= w[1]),
+        "it grows: {turned:?}"
+    );
+    assert!(turned[0] > 0.0 && turned[0] < 90.0);
+    assert_eq!(turned.last(), Some(&90.0), "and stays at the end");
+}
+
+#[test]
+fn kame_thinks_about_the_move_so_far() {
+    let seen = thoughts("RT 90 FD 50", Speed::Animated(200.0));
+    let moves: Vec<(f64, f64)> = seen
+        .iter()
+        .filter_map(|t| match t.current {
+            Some(Thought::Move {
+                from, to, length, ..
+            }) => {
+                assert_eq!((from.x, from.y), (0.0, 0.0));
+                Some((to.x, length))
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(moves.len() > 5, "{moves:?}");
+    for (x, length) in &moves {
+        assert!(
+            (x - length).abs() < 1e-9,
+            "to is where Kame has got: {moves:?}"
+        );
+    }
+    assert_eq!(moves.last(), Some(&(50.0, 50.0)));
+}
+
+#[test]
+fn the_last_thought_fades_as_the_next_starts() {
+    let seen = thoughts("FD 50 RT 90 FD 50", Speed::Animated(100.0));
+    let first_turn = seen
+        .iter()
+        .position(|t| matches!(t.current, Some(Thought::Turn { .. })))
+        .unwrap();
+    let Some((Thought::Move { length, .. }, left)) = seen[first_turn].fading else {
+        panic!("the move fades as the turn starts: {:?}", seen[first_turn]);
+    };
+    assert_eq!(length, 50.0);
+    assert!(left > 0.0 && left <= 1.0);
+    // A third of a second later, it's gone.
+    let after = (FADE / FRAME.as_secs_f64()).ceil() as usize + 1;
+    assert!(
+        !matches!(
+            seen[first_turn + after].fading,
+            Some((Thought::Move { .. }, _))
+        ),
+        "{:?}",
+        seen[first_turn + after]
+    );
+    // The turn fades as the second move starts.
+    let second_move = first_turn
+        + seen[first_turn..]
+            .iter()
+            .position(|t| matches!(t.current, Some(Thought::Move { .. })))
+            .unwrap();
+    assert!(matches!(
+        seen[second_move].fading,
+        Some((Thought::Turn { by: 90.0, .. }, _))
+    ));
+}
+
+#[test]
+fn more_than_a_whole_turn_and_turning_left() {
+    let seen = thoughts("RT 450", Speed::Animated(2000.0));
+    assert!(matches!(
+        seen.last().unwrap().current,
+        Some(Thought::Turn {
+            by: 450.0,
+            done: true,
+            ..
+        })
+    ));
+    let seen = thoughts("LT 30", Speed::Animated(100.0));
+    assert!(matches!(
+        seen.last().unwrap().current,
+        Some(Thought::Turn {
+            by: -30.0,
+            done: true,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn nothing_to_think_about_at_instant() {
+    let seen = thoughts("FD 50 RT 90 FD 50", Speed::Instant);
+    assert!(seen.iter().all(|t| *t == Thinking::default()), "{seen:?}");
 }

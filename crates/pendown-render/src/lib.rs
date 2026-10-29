@@ -76,7 +76,10 @@ pub struct Drawing {
 }
 
 fn settings(threads: u16) -> RenderSettings {
-    RenderSettings { num_threads: threads, ..RenderSettings::default() }
+    RenderSettings {
+        num_threads: threads,
+        ..RenderSettings::default()
+    }
 }
 
 impl Default for Drawing {
@@ -89,7 +92,8 @@ impl Drawing {
     /// An empty drawing. vello_cpu uses one worker thread fewer than the CPUs
     /// (ADR 0010).
     pub fn new() -> Drawing {
-        let threads = std::thread::available_parallelism().map_or(1, |n| n.get().saturating_sub(1).max(1)) as u16;
+        let threads = std::thread::available_parallelism()
+            .map_or(1, |n| n.get().saturating_sub(1).max(1)) as u16;
         Drawing {
             width: 0,
             height: 0,
@@ -159,6 +163,22 @@ impl Drawing {
         self.display = display;
     }
 
+    /// Takes back everything drawn after the first `n` marks, as Undo at the
+    /// console does (ADR 0025), and draws the rest again.
+    pub fn truncate(&mut self, n: usize) {
+        if n >= self.display.len() {
+            return;
+        }
+        self.display.truncate(n);
+        self.pending.clear();
+        self.fill_background();
+        let display = std::mem::take(&mut self.display);
+        let started = self.metrics.rerenders.start();
+        self.draw(&display);
+        self.metrics.rerenders.stop(started);
+        self.display = display;
+    }
+
     /// Adds finished lines, arcs and shapes. They're drawn by the next
     /// `draw_pending`. Marks drawn with the pen up are left out.
     pub fn push(&mut self, marks: &[Mark]) {
@@ -187,8 +207,14 @@ impl Drawing {
             .display
             .iter()
             .flat_map(|m| {
-                let half_pen = if m.pen().down { m.pen().size / 2.0 } else { 0.0 };
-                m.outline(1.0).into_iter().map(move |p| p.x.abs().max(p.y.abs()) + half_pen)
+                let half_pen = if m.pen().down {
+                    m.pen().size / 2.0
+                } else {
+                    0.0
+                };
+                m.outline(1.0)
+                    .into_iter()
+                    .map(move |p| p.x.abs().max(p.y.abs()) + half_pen)
             })
             .fold(0.0, f64::max);
         let area = (extent * 2.0 * 1.1).clamp(min, TURTLE_AREA);
@@ -204,7 +230,10 @@ impl Drawing {
     /// fitted to the buffer without stretching, and y points down.
     pub fn to_device(&self, p: Point) -> (f64, f64) {
         let scale = self.scale();
-        (self.width as f64 / 2.0 + p.x * scale, self.height as f64 / 2.0 - p.y * scale)
+        (
+            self.width as f64 / 2.0 + p.x * scale,
+            self.height as f64 / 2.0 - p.y * scale,
+        )
     }
 
     /// Makes the buffer `width` × `height` device pixels, re-rendering
@@ -214,7 +243,10 @@ impl Drawing {
         if (self.width, self.height) == (width, height) {
             return None;
         }
-        assert!(width <= u16::MAX as u32 && height <= u16::MAX as u32, "vello_cpu buffers are at most 65,535 pixels wide");
+        assert!(
+            width <= u16::MAX as u32 && height <= u16::MAX as u32,
+            "vello_cpu buffers are at most 65,535 pixels wide"
+        );
         self.width = width;
         self.height = height;
         self.data = vec![0; width as usize * height as usize * 4];
@@ -264,17 +296,23 @@ impl Drawing {
         for mark in marks {
             let points = mark.outline(tolerance);
             let mut path = BezPath::new();
-            let (mut left, mut top, mut right, mut bottom) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+            let (mut left, mut top, mut right, mut bottom) =
+                (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
             for (i, p) in points.iter().enumerate() {
                 let (x, y) = self.to_device(*p);
-                if i == 0 { path.move_to((x, y)) } else { path.line_to((x, y)) }
+                if i == 0 {
+                    path.move_to((x, y))
+                } else {
+                    path.line_to((x, y))
+                }
                 (left, top, right, bottom) = (left.min(x), top.min(y), right.max(x), bottom.max(y));
             }
             if mark.closed() {
                 path.close_path();
             }
             // Red and blue swapped, so the buffer is BGRA.
-            let paint = |[r, g, b, a]: [u8; 4]| vello_cpu::color::AlphaColor::from_rgba8(b, g, r, a);
+            let paint =
+                |[r, g, b, a]: [u8; 4]| vello_cpu::color::AlphaColor::from_rgba8(b, g, r, a);
             let pen = mark.pen();
             if let Some(fill) = mark.fill() {
                 self.context.set_paint(paint(fill));
@@ -283,15 +321,25 @@ impl Drawing {
             let width = pen_width(pen, scale);
             if pen.down {
                 self.context.set_paint(paint(pen.color));
-                self.context.set_stroke(Stroke::new(width).with_caps(Cap::Round).with_join(Join::Round));
+                self.context.set_stroke(
+                    Stroke::new(width)
+                        .with_caps(Cap::Round)
+                        .with_join(Join::Round),
+                );
                 self.context.stroke_path(&path);
             }
             self.mark_dirty(left, top, right, bottom, width / 2.0 + 2.0);
         }
         self.context.flush();
-        let target = vello_cpu::PixmapMut::new(self.width as u16, self.height as u16, &mut self.data).expect("size matches");
-        let settings = RasterizerSettings { target_init: TargetInit::SrcOver, ..RasterizerSettings::default() };
-        self.context.render_with(target, &mut self.resources, settings);
+        let target =
+            vello_cpu::PixmapMut::new(self.width as u16, self.height as u16, &mut self.data)
+                .expect("size matches");
+        let settings = RasterizerSettings {
+            target_init: TargetInit::SrcOver,
+            ..RasterizerSettings::default()
+        };
+        self.context
+            .render_with(target, &mut self.resources, settings);
         self.last_draw = started.elapsed();
         let each = self.last_draw / marks.len() as u32;
         self.per_segment = (self.per_segment * 3 + each) / 4;
@@ -303,9 +351,14 @@ impl Drawing {
         }
         let rows = self.dirty.len() as u32 / self.columns;
         // Off-buffer coordinates clamp to the edge tiles.
-        let column = |x: f64| ((x.max(0.0) as u32).min(self.width - 1) / TILE).min(self.columns - 1);
+        let column =
+            |x: f64| ((x.max(0.0) as u32).min(self.width - 1) / TILE).min(self.columns - 1);
         let row = |y: f64| ((y.max(0.0) as u32).min(self.height - 1) / TILE).min(rows - 1);
-        if right + margin < 0.0 || bottom + margin < 0.0 || left - margin >= self.width as f64 || top - margin >= self.height as f64 {
+        if right + margin < 0.0
+            || bottom + margin < 0.0
+            || left - margin >= self.width as f64
+            || top - margin >= self.height as f64
+        {
             return;
         }
         for ty in row(top - margin)..=row(bottom + margin) {
@@ -333,8 +386,17 @@ impl Drawing {
     }
 
     fn tile(&self, index: usize) -> Tile {
-        let (x, y) = (index as u32 % self.columns * TILE, index as u32 / self.columns * TILE);
-        Tile { index, x, y, width: TILE.min(self.width - x), height: TILE.min(self.height - y) }
+        let (x, y) = (
+            index as u32 % self.columns * TILE,
+            index as u32 / self.columns * TILE,
+        );
+        Tile {
+            index,
+            x,
+            y,
+            width: TILE.min(self.width - x),
+            height: TILE.min(self.height - y),
+        }
     }
 
     /// A tile's pixels, in BGRA order, as gpui's `RenderImage` wants them.
@@ -367,9 +429,12 @@ impl Drawing {
     /// The drawing as a PNG file.
     pub fn png(&self) -> Vec<u8> {
         let started = self.metrics.png.start();
-        let image = image::RgbaImage::from_raw(self.width, self.height, self.rgba()).expect("buffer matches size");
+        let image = image::RgbaImage::from_raw(self.width, self.height, self.rgba())
+            .expect("buffer matches size");
         let mut out = Cursor::new(Vec::new());
-        image.write_to(&mut out, image::ImageFormat::Png).expect("PNG encoding to memory can't fail");
+        image
+            .write_to(&mut out, image::ImageFormat::Png)
+            .expect("PNG encoding to memory can't fail");
         self.metrics.png.stop(started);
         out.into_inner()
     }
@@ -384,8 +449,16 @@ pub fn pen_width(pen: Pen, scale: f64) -> f64 {
 mod tests {
     use super::*;
 
-    const WHITE: Pen = Pen { down: true, color: [255, 255, 255, 255], size: 1.0 };
-    const RED: Pen = Pen { down: true, color: [255, 0, 0, 255], size: 10.0 };
+    const WHITE: Pen = Pen {
+        down: true,
+        color: [255, 255, 255, 255],
+        size: 1.0,
+    };
+    const RED: Pen = Pen {
+        down: true,
+        color: [255, 0, 0, 255],
+        size: 10.0,
+    };
 
     fn p(x: f64, y: f64) -> Point {
         Point { x, y }
@@ -395,7 +468,12 @@ mod tests {
     fn draws_a_line_in_the_pen_colour() {
         let mut d = Drawing::new();
         d.resize(1000, 1000);
-        d.push(&[Segment { from: p(-200.0, 0.0), to: p(200.0, 0.0), pen: RED }.into()]);
+        d.push(&[Segment {
+            from: p(-200.0, 0.0),
+            to: p(200.0, 0.0),
+            pen: RED,
+        }
+        .into()]);
         d.draw_pending();
         assert_eq!(d.pixel(500, 500), [255, 0, 0, 255], "on the line");
         assert_eq!(d.pixel(500, 520), BACKGROUND, "off the line");
@@ -410,7 +488,14 @@ mod tests {
         assert_eq!(d.take_dirty_tiles().len(), 16, "a new buffer is all new");
         // A short line at the centre, which is at x 500, crosses from the
         // tile ending at 511 into the next.
-        let line = |y| Segment { from: p(-10.0, y), to: p(10.0, y), pen: WHITE }.into();
+        let line = |y| {
+            Segment {
+                from: p(-10.0, y),
+                to: p(10.0, y),
+                pen: WHITE,
+            }
+            .into()
+        };
         d.push(&[line(0.0), line(1.0)]);
         d.draw_pending();
         assert_eq!(d.take_dirty_tiles().len(), 2);
@@ -418,10 +503,17 @@ mod tests {
         d.draw_pending();
         assert_eq!(d.take_dirty_tiles().len(), 0);
         let m = &d.metrics;
-        assert_eq!((m.marks.get(), m.drawing.count(), m.tiles.get()), (2, 1, 18));
+        assert_eq!(
+            (m.marks.get(), m.drawing.count(), m.tiles.get()),
+            (2, 1, 18)
+        );
         d.resize(500, 500);
         d.set_background([0, 0, 255, 255]);
-        assert_eq!(d.metrics.rerenders.count(), 3, "two resizes and a new background");
+        assert_eq!(
+            d.metrics.rerenders.count(),
+            3,
+            "two resizes and a new background"
+        );
         assert_eq!(d.metrics.marks.get(), 2, "re-renders aren't new marks");
     }
 
@@ -438,12 +530,21 @@ mod tests {
     fn resizing_re_renders_the_display_list() {
         let mut d = Drawing::new();
         d.resize(500, 500);
-        d.push(&[Segment { from: p(0.0, -300.0), to: p(0.0, 300.0), pen: RED }.into()]);
+        d.push(&[Segment {
+            from: p(0.0, -300.0),
+            to: p(0.0, 300.0),
+            pen: RED,
+        }
+        .into()]);
         d.draw_pending();
         assert_eq!(d.pixel(250, 250), [255, 0, 0, 255]);
         let took = d.resize(1000, 1000);
         assert!(took.is_some());
-        assert_eq!(d.pixel(500, 500), [255, 0, 0, 255], "drawn again at the new size");
+        assert_eq!(
+            d.pixel(500, 500),
+            [255, 0, 0, 255],
+            "drawn again at the new size"
+        );
         // The line ends at y 300, which is device row 200 at this size.
         assert_eq!(d.pixel(500, 210), [255, 0, 0, 255]);
         assert_eq!(d.pixel(500, 180), BACKGROUND, "and no further");
@@ -454,7 +555,12 @@ mod tests {
     fn clean_clears_the_drawing() {
         let mut d = Drawing::new();
         d.resize(100, 100);
-        d.push(&[Segment { from: p(-400.0, 0.0), to: p(400.0, 0.0), pen: RED }.into()]);
+        d.push(&[Segment {
+            from: p(-400.0, 0.0),
+            to: p(400.0, 0.0),
+            pen: RED,
+        }
+        .into()]);
         d.draw_pending();
         d.clean();
         assert_eq!(d.segments(), 0);
@@ -467,13 +573,34 @@ mod tests {
         let thick = Pen { size: 100.0, ..RED };
         let mut d = Drawing::new();
         d.resize(100, 100);
-        d.push(&[Segment { from: p(-400.0, 0.0), to: p(400.0, 0.0), pen: thick }.into()]);
+        d.push(&[Segment {
+            from: p(-400.0, 0.0),
+            to: p(400.0, 0.0),
+            pen: thick,
+        }
+        .into()]);
         d.draw_pending();
         d.set_background([0, 0, 255, 128]);
-        assert_eq!(d.pixel(50, 10), [0, 0, 255, 255], "opaque, whatever the input");
-        assert_eq!(d.pixel(50, 50), [255, 0, 0, 255], "the line is still on top");
+        assert_eq!(
+            d.pixel(50, 10),
+            [0, 0, 255, 255],
+            "opaque, whatever the input"
+        );
+        assert_eq!(
+            d.pixel(50, 50),
+            [255, 0, 0, 255],
+            "the line is still on top"
+        );
         // A line pushed but not drawn yet is drawn once, by draw_pending.
-        d.push(&[Segment { from: p(0.0, -400.0), to: p(0.0, 400.0), pen: Pen { size: 100.0, ..WHITE } }.into()]);
+        d.push(&[Segment {
+            from: p(0.0, -400.0),
+            to: p(0.0, 400.0),
+            pen: Pen {
+                size: 100.0,
+                ..WHITE
+            },
+        }
+        .into()]);
         d.set_background([0, 255, 0, 255]);
         d.draw_pending();
         assert_eq!(d.pixel(50, 10), [255, 255, 255, 255]);
@@ -486,12 +613,52 @@ mod tests {
         let mut d = Drawing::new();
         d.resize(100, 100);
         d.set_background([255, 255, 255, 255]);
-        let half_red = Pen { down: true, color: [255, 0, 0, 128], size: 100.0 };
-        d.push(&[Segment { from: p(-400.0, 0.0), to: p(400.0, 0.0), pen: half_red }.into()]);
+        let half_red = Pen {
+            down: true,
+            color: [255, 0, 0, 128],
+            size: 100.0,
+        };
+        d.push(&[Segment {
+            from: p(-400.0, 0.0),
+            to: p(400.0, 0.0),
+            pen: half_red,
+        }
+        .into()]);
         d.draw_pending();
         let [r, g, b, a] = d.pixel(50, 50);
         assert_eq!((r, a), (255, 255));
-        assert!((126..=128).contains(&g) && g == b, "about half way to red: {:?}", [r, g, b, a]);
+        assert!(
+            (126..=128).contains(&g) && g == b,
+            "about half way to red: {:?}",
+            [r, g, b, a]
+        );
+    }
+
+    #[test]
+    fn truncate_takes_back_the_newest_marks() {
+        let mut d = Drawing::new();
+        d.resize(1000, 1000);
+        let line = |y| {
+            Mark::from(Segment {
+                from: p(-200.0, y),
+                to: p(200.0, y),
+                pen: RED,
+            })
+        };
+        d.push(&[line(0.0)]);
+        d.draw_pending();
+        d.push(&[line(100.0)]);
+        d.draw_pending();
+        // Not drawn yet: truncating draws what's left anyway.
+        d.push(&[line(200.0)]);
+        d.truncate(1);
+        assert_eq!(d.segments(), 1);
+        assert_eq!(d.pixel(500, 500), [255, 0, 0, 255], "the first line stays");
+        assert_eq!(d.pixel(500, 400), BACKGROUND, "the second has gone");
+        d.draw_pending();
+        assert_eq!(d.pixel(500, 300), BACKGROUND, "the third was never drawn");
+        d.truncate(5);
+        assert_eq!(d.segments(), 1, "nothing to take back");
     }
 
     #[test]
@@ -499,15 +666,37 @@ mod tests {
         let mut d = Drawing::new();
         d.resize(1000, 1000);
         let thick = Pen { size: 6.0, ..RED };
-        d.push(&[Mark::Ellipse { center: p(0.0, 0.0), radii: (200.0, 200.0), heading: 0.0, pen: thick, fill: None }]);
-        d.push(&[Mark::Rect { center: p(0.0, 0.0), size: (100.0, 100.0), corner: 0.0, heading: 45.0, pen: thick, fill: None }]);
+        d.push(&[Mark::Ellipse {
+            center: p(0.0, 0.0),
+            radii: (200.0, 200.0),
+            heading: 0.0,
+            pen: thick,
+            fill: None,
+        }]);
+        d.push(&[Mark::Rect {
+            center: p(0.0, 0.0),
+            size: (100.0, 100.0),
+            corner: 0.0,
+            heading: 45.0,
+            pen: thick,
+            fill: None,
+        }]);
         d.draw_pending();
         assert_eq!(d.pixel(500, 300), [255, 0, 0, 255], "the top of the circle");
         assert_eq!(d.pixel(500, 500), BACKGROUND, "not filled");
         // The square is turned 45 degrees, so its corner is straight ahead.
         assert_eq!(d.pixel(500, 430), [255, 0, 0, 255]);
         // Pen-up marks aren't drawn or kept.
-        d.push(&[Mark::Ellipse { center: p(0.0, 0.0), radii: (100.0, 100.0), heading: 0.0, pen: Pen { down: false, ..thick }, fill: None }]);
+        d.push(&[Mark::Ellipse {
+            center: p(0.0, 0.0),
+            radii: (100.0, 100.0),
+            heading: 0.0,
+            pen: Pen {
+                down: false,
+                ..thick
+            },
+            fill: None,
+        }]);
         assert_eq!(d.segments(), 2);
     }
 
@@ -517,16 +706,36 @@ mod tests {
         d.resize(1000, 1000);
         let thick = Pen { size: 6.0, ..RED };
         let green = Some([0, 255, 0, 255]);
-        d.push(&[Mark::Ellipse { center: p(0.0, 0.0), radii: (200.0, 200.0), heading: 0.0, pen: thick, fill: green }]);
+        d.push(&[Mark::Ellipse {
+            center: p(0.0, 0.0),
+            radii: (200.0, 200.0),
+            heading: 0.0,
+            pen: thick,
+            fill: green,
+        }]);
         // With the pen up, a filled shape has no outline.
         let blue = Some([0, 0, 255, 255]);
-        let up = Pen { down: false, ..thick };
-        d.push(&[Mark::Rect { center: p(300.0, 300.0), size: (100.0, 100.0), corner: 0.0, heading: 0.0, pen: up, fill: blue }]);
+        let up = Pen {
+            down: false,
+            ..thick
+        };
+        d.push(&[Mark::Rect {
+            center: p(300.0, 300.0),
+            size: (100.0, 100.0),
+            corner: 0.0,
+            heading: 0.0,
+            pen: up,
+            fill: blue,
+        }]);
         d.draw_pending();
         assert_eq!(d.pixel(500, 500), [0, 255, 0, 255], "filled");
         assert_eq!(d.pixel(500, 300), [255, 0, 0, 255], "the outline on top");
         assert_eq!(d.pixel(800, 200), [0, 0, 255, 255], "the square's middle");
-        assert_eq!(d.pixel(849, 200), [0, 0, 255, 255], "and its edge, with no outline");
+        assert_eq!(
+            d.pixel(849, 200),
+            [0, 0, 255, 255],
+            "and its edge, with no outline"
+        );
         assert_eq!(d.segments(), 2, "both are kept");
     }
 
@@ -536,10 +745,24 @@ mod tests {
         d.resize(1000, 600);
         let all = d.take_dirty_tiles();
         assert_eq!(all.len(), 4 * 3, "everything is dirty at first");
-        assert_eq!(all.last().unwrap(), &Tile { index: 11, x: 768, y: 512, width: 232, height: 88 });
+        assert_eq!(
+            all.last().unwrap(),
+            &Tile {
+                index: 11,
+                x: 768,
+                y: 512,
+                width: 232,
+                height: 88
+            }
+        );
         assert!(d.take_dirty_tiles().is_empty());
         // A short line near the centre, inside one tile.
-        d.push(&[Segment { from: p(-10.0, 50.0), to: p(10.0, 50.0), pen: WHITE }.into()]);
+        d.push(&[Segment {
+            from: p(-10.0, 50.0),
+            to: p(10.0, 50.0),
+            pen: WHITE,
+        }
+        .into()]);
         d.draw_pending();
         let dirty: Vec<_> = d.take_dirty_tiles().iter().map(|t| t.index).collect();
         assert_eq!(dirty, [5]);
@@ -549,7 +772,12 @@ mod tests {
     fn tiles_and_pngs_have_the_right_bytes() {
         let mut d = Drawing::new();
         d.resize(300, 300);
-        d.push(&[Segment { from: p(-500.0, 0.0), to: p(500.0, 0.0), pen: RED }.into()]);
+        d.push(&[Segment {
+            from: p(-500.0, 0.0),
+            to: p(500.0, 0.0),
+            pen: RED,
+        }
+        .into()]);
         d.draw_pending();
         let tile = d.tiles().next().unwrap();
         let bgra = d.tile_bgra(tile);

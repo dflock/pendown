@@ -26,23 +26,58 @@ pub struct Case {
 }
 
 pub const CASES: &[Case] = &[
-    Case { name: "interpreter: REPEAT [FD 1 RT 1], no events", run: || interpret(REPEAT, Sink::Discard, false) },
-    Case { name: "interpreter: REPEAT [FD 1 RT 1], with Instruction events", run: || interpret(REPEAT, Sink::Discard, true) },
-    Case { name: "interpreter: REPEAT [FD 1 RT 1], batches through a channel", run: || interpret(REPEAT, Sink::Batches, true) },
-    Case { name: "interpreter: tail-recursive loop", run: || interpret(LOOP, Sink::Discard, false) },
-    Case { name: "interpreter: FIB 25", run: || interpret(FIB, Sink::Discard, false) },
-    Case { name: "interpreter: MAP and FOREACH over 300,000 members", run: || interpret(TEMPLATES, Sink::Discard, false) },
-    Case { name: "renderer: draw the 131,070-line tree", run: draw_tree },
-    Case { name: "renderer: the tree as a 3000 × 3000 PNG", run: png_tree },
-    Case { name: "animator: the tree at Instant", run: || animate(TREE, Speed::Instant, None) },
-    Case { name: "animator: 5,000 lines in lockstep", run: || animate(LINES, Speed::Animated(1e6), None) },
-    Case { name: "end to end: the tree at Instant, drawn and uploaded", run: || animate(TREE, Speed::Instant, Some(1000)) },
+    Case {
+        name: "interpreter: REPEAT [FD 1 RT 1], no events",
+        run: || interpret(REPEAT, Sink::Discard, false),
+    },
+    Case {
+        name: "interpreter: REPEAT [FD 1 RT 1], with Instruction events",
+        run: || interpret(REPEAT, Sink::Discard, true),
+    },
+    Case {
+        name: "interpreter: REPEAT [FD 1 RT 1], batches through a channel",
+        run: || interpret(REPEAT, Sink::Batches, true),
+    },
+    Case {
+        name: "interpreter: tail-recursive loop",
+        run: || interpret(LOOP, Sink::Discard, false),
+    },
+    Case {
+        name: "interpreter: FIB 25",
+        run: || interpret(FIB, Sink::Discard, false),
+    },
+    Case {
+        name: "interpreter: MAP and FOREACH over 300,000 members",
+        run: || interpret(TEMPLATES, Sink::Discard, false),
+    },
+    Case {
+        name: "renderer: draw the 131,070-line tree",
+        run: draw_tree,
+    },
+    Case {
+        name: "renderer: the tree as a 3000 × 3000 PNG",
+        run: png_tree,
+    },
+    Case {
+        name: "animator: the tree at Instant",
+        run: || animate(TREE, Speed::Instant, None),
+    },
+    Case {
+        name: "animator: 5,000 lines in lockstep",
+        run: || animate(LINES, Speed::Animated(1e6), None),
+    },
+    Case {
+        name: "end to end: the tree at Instant, drawn and uploaded",
+        run: || animate(TREE, Speed::Instant, Some(1000)),
+    },
 ];
 
 const REPEAT: &str = "REPEAT 1000000 [FD 1 RT 1]";
 const LOOP: &str = "TO LOOP :n\n IF :n = 0 [STOP]\n FD 1 RT 1\n LOOP :n - 1\nEND\nLOOP 500000";
-const FIB: &str = "TO FIB :n\n IF :n < 2 [OUTPUT :n]\n OUTPUT (FIB :n - 1) + (FIB :n - 2)\nEND\nMAKE \"x FIB 25";
-const TEMPLATES: &str = "MAKE \"xs ISEQ 1 300000\nMAKE \"ys MAP [? * 2] :xs\nFOREACH :ys [MAKE \"last ?]";
+const FIB: &str =
+    "TO FIB :n\n IF :n < 2 [OUTPUT :n]\n OUTPUT (FIB :n - 1) + (FIB :n - 2)\nEND\nMAKE \"x FIB 25";
+const TEMPLATES: &str =
+    "MAKE \"xs ISEQ 1 300000\nMAKE \"ys MAP [? * 2] :xs\nFOREACH :ys [MAKE \"last ?]";
 
 /// The scripted session's tree: 131,070 lines.
 pub const TREE: &str = "TO TREE :size :depth
@@ -67,13 +102,21 @@ enum Sink {
 
 fn interpret(src: &'static str, sink: Sink, events: bool) -> Duration {
     on_stack(move || {
-        let limits = Limits { instruction_events: events, ..Limits::default() };
+        let limits = Limits {
+            instruction_events: events,
+            ..Limits::default()
+        };
         let (sink, drain): (Box<dyn EventSink>, _) = match sink {
             Sink::Discard => (Box::new(Discard), None),
             Sink::Batches => {
                 let (tx, rx) = mpsc::sync_channel::<Vec<Event>>(DEFAULT_CHANNEL.capacity);
                 let sink = BatchSender::new(tx, DEFAULT_CHANNEL.batch, DEFAULT_CHANNEL.max_wait);
-                (Box::new(sink) as Box<dyn EventSink>, Some(thread::spawn(move || rx.into_iter().map(|b| b.len()).sum::<usize>())))
+                (
+                    Box::new(sink) as Box<dyn EventSink>,
+                    Some(thread::spawn(move || {
+                        rx.into_iter().map(|b| b.len()).sum::<usize>()
+                    })),
+                )
             }
         };
         let mut it = interpreter(sink, limits);
@@ -107,7 +150,13 @@ fn tree() -> &'static [Mark] {
     LINES.get_or_init(|| {
         on_stack(|| {
             let lines = Rc::new(RefCell::new(Vec::new()));
-            let mut it = interpreter(Box::new(Lines(lines.clone())), Limits { instruction_events: false, ..Limits::default() });
+            let mut it = interpreter(
+                Box::new(Lines(lines.clone())),
+                Limits {
+                    instruction_events: false,
+                    ..Limits::default()
+                },
+            );
             it.run_program(TREE).unwrap();
             drop(it);
             lines.take()
@@ -165,6 +214,10 @@ fn animate(src: &str, speed: Speed, size: Option<u32>) -> Duration {
     while run.exited().is_none() {
         thread::yield_now();
     }
-    assert!(matches!(run.result(), Some(Ok(()))), "{src} failed: {:?}", run.result());
+    assert!(
+        matches!(run.result(), Some(Ok(()))),
+        "{src} failed: {:?}",
+        run.result()
+    );
     took
 }

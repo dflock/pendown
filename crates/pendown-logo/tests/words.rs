@@ -7,7 +7,11 @@ use common::*;
 #[track_caller]
 fn shows(cases: &[(&str, &str)]) {
     for (expr, expected) in cases {
-        assert_eq!(output(&format!("SHOW {expr}")), format!("{expected}\n"), "{expr}");
+        assert_eq!(
+            output(&format!("SHOW {expr}")),
+            format!("{expected}\n"),
+            "{expr}"
+        );
     }
 }
 
@@ -48,10 +52,19 @@ fn selectors() {
 
 #[test]
 fn stacks_and_queues() {
-    assert_eq!(output("MAKE \"s [] PUSH \"s 1 PUSH \"s 2 SHOW :s SHOW POP \"s SHOW :s"), "[2 1]\n2\n[1]\n");
-    assert_eq!(output("MAKE \"q [] QUEUE \"q 1 QUEUE \"q 2 SHOW :q SHOW DEQUEUE \"q SHOW :q"), "[1 2]\n1\n[2]\n");
+    assert_eq!(
+        output("MAKE \"s [] PUSH \"s 1 PUSH \"s 2 SHOW :s SHOW POP \"s SHOW :s"),
+        "[2 1]\n2\n[1]\n"
+    );
+    assert_eq!(
+        output("MAKE \"q [] QUEUE \"q 1 QUEUE \"q 2 SHOW :q SHOW DEQUEUE \"q SHOW :q"),
+        "[1 2]\n1\n[2]\n"
+    );
     assert_eq!(error("PUSH \"nothing 1"), "nothing has no value");
-    assert_eq!(error("MAKE \"s 5 PUSH \"s 1"), "PUSH doesn't like 5 as the value of s");
+    assert_eq!(
+        error("MAKE \"s 5 PUSH \"s 1"),
+        "PUSH doesn't like 5 as the value of s"
+    );
     assert_eq!(error("MAKE \"s [] SHOW POP \"s"), "s is empty");
 }
 
@@ -97,10 +110,19 @@ fn queries() {
 
 #[test]
 fn errors() {
-    assert_eq!(error("SHOW FPUT \"ab \"cd"), "FPUT doesn't like ab as input");
-    assert_eq!(error("SHOW FIRSTS [[1] []]"), "FIRSTS doesn't like [[1] []] as input");
+    assert_eq!(
+        error("SHOW FPUT \"ab \"cd"),
+        "FPUT doesn't like ab as input"
+    );
+    assert_eq!(
+        error("SHOW FIRSTS [[1] []]"),
+        "FIRSTS doesn't like [[1] []] as input"
+    );
     assert_eq!(error("SHOW PICK []"), "PICK doesn't like [] as input");
     assert_eq!(error("SHOW ASCII \"ab"), "ASCII doesn't like ab as input");
     assert_eq!(error("SHOW CHAR -1"), "CHAR doesn't like -1 as input");
-    assert_eq!(error("SHOW MEMBER 1 {1 2}"), "MEMBER doesn't like {1 2} as input");
+    assert_eq!(
+        error("SHOW MEMBER 1 {1 2}"),
+        "MEMBER doesn't like {1 2} as input"
+    );
 }

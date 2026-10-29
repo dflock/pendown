@@ -31,14 +31,26 @@ fn describe(w: &Watch) -> String {
         .iter()
         .map(|c| {
             let of = c.of.map_or(String::new(), |of| format!(" of {of}"));
-            format!("{} {}{of}{}", c.name, c.count, if c.repcount { "*" } else { "" })
+            format!(
+                "{} {}{of}{}",
+                c.name,
+                c.count,
+                if c.repcount { "*" } else { "" }
+            )
         })
         .collect();
     for scope in &w.scopes {
         let vars: Vec<String> = scope
             .variables
             .iter()
-            .map(|v| format!("{}{}={}", if v.hidden { "~" } else { "" }, v.name, v.value.as_deref().unwrap_or("-")))
+            .map(|v| {
+                format!(
+                    "{}{}={}",
+                    if v.hidden { "~" } else { "" },
+                    v.name,
+                    v.value.as_deref().unwrap_or("-")
+                )
+            })
             .collect();
         let name = match scope.kind {
             ScopeKind::Globals => "globals",
@@ -87,7 +99,9 @@ fn at(src: &str, instruction: &str, nth: usize) -> String {
     for event in events(src) {
         match event {
             Event::Watch(w) => shown = describe(&w),
-            Event::Instruction { span, .. } if &src[span.start as usize..span.end as usize] == instruction => {
+            Event::Instruction { span, .. }
+                if &src[span.start as usize..span.end as usize] == instruction =>
+            {
                 seen += 1;
                 if seen == nth {
                     return shown;
@@ -106,7 +120,10 @@ fn last(src: &str) -> String {
 
 #[test]
 fn globals_are_sorted_and_keep_their_spelling() {
-    assert_eq!(last("MAKE \"Zebra 1\nMAKE \"apple [a b]\nMAKE \"zebra 2"), "globals: apple=[a b] Zebra=2");
+    assert_eq!(
+        last("MAKE \"Zebra 1\nMAKE \"apple [a b]\nMAKE \"zebra 2"),
+        "globals: apple=[a b] Zebra=2"
+    );
 }
 
 #[test]
@@ -128,14 +145,20 @@ fn an_unchanged_watch_isnt_sent_again() {
 #[test]
 fn special_variables_are_hidden_at_their_starting_values() {
     assert_eq!(last("MAKE \"a 1"), "globals: a=1");
-    assert_eq!(last("MAKE \"caseignoredp \"false"), "globals: caseignoredp=false");
+    assert_eq!(
+        last("MAKE \"caseignoredp \"false"),
+        "globals: caseignoredp=false"
+    );
 }
 
 #[test]
 fn procedures_show_their_inputs_and_locals_in_the_call_chain() {
     let src = "TO OUTER :size\n LOCAL \"n\n INNER :size * 2\n FD 1\nEND\nTO INNER :Size\n FD :size\nEND\nMAKE \"size 1\nOUTER 10";
     // One name, spelt as its first definition spells it.
-    assert_eq!(at(src, "FD :size", 1), "globals: ~size=1 | OUTER: ~size=10 n=- | INNER: size=20");
+    assert_eq!(
+        at(src, "FD :size", 1),
+        "globals: ~size=1 | OUTER: ~size=10 n=- | INNER: size=20"
+    );
     // Nothing is left of the frames when the run ends.
     assert_eq!(last(src), "globals: size=1");
 }
@@ -157,8 +180,14 @@ fn a_tail_call_replaces_the_frame() {
 #[test]
 fn counters_are_outermost_first_and_repcount_is_marked() {
     let src = "REPEAT 3 [REPEAT 2 [FD 1]]";
-    assert_eq!(at(src, "FD 1", 1), "REPEAT 1 of 3 | REPEAT 1 of 2* | globals: ");
-    assert_eq!(at(src, "FD 1", 4), "REPEAT 2 of 3 | REPEAT 2 of 2* | globals: ");
+    assert_eq!(
+        at(src, "FD 1", 1),
+        "REPEAT 1 of 3 | REPEAT 1 of 2* | globals: "
+    );
+    assert_eq!(
+        at(src, "FD 1", 4),
+        "REPEAT 2 of 3 | REPEAT 2 of 2* | globals: "
+    );
     assert_eq!(last(src), "globals: ");
 }
 
@@ -166,7 +195,14 @@ fn counters_are_outermost_first_and_repcount_is_marked() {
 fn a_one_line_loop_sends_each_pass() {
     let src = "REPEAT 3 [FD 1]";
     let passes: Vec<String> = (1..=3).map(|n| at(src, "FD 1", n)).collect();
-    assert_eq!(passes, ["REPEAT 1 of 3* | globals: ", "REPEAT 2 of 3* | globals: ", "REPEAT 3 of 3* | globals: "]);
+    assert_eq!(
+        passes,
+        [
+            "REPEAT 1 of 3* | globals: ",
+            "REPEAT 2 of 3* | globals: ",
+            "REPEAT 3 of 3* | globals: "
+        ]
+    );
 }
 
 #[test]
@@ -178,14 +214,23 @@ fn forever_has_no_total() {
 #[test]
 fn for_has_a_counter_and_a_scope_but_repcount_skips_it() {
     let src = "REPEAT 2 [FOR [i 10 30 10] [FD :i]]";
-    assert_eq!(at(src, "FD :i", 3), "REPEAT 1 of 2* | FOR 3 of 3 | globals:  | FOR: i=30");
-    assert_eq!(at("FOR [i 5 1] [FD :i]", "FD :i", 2), "FOR 2 of 5 | globals:  | FOR: i=4");
+    assert_eq!(
+        at(src, "FD :i", 3),
+        "REPEAT 1 of 2* | FOR 3 of 3 | globals:  | FOR: i=30"
+    );
+    assert_eq!(
+        at("FOR [i 5 1] [FD :i]", "FD :i", 2),
+        "FOR 2 of 5 | globals:  | FOR: i=4"
+    );
 }
 
 #[test]
 fn templates_count_their_members_and_lambdas_have_scopes() {
     let src = "FOREACH [a b c] [[w] PRINT :w]";
-    assert_eq!(at(src, "PRINT :w", 2), "FOREACH 2 of 3* | globals:  | FOREACH: w=b");
+    assert_eq!(
+        at(src, "PRINT :w", 2),
+        "FOREACH 2 of 3* | globals:  | FOREACH: w=b"
+    );
 }
 
 #[test]
@@ -211,13 +256,23 @@ fn instant_sends_a_watch_only_when_asked() {
     let control = Arc::new(Control::default());
     let mut it = Interpreter::new(Box::new(events.clone()), control.clone());
     it.run_program("MAKE \"x 1\nMAKE \"x 2").unwrap();
-    let count = |events: &Shared| events.0.borrow().iter().filter(|e| matches!(e, Event::Watch(_))).count();
+    let count = |events: &Shared| {
+        events
+            .0
+            .borrow()
+            .iter()
+            .filter(|e| matches!(e, Event::Watch(_)))
+            .count()
+    };
     assert_eq!(count(&events), 1, "only at the end");
 
     control.watch.store(true, Ordering::Relaxed);
     it.run_console("MAKE \"y 3\nMAKE \"y 4").unwrap();
     assert_eq!(count(&events), 3, "one asked for, and one at the end");
-    assert!(!control.watch.load(Ordering::Relaxed), "the request is answered");
+    assert!(
+        !control.watch.load(Ordering::Relaxed),
+        "the request is answered"
+    );
 }
 
 #[test]
@@ -230,9 +285,22 @@ fn the_cli_never_pays_for_watches() {
 fn colours_are_shown_as_set_with_what_they_look_like() {
     let events = events("SETPC \"red\nSETBG [0 0 255]\nSETFC 2\nFD 1");
     let colours = |w: &Watch| {
-        w.colours.iter().map(|c| format!("{}={} {:?}", c.name, c.value, c.rgba)).collect::<Vec<_>>().join(" ")
+        w.colours
+            .iter()
+            .map(|c| format!("{}={} {:?}", c.name, c.value, c.rgba))
+            .collect::<Vec<_>>()
+            .join(" ")
     };
-    let watches: Vec<String> = events.iter().filter_map(|e| if let Event::Watch(w) = e { Some(colours(w)) } else { None }).collect();
+    let watches: Vec<String> = events
+        .iter()
+        .filter_map(|e| {
+            if let Event::Watch(w) = e {
+                Some(colours(w))
+            } else {
+                None
+            }
+        })
+        .collect();
     assert_eq!(
         watches.first().unwrap(),
         "PENCOLOR=7 Some([255, 255, 255, 255]) FILLCOLOR=none None BACKGROUND=0 Some([0, 0, 0, 255])"
@@ -251,7 +319,15 @@ fn the_same_palette_number_in_a_new_colour_shows() {
     // out the pen's colour when SETPC runs, so after SETPALETTE, SETPC 8
     // is the same value in a new colour, which the panel must show.
     let events = events("SETPC 8\nFD 1\nSETPALETTE 8 [255 0 0]\nSETPC 8\nFD 1");
-    let pens: Vec<Option<[u8; 4]>> =
-        events.iter().filter_map(|e| if let Event::Watch(w) = e { Some(w.colours[0].rgba) } else { None }).collect();
+    let pens: Vec<Option<[u8; 4]>> = events
+        .iter()
+        .filter_map(|e| {
+            if let Event::Watch(w) = e {
+                Some(w.colours[0].rgba)
+            } else {
+                None
+            }
+        })
+        .collect();
     assert_eq!(pens.last().unwrap(), &Some([255, 0, 0, 255]), "{pens:?}");
 }

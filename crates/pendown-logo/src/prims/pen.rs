@@ -18,7 +18,9 @@ impl Args<'_> {
     pub fn colour(&self, it: &Interpreter, i: usize) -> Result<Rgba, Flow> {
         colour::parse_with(&self.vals[i], &it.palette).map_err(|e| match e.message() {
             None => self.doesnt_like(i),
-            Some(message) => Flow::Error(Box::new(Error::new(message, Some(self.call.args[i].span())).about(&self.call.name))),
+            Some(message) => Flow::Error(Box::new(
+                Error::new(message, Some(self.call.args[i].span())).about(&self.call.name),
+            )),
         })
     }
 }
@@ -70,14 +72,19 @@ pub(super) fn setpensize(it: &mut Interpreter, a: &Args) -> Out {
 /// `[width height]`, as in UCBLogo. They're always equal.
 pub(super) fn pensize(it: &mut Interpreter, _: &Args) -> Out {
     let size = Value::Num(it.turtle.pen.size);
-    Ok(Some(Value::List(Rc::new(List::new(vec![size.clone(), size])))))
+    Ok(Some(Value::List(Rc::new(List::new(vec![
+        size.clone(),
+        size,
+    ])))))
 }
 
 /// The background is always solid, so any opacity is ignored.
 pub(super) fn setbackground(it: &mut Interpreter, a: &Args) -> Out {
     let [r, g, b, _] = a.colour(it, 0)?;
     it.background = ([r, g, b, 255], a.vals[0].clone());
-    it.emit(Event::SetBackground { color: it.background.0 })?;
+    it.emit(Event::SetBackground {
+        color: it.background.0,
+    })?;
     Ok(None)
 }
 

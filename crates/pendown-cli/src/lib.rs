@@ -1,14 +1,7 @@
 //! Runs a program with no timing and draws it (ADR 0009). The binary in
 //! `main.rs` handles the command line; this part is what the tests use.
 
-use std::{
-    cell::RefCell,
-    fmt::Write as _,
-    rc::Rc,
-    sync::Arc,
-    thread,
-    time::Instant,
-};
+use std::{cell::RefCell, fmt::Write as _, rc::Rc, sync::Arc, thread, time::Instant};
 
 use pendown_logo::{
     Error, Event, EventSink, Halted, Interpreter, Limits, RunError,
@@ -90,13 +83,47 @@ impl EventSink for DrawingSink {
     fn send(&mut self, event: Event) -> Result<(), Halted> {
         match event {
             Event::Move { from, to, pen } => self.add(Segment { from, to, pen }.into()),
-            Event::Arc { center, radius, start_heading, angle, pen } => {
-                self.add(Mark::Arc { center, radius, start_heading, angle, pen })
-            }
-            Event::Ellipse { center, radii, heading, pen, fill } => self.add(Mark::Ellipse { center, radii, heading, pen, fill }),
-            Event::Rect { center, size, corner, heading, pen, fill } => {
-                self.add(Mark::Rect { center, size, corner, heading, pen, fill })
-            }
+            Event::Arc {
+                center,
+                radius,
+                start_heading,
+                angle,
+                pen,
+            } => self.add(Mark::Arc {
+                center,
+                radius,
+                start_heading,
+                angle,
+                pen,
+            }),
+            Event::Ellipse {
+                center,
+                radii,
+                heading,
+                pen,
+                fill,
+            } => self.add(Mark::Ellipse {
+                center,
+                radii,
+                heading,
+                pen,
+                fill,
+            }),
+            Event::Rect {
+                center,
+                size,
+                corner,
+                heading,
+                pen,
+                fill,
+            } => self.add(Mark::Rect {
+                center,
+                size,
+                corner,
+                heading,
+                pen,
+                fill,
+            }),
             Event::Print(text) => self.printed.borrow_mut().push_str(&text),
             Event::Clean => {
                 self.pending.clear();
@@ -174,9 +201,15 @@ pub fn render(source: &str, options: Options) -> Output {
 pub fn parse_size(text: &str) -> Result<(u32, u32), String> {
     let bad = || format!("expected a size like 250x300, not {text:?}");
     let (w, h) = text.split_once(['x', 'X']).ok_or_else(bad)?;
-    let (w, h): (u32, u32) = (w.trim().parse().map_err(|_| bad())?, h.trim().parse().map_err(|_| bad())?);
+    let (w, h): (u32, u32) = (
+        w.trim().parse().map_err(|_| bad())?,
+        h.trim().parse().map_err(|_| bad())?,
+    );
     if w == 0 || h == 0 || w > u16::MAX as u32 || h > u16::MAX as u32 {
-        return Err(format!("the width and height must be from 1 to {}, not {text:?}", u16::MAX));
+        return Err(format!(
+            "the width and height must be from 1 to {}, not {text:?}",
+            u16::MAX
+        ));
     }
     Ok((w, h))
 }
@@ -195,7 +228,12 @@ pub fn describe(path: &str, source: &str, error: &Error) -> String {
     };
     for (i, call) in error.calls.iter().enumerate() {
         let how = if i == 0 { "in" } else { "called from" };
-        let _ = write!(out, "\n  {how} {} (line {})", call.procedure, call.span.line + 1);
+        let _ = write!(
+            out,
+            "\n  {how} {} (line {})",
+            call.procedure,
+            call.span.line + 1
+        );
     }
     out
 }

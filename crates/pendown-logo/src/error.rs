@@ -24,7 +24,12 @@ pub struct CallSite {
 
 impl Error {
     pub fn new(message: impl Into<String>, span: Option<Span>) -> Error {
-        Error { message: message.into(), span, calls: Vec::new(), command: None }
+        Error {
+            message: message.into(),
+            span,
+            calls: Vec::new(),
+            command: None,
+        }
     }
 
     /// The error is about this command.
@@ -38,7 +43,9 @@ impl Error {
     pub fn unknown(name: &str, span: Option<Span>) -> Error {
         let upper = name.to_uppercase();
         match crate::reference::reference().obsolete_reason(name) {
-            Some(reason) => Error::new(format!("{upper} isn't in Pendown: {reason}"), span).about(name),
+            Some(reason) => {
+                Error::new(format!("{upper} isn't in Pendown: {reason}"), span).about(name)
+            }
             None => Error::new(format!("I don't know how to {upper}"), span),
         }
     }
@@ -49,7 +56,12 @@ impl fmt::Display for Error {
         f.write_str(&self.message)?;
         for (i, call) in self.calls.iter().enumerate() {
             let how = if i == 0 { "in" } else { "called from" };
-            write!(f, ", {how} {} (line {})", call.procedure, call.span.line + 1)?;
+            write!(
+                f,
+                ", {how} {} (line {})",
+                call.procedure,
+                call.span.line + 1
+            )?;
         }
         Ok(())
     }

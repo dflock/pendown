@@ -10,13 +10,14 @@ use std::{
     time::{Duration, Instant},
 };
 
-use gpui_kit::*;
+use gpui_kit::{component::WindowExt as _, *};
 use pendown::{
     animator::{Mode, Speed},
     metrics::Snapshot,
     run::DEFAULT_CHANNEL,
     speed::level_speed,
 };
+use pendown_logo::SourceId;
 
 use crate::app::App;
 
@@ -102,8 +103,82 @@ enum Step {
     CheckConsole(&'static str),
     /// Type a line into the console and press Enter.
     Console(&'static str),
+    /// Press keys in the console's input line, as `Keystroke::parse` reads them.
+    ConsoleKeys(&'static str),
+    /// Press the console's Undo button.
+    UndoConsole,
+    /// The console's input line holds exactly this.
+    CheckConsoleTyped(&'static str),
+    /// Press the console's Teach Kame button.
+    OpenTeach,
+    /// Type the new word's name in Teach Kame's dialog.
+    TeachName(&'static str),
+    /// Tick or untick an entry in the dialog, with Shift if asked.
+    TeachToggle(usize, bool),
+    /// Press the dialog's Teach Kame button.
+    PressTeach,
+    /// Press the dialog's All (true) or None (false).
+    TeachAll(bool),
+    /// The dialog's rows, as `TeachKame::describe` gives them.
+    CheckTeachRows(&'static str),
+    /// Why the dialog won't take the name, or "" if it will.
+    CheckTeachProblem(&'static str),
+    /// The dialog's picture has been drawn.
+    CheckTeachPicture,
+    /// A dialog is open, or not.
+    CheckDialog(bool),
+    /// The console's Undo button names this entry, or is disabled for "".
+    CheckUndoLabel(&'static str),
+    /// The console's Teach Kame button is enabled, or not.
+    CheckCanTeach(bool),
+    /// Press keys wherever the focus is, or in the editor.
+    Keys(&'static str),
+    EditorKeys(&'static str),
+    /// Press the console's Copy to editor.
+    CopyDefinitions,
+    /// Open the side panel, if it isn't.
+    ShowPanel,
+    /// Turn Show thinking on or off.
+    SetThinking(bool),
+    /// Turn Drive on or off.
+    Drive(bool),
+    /// Press keys while driving: up, down, left, right, space, undo, escape.
+    DriveKeys(&'static [&'static str]),
+    /// Wait until every press has played.
+    WaitDriven,
+    /// Driving is on, or not.
+    CheckDriving(bool),
+    /// Choose driving's steps for moves and turns.
+    DriveSteps(f64, f64),
+    /// How many presses are waiting to play.
+    CheckDriveQueue(usize),
+    /// What Kame is thinking about while driving, as `thinking()` gives it.
+    CheckDriveThinking(&'static str),
+    /// Scroll the help page this far down, in logical pixels.
+    ScrollHelp(f32),
+    /// Type in the Colours page's R, G, B, A or hex field, counting from 0.
+    ColourField(usize, &'static str),
+    /// Click on the Colours page's wheel, from 0 to 1 across and down.
+    WheelAt(f64, f64),
+    /// Click a palette swatch, or a name.
+    PickPalette(u8),
+    PickName(&'static str),
+    /// Choose the form to copy in, by its button's label.
+    ChooseForm(&'static str),
+    /// Press the Colours page's Copy to editor.
+    CopyColour,
+    /// What Copy to editor would put in.
+    CheckCurrentColour(&'static str),
+    /// Why a field doesn't make sense, or "" if they all do.
+    CheckColourProblem(&'static str),
+    /// Type in the names' filter.
+    FilterNames(&'static str),
+    /// The drawing's background, as RGBA.
+    CheckBackground([u8; 4]),
     /// How many lines, arcs and shapes are drawn.
     CheckDrawn(usize),
+    /// Where the turtle sprite is, and its heading.
+    CheckTurtle(f64, f64, f64),
     /// Save the program as this file in the autotest folder, as Save As
     /// would once the dialog has a name.
     SaveTo(&'static str),
@@ -191,6 +266,18 @@ fn script() -> Vec<Step> {
     use Step::*;
     let ms = Duration::from_millis;
     vec![
+        Say("A console entry before any run"),
+        Console("FD 1"),
+        WaitFinished,
+        CheckDrawn(1),
+        Say("A console turn turns where the last entry left the turtle"),
+        Console("CS"),
+        WaitFinished,
+        Console("FD 100"),
+        WaitFinished,
+        Console("RT 45"),
+        WaitFinished,
+        CheckTurtle(0.0, 100.0, 45.0),
         Say("The welcome program"),
         Run(crate::app::WELCOME, level_speed(10)),
         WaitFinished,
@@ -213,7 +300,9 @@ fn script() -> Vec<Step> {
         Screenshot("console"),
         Run(crate::app::WELCOME, Speed::Instant),
         WaitFinished,
-        CheckConsole("Run cleared the procedures you defined in the console. \"Copy to editor\" keeps them."),
+        CheckConsole(
+            "Run cleared the procedures you defined in the console. \"Copy to editor\" keeps them.",
+        ),
         Console("TRI 10"),
         WaitFinished,
         CheckConsole("In the console: I don't know how to TRI"),
@@ -252,7 +341,17 @@ fn script() -> Vec<Step> {
         CheckMoving,
         Screenshot("highlight-mid-move"),
         WaitFinished,
-        CheckTrace(&["REPEAT 4 [FD 300 RT 90]", "FD 300", "RT 90", "FD 300", "RT 90", "FD 300", "RT 90", "FD 300", "RT 90"]),
+        CheckTrace(&[
+            "REPEAT 4 [FD 300 RT 90]",
+            "FD 300",
+            "RT 90",
+            "FD 300",
+            "RT 90",
+            "FD 300",
+            "RT 90",
+            "FD 300",
+            "RT 90",
+        ]),
         Say("A speed change applies in the middle of a move"),
         Track,
         Run("FD 600", Speed::Animated(50.0)),
@@ -313,7 +412,10 @@ fn script() -> Vec<Step> {
         WaitFinished,
         CheckConsole("Line 2: Not enough inputs to RT"),
         Say("Phase 2: filled shapes, FOR and a template, animated"),
-        Run("FOR [i 3 1] [SETFC ITEM :i [red orange gold] CIRCLE :i * 50]\nPRINT MAP [? * 2] [1 2 3]", Speed::Animated(2560.0)),
+        Run(
+            "FOR [i 3 1] [SETFC ITEM :i [red orange gold] CIRCLE :i * 50]\nPRINT MAP [? * 2] [1 2 3]",
+            Speed::Animated(2560.0),
+        ),
         WaitFinished,
         CheckDrawn(3),
         CheckConsole("2 4 6"),
@@ -378,7 +480,10 @@ fn script() -> Vec<Step> {
         Wait(ms(100)),
         CheckPanelsDrawn,
         Say("Phase 4: the colours, with a square of each"),
-        Run("SETPC \"orange\nSETBG [20 40 80]\nSETFC \"#40c0ff80\nCIRCLE 100", Speed::Animated(200.0)),
+        Run(
+            "SETPC \"orange\nSETBG [20 40 80]\nSETFC \"#40c0ff80\nCIRCLE 100",
+            Speed::Animated(200.0),
+        ),
         WaitFinished,
         CheckColours("PENCOLOR=orange FILLCOLOR=#40c0ff80 BACKGROUND=[20 40 80]"),
         Screenshot("colours"),
@@ -428,7 +533,9 @@ fn script() -> Vec<Step> {
         CheckErrorHelp("FORWARD"),
         Run("EDIT \"square", Speed::Instant),
         WaitFinished,
-        CheckConsole("Line 1: EDIT isn't in Pendown: it opens an external text editor, and Pendown has its own."),
+        CheckConsole(
+            "Line 1: EDIT isn't in Pendown: it opens an external text editor, and Pendown has its own.",
+        ),
         CheckErrorHelp("EDIT"),
         Wait(ms(100)),
         Screenshot("error-help"),
@@ -448,7 +555,387 @@ fn script() -> Vec<Step> {
         WaitFinished,
         CheckDrawn(32),
         BackToMyDrawing,
+        Say("Tutorial: Help Kame fix the bug, with what Kame meant and the bug it drew"),
+        Lesson(3),
+        Wait(ms(500)),
+        Screenshot("tutorial-bug"),
+        RunLesson(3, 0),
+        WaitFinished,
+        // The box's four sides, and the triangle's three, inside it.
+        CheckDrawn(7),
+        Screenshot("tutorial-bug-run"),
+        BackToMyDrawing,
         CloseHelp,
+        Say("Console undo: an oops at the console, taken back"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        Console("FD 100"),
+        WaitFinished,
+        Console("RT 90"),
+        WaitFinished,
+        Console("FD 100"),
+        WaitFinished,
+        Console("RT 45"),
+        WaitFinished,
+        CheckTurtle(100.0, 100.0, 135.0),
+        Screenshot("undo-before"),
+        UndoConsole,
+        WaitFinished,
+        CheckTurtle(100.0, 100.0, 90.0),
+        CheckDrawn(2),
+        CheckConsole("Undid: RT 45"),
+        Console("RT 90"),
+        WaitFinished,
+        Console("FD 100"),
+        WaitFinished,
+        CheckDrawn(3),
+        Screenshot("undo-after"),
+        Say("Console undo: Ctrl+Z with nothing typed, back past a CLEAN and a colour"),
+        Console("SETPC \"orange CLEAN FD 50 RT 90 FD 50"),
+        WaitFinished,
+        CheckDrawn(2),
+        CheckColours("PENCOLOR=orange FILLCOLOR=none BACKGROUND=0"),
+        ConsoleKeys("secondary-z"),
+        Wait(ms(200)),
+        WaitFinished,
+        CheckDrawn(3),
+        CheckTurtle(100.0, 0.0, 180.0),
+        CheckColours("PENCOLOR=7 FILLCOLOR=none BACKGROUND=0"),
+        CheckConsole("Undid: SETPC \"orange CLEAN FD 50 RT 90 FD 50"),
+        Say("Console undo: an entry that stopped with an error"),
+        Console("FD 30 FD \"far"),
+        WaitFinished,
+        CheckDrawn(4),
+        CheckTurtle(100.0, -30.0, 180.0),
+        UndoConsole,
+        WaitFinished,
+        CheckDrawn(3),
+        CheckTurtle(100.0, 0.0, 180.0),
+        Say("Console undo: with something typed, Ctrl+Z undoes the typing"),
+        ConsoleKeys("x"),
+        Wait(ms(100)),
+        CheckConsoleTyped("x"),
+        ConsoleKeys("secondary-z"),
+        Wait(ms(200)),
+        CheckDrawn(3),
+        CheckConsoleTyped(""),
+        Say("Console undo: an entry that was stopped"),
+        SetSpeed(Speed::Animated(50.0)),
+        Console("FOREVER [FD 1 RT 1]"),
+        Wait(ms(500)),
+        Stop,
+        UndoConsole,
+        WaitFinished,
+        CheckDrawn(3),
+        CheckTurtle(100.0, 0.0, 180.0),
+        SetSpeed(Speed::Instant),
+        Say("Teach Kame: the entries since the last Run become a procedure"),
+        Console("FD"),
+        WaitFinished,
+        OpenTeach,
+        Wait(ms(300)),
+        TeachName("fd"),
+        Wait(ms(100)),
+        Screenshot("teach-name-taken"),
+        TeachName("house"),
+        // Untick the second and fourth, then Shift-click the second: the
+        // second to the fourth are ticked again. The error stays unticked.
+        TeachToggle(1, false),
+        TeachToggle(3, false),
+        TeachToggle(1, true),
+        Wait(ms(500)),
+        Screenshot("teach"),
+        PressTeach,
+        Wait(ms(300)),
+        WaitFinished,
+        CheckEditor("TO HOUSE\n  FD 100\n  RT 90\n  FD 100\n  RT 90\n  FD 100\nEND\n"),
+        CheckConsole("Kame knows HOUSE now. It's at the end of your program."),
+        CheckTurtle(100.0, 0.0, 180.0),
+        Console("RT 45"),
+        WaitFinished,
+        Console("HOUSE"),
+        WaitFinished,
+        CheckDrawn(6),
+        Screenshot("taught"),
+        Say("Teach Kame: Undo goes back past the definition"),
+        UndoConsole,
+        WaitFinished,
+        UndoConsole,
+        WaitFinished,
+        CheckDrawn(3),
+        CheckTurtle(100.0, 0.0, 180.0),
+        Say("Console undo: the background comes back"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        Console("FD 10"),
+        WaitFinished,
+        Console("SETBG 1 FD 10"),
+        WaitFinished,
+        CheckColours("PENCOLOR=7 FILLCOLOR=none BACKGROUND=1"),
+        UndoConsole,
+        WaitFinished,
+        CheckBackground([0, 0, 0, 255]),
+        CheckColours("PENCOLOR=7 FILLCOLOR=none BACKGROUND=0"),
+        CheckDrawn(1),
+        Say("Console undo: long entries are cut short, and Run leaves nothing to undo"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        CheckUndoLabel(""),
+        CheckCanTeach(false),
+        Console("TO TRI :n"),
+        Console("REPEAT 3 [FD :n RT 120]"),
+        Console("END"),
+        WaitFinished,
+        CheckUndoLabel("TO TRI :n…"),
+        CheckCanTeach(false),
+        Console("REPEAT 36 [FD 10 RT 10 FD 5]"),
+        WaitFinished,
+        CheckUndoLabel("REPEAT 36 [FD 10 RT 10…"),
+        CheckCanTeach(true),
+        Run("FD 10", Speed::Instant),
+        WaitFinished,
+        CheckUndoLabel(""),
+        CheckCanTeach(false),
+        Say("Console undo: with an example showing, your drawing comes back first"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        Console("FD 50"),
+        WaitFinished,
+        Console("RT 90 FD 50"),
+        WaitFinished,
+        CheckDrawn(2),
+        OpenHelp("forward"),
+        RunExample("forward", 0),
+        WaitFinished,
+        CheckDrawn(8),
+        UndoConsole,
+        WaitFinished,
+        CheckDrawn(1),
+        CheckTurtle(0.0, 50.0, 0.0),
+        CloseHelp,
+        Say("Teach Kame: rows that can't be ticked, notes, All and None"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        Console("TO TRI :n"),
+        Console("REPEAT 3 [FD :n RT 120]"),
+        Console("END"),
+        WaitFinished,
+        Console("TRI 40"),
+        WaitFinished,
+        Console("FD"),
+        WaitFinished,
+        Console("RT 30"),
+        WaitFinished,
+        OpenTeach,
+        Wait(ms(800)),
+        CheckTeachRows(
+            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | x TRI 40 (uses TRI) | - FD (Not enough inputs to FD) | x RT 30",
+        ),
+        CheckTeachPicture,
+        TeachName("tri"),
+        Wait(ms(100)),
+        CheckTeachProblem("TRI is already defined at the console. Choose another name."),
+        Screenshot("teach-rows"),
+        TeachAll(false),
+        CheckTeachRows(
+            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | - TRI 40 (uses TRI) | - FD (Not enough inputs to FD) | - RT 30",
+        ),
+        TeachAll(true),
+        CheckTeachRows(
+            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | x TRI 40 (uses TRI) | x FD (Not enough inputs to FD) | x RT 30",
+        ),
+        Say("Teach Kame: Escape closes the dialog, and nothing changes"),
+        Keys("escape"),
+        Wait(ms(400)),
+        CheckDialog(false),
+        CheckEditor(""),
+        CheckCanTeach(true),
+        Say("Teach Kame: the editor's Undo takes the procedure back out"),
+        Run("; mine", Speed::Instant),
+        WaitFinished,
+        Console("FD 20"),
+        WaitFinished,
+        OpenTeach,
+        Wait(ms(300)),
+        TeachName("stair"),
+        PressTeach,
+        Wait(ms(300)),
+        WaitFinished,
+        CheckDialog(false),
+        CheckEditor("; mine\n\nTO STAIR\n  FD 20\nEND\n"),
+        EditorKeys("secondary-z"),
+        Wait(ms(300)),
+        CheckEditor("; mine"),
+        Say("Teach Kame: so does Copy to editor's, for definitions typed at the console"),
+        Console("TO STEP2"),
+        Console("FD 5"),
+        Console("END"),
+        WaitFinished,
+        CopyDefinitions,
+        Wait(ms(100)),
+        // TRI too, from earlier: Copy to editor keeps definitions across a
+        // Run, but only the newest of each name.
+        CheckEditor("; mine\n\nTO TRI :n\nREPEAT 3 [FD :n RT 120]\nEND\n\nTO STEP2\nFD 5\nEND\n"),
+        EditorKeys("secondary-z"),
+        Wait(ms(300)),
+        CheckEditor("; mine"),
+        Say("Colours: the page, found by searching for color"),
+        Run("FD 100", Speed::Instant),
+        WaitFinished,
+        Type("SETPC\nFD 100"),
+        ShowPanel,
+        SearchHelp("color"),
+        Wait(ms(100)),
+        CheckFirstResult("Colours"),
+        SearchHelp(""),
+        OpenHelp("colours"),
+        Wait(ms(500)),
+        CheckCurrentColour("\"#ffffff"),
+        Screenshot("colours"),
+        Say("Colours: the fields set the colour, and Copy to editor puts it at the cursor"),
+        ColourField(4, "#ff9a26"),
+        Wait(ms(100)),
+        CheckCurrentColour("\"#ff9a26"),
+        CursorAt("C\n"),
+        CopyColour,
+        Wait(ms(200)),
+        CheckEditor("SETPC \"#ff9a26\nFD 100"),
+        EditorKeys("secondary-z"),
+        Wait(ms(300)),
+        CheckEditor("SETPC\nFD 100"),
+        ChooseForm("RGBA"),
+        CheckCurrentColour("[255 154 38 255]"),
+        Say("Colours: a field that doesn't make sense leaves the colour as it was"),
+        ColourField(0, "300"),
+        Wait(ms(100)),
+        CheckColourProblem("R goes from 0 to 255."),
+        CheckCurrentColour("[255 154 38 255]"),
+        ScrollHelp(380.),
+        Wait(ms(200)),
+        Screenshot("colours-problem"),
+        ColourField(0, "64"),
+        Wait(ms(100)),
+        CheckColourProblem(""),
+        CheckCurrentColour("[64 154 38 255]"),
+        Say("Colours: the wheel, the palette and the names"),
+        WheelAt(0.5, 0.0),
+        CheckCurrentColour("[154 0 0 255]"),
+        PickPalette(4),
+        CheckCurrentColour("4"),
+        PickName("tomato"),
+        CheckCurrentColour("\"tomato"),
+        FilterNames("red"),
+        ScrollHelp(1000.),
+        Wait(ms(200)),
+        Screenshot("colours-names"),
+        CursorAt("C\n"),
+        CopyColour,
+        Wait(ms(200)),
+        CheckEditor("SETPC \"tomato\nFD 100"),
+        Run("SETPC \"tomato\nFD 100", Speed::Instant),
+        WaitFinished,
+        CheckColours("PENCOLOR=tomato FILLCOLOR=none BACKGROUND=0"),
+        Screenshot("colours-copied"),
+        CloseHelp,
+        Say("Show thinking: an arc on a turn, and a ruler on a move"),
+        SetThinking(true),
+        // At 80 steps a second, FD 100 takes 1.25 s and RT 120 0.5 s.
+        Run("FD 100 RT 120 FD 100", Speed::Animated(80.0)),
+        Wait(ms(1500)),
+        Screenshot("thinking-turn"),
+        Wait(ms(900)),
+        Screenshot("thinking-move"),
+        SetSpeed(Speed::Instant),
+        WaitFinished,
+        // On a light background it's dark amber, so it still shows.
+        Run("SETBG 7 SETPC 0 FD 100 RT 120", Speed::Animated(80.0)),
+        Wait(ms(1500)),
+        Screenshot("thinking-light"),
+        SetSpeed(Speed::Instant),
+        WaitFinished,
+        SetThinking(false),
+        Say("Drive Kame: the keys make console entries, and the same key joins up"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        Drive(true),
+        CheckDriving(true),
+        DriveKeys(&["up", "up", "up", "up", "up", "up", "up", "up", "up", "up"]),
+        WaitDriven,
+        CheckConsole("> FD 100"),
+        CheckTurtle(0.0, 100.0, 0.0),
+        // Each press draws its own line: ten for FD 100, which look as one.
+        CheckDrawn(10),
+        DriveKeys(&["right", "right", "right", "right", "right", "right"]),
+        WaitDriven,
+        CheckConsole("> RT 90"),
+        CheckTurtle(0.0, 100.0, 90.0),
+        DriveKeys(&["up", "up", "up", "up", "up", "up", "up", "up", "up", "up"]),
+        WaitDriven,
+        CheckTurtle(100.0, 100.0, 90.0),
+        DriveKeys(&["right", "right", "right"]),
+        WaitDriven,
+        CheckUndoLabel("RT 45"),
+        Wait(ms(100)),
+        Screenshot("driving"),
+        Say("Drive Kame: Backspace takes back the whole entry, and Space lifts the pen"),
+        DriveKeys(&["undo"]),
+        WaitDriven,
+        CheckTurtle(100.0, 100.0, 90.0),
+        CheckUndoLabel("FD 100"),
+        DriveKeys(&["space", "up", "space"]),
+        WaitDriven,
+        CheckDrawn(20),
+        CheckTurtle(110.0, 100.0, 90.0),
+        CheckConsole("> PU"),
+        CheckConsole("> PD"),
+        Say("Drive Kame: Teach Kame what you drove"),
+        OpenTeach,
+        Wait(ms(300)),
+        TeachName("corner"),
+        PressTeach,
+        Wait(ms(300)),
+        WaitDriven,
+        CheckEditor("TO CORNER\n  FD 100\n  RT 90\n  FD 100\n  PU\n  FD 10\n  PD\nEND\n"),
+        Say("Drive Kame: Esc and Run stop driving"),
+        DriveKeys(&["escape"]),
+        CheckDriving(false),
+        Drive(true),
+        Run("FD 1", Speed::Instant),
+        WaitFinished,
+        CheckDriving(false),
+        Say("Drive Kame: the steps, and presses waiting their turn"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        Drive(true),
+        DriveSteps(50.0, 90.0),
+        DriveKeys(&["up", "up", "up"]),
+        CheckDriveQueue(2),
+        WaitDriven,
+        CheckDriveQueue(0),
+        CheckConsole("> FD 150"),
+        CheckTurtle(0.0, 150.0, 0.0),
+        DriveKeys(&["right"]),
+        WaitDriven,
+        CheckConsole("> RT 90"),
+        Screenshot("driving-steps"),
+        Say("Drive Kame: typing at the console ends a driven entry"),
+        DriveSteps(10.0, 15.0),
+        DriveKeys(&["up"]),
+        WaitDriven,
+        Console("PRINT 1"),
+        WaitFinished,
+        DriveKeys(&["up"]),
+        WaitDriven,
+        CheckUndoLabel("FD 10"),
+        CheckTurtle(20.0, 150.0, 90.0),
+        Say("Drive Kame: the last entry's thought fades as the next starts"),
+        DriveKeys(&["right"]),
+        // Before its first frame, the turn hasn't started; the move fades.
+        CheckDriveThinking("nothing, fading move 10"),
+        WaitDriven,
+        Wait(ms(500)),
+        CheckDriveThinking("turn 15"),
+        DriveKeys(&["escape"]),
         Quit,
     ]
 }
@@ -471,14 +958,22 @@ pub struct Autotest {
 impl Autotest {
     pub fn from_env() -> Option<Autotest> {
         let value = std::env::var("PENDOWN_AUTOTEST").ok()?;
-        let dir = if value == "1" { PathBuf::from("target/autotest") } else { PathBuf::from(value) };
+        let dir = if value == "1" {
+            PathBuf::from("target/autotest")
+        } else {
+            PathBuf::from(value)
+        };
         std::fs::create_dir_all(&dir).ok();
         let steps = script();
         // PENDOWN_AUTOTEST_FROM="Phase 5" starts at the first section whose
         // title has that in it.
         let next = std::env::var("PENDOWN_AUTOTEST_FROM")
             .ok()
-            .and_then(|from| steps.iter().position(|s| matches!(s, Step::Say(text) if text.contains(from.as_str()))))
+            .and_then(|from| {
+                steps
+                    .iter()
+                    .position(|s| matches!(s, Step::Say(text) if text.contains(from.as_str())))
+            })
             .unwrap_or(0);
         Some(Autotest {
             steps,
@@ -509,7 +1004,10 @@ impl App {
     fn check(&mut self, ok: bool, what: String) {
         self.say(format!("  {} {what}", if ok { "ok  " } else { "FAIL" }));
         if !ok {
-            self.autotest.as_mut().expect("running the autotest").failures += 1;
+            self.autotest
+                .as_mut()
+                .expect("running the autotest")
+                .failures += 1;
         }
     }
 
@@ -532,8 +1030,14 @@ impl App {
         }
     }
 
+    /// The editor text the highlight is on. Console entries aren't in the
+    /// editor, so their spans don't index `run_text`.
     fn highlighted(&self) -> String {
-        self.animator.as_ref().and_then(|a| a.highlight).map_or(String::new(), |s| self.run_text[s.range()].to_string())
+        self.animator
+            .as_ref()
+            .and_then(|a| a.highlight)
+            .filter(|s| s.source == SourceId::Editor)
+            .map_or(String::new(), |s| self.run_text[s.range()].to_string())
     }
 
     /// Takes the session's next steps, until one has to wait. Returns
@@ -548,9 +1052,19 @@ impl App {
             if let Some((step, since)) = auto.waiting.clone() {
                 let done = match step {
                     Step::Wait(d) => since.elapsed() >= d,
-                    Step::WaitFinished => self.animator.as_ref().is_none_or(|a| a.finished()) || since.elapsed() > Duration::from_secs(60),
+                    Step::WaitDriven => {
+                        (self.animator.as_ref().is_none_or(|a| a.finished())
+                            && self.driving.as_ref().is_none_or(|d| d.queue.is_empty()))
+                            || since.elapsed() > Duration::from_secs(20)
+                    }
+                    Step::WaitFinished => {
+                        self.animator.as_ref().is_none_or(|a| a.finished())
+                            || since.elapsed() > Duration::from_secs(60)
+                    }
                     Step::WaitPaused => {
-                        self.animator.as_ref().is_none_or(|a| a.mode() == Mode::Paused || a.finished())
+                        self.animator
+                            .as_ref()
+                            .is_none_or(|a| a.mode() == Mode::Paused || a.finished())
                             || since.elapsed() > Duration::from_secs(10)
                     }
                     Step::CheckStopsWithin(limit) => {
@@ -558,7 +1072,13 @@ impl App {
                         match (exited, self.stop_at) {
                             (Some(exited), Some(stop)) => {
                                 let took = exited.saturating_duration_since(stop);
-                                self.check(took <= limit, format!("the interpreter stopped {:.3} ms after Stop", took.as_secs_f64() * 1e3));
+                                self.check(
+                                    took <= limit,
+                                    format!(
+                                        "the interpreter stopped {:.3} ms after Stop",
+                                        took.as_secs_f64() * 1e3
+                                    ),
+                                );
                                 true
                             }
                             _ if since.elapsed() > Duration::from_secs(2) => {
@@ -576,47 +1096,81 @@ impl App {
                 self.autotest.as_mut().unwrap().waiting = None;
                 continue;
             }
-            let Some(step) = auto.steps.get(auto.next).cloned() else { return took };
+            let Some(step) = auto.steps.get(auto.next).cloned() else {
+                return took;
+            };
             auto.next += 1;
             took = true;
             match step.clone() {
                 Step::Say(text) => self.say(format!("\n{text}")),
                 Step::Run(program, speed) => {
                     self.set_speed(speed, window, cx);
-                    self.editor.update(cx, |state, cx| state.set_value(program.to_string(), window, cx));
+                    self.editor.update(cx, |state, cx| {
+                        state.set_value(program.to_string(), window, cx)
+                    });
                     self.start(DEFAULT_CHANNEL, cx);
                 }
-                Step::Wait(_) | Step::WaitFinished | Step::WaitPaused | Step::CheckStopsWithin(_) => {
+                Step::Wait(_)
+                | Step::WaitFinished
+                | Step::WaitDriven
+                | Step::WaitPaused
+                | Step::CheckStopsWithin(_) => {
                     self.autotest.as_mut().unwrap().waiting = Some((step, Instant::now()));
                 }
                 Step::SetSpeed(speed) => self.set_speed(speed, window, cx),
                 Step::Pause => self.animator.as_mut().map_or((), |a| a.pause()),
                 Step::Resume => self.animator.as_mut().map_or((), |a| a.resume()),
                 Step::StepLine => self.animator.as_mut().map_or((), |a| a.step_line()),
-                Step::StepInstruction => self.animator.as_mut().map_or((), |a| a.step_instruction()),
+                Step::StepInstruction => {
+                    self.animator.as_mut().map_or((), |a| a.step_instruction())
+                }
                 Step::Stop => self.stop(cx),
                 Step::Screenshot(name) => self.screenshot(name),
                 Step::Track => self.autotest.as_mut().unwrap().track = Some(Vec::new()),
                 Step::CheckSpeeds(at, before, after) => {
-                    let track = self.autotest.as_mut().unwrap().track.take().unwrap_or_default();
+                    let track = self
+                        .autotest
+                        .as_mut()
+                        .unwrap()
+                        .track
+                        .take()
+                        .unwrap_or_default();
                     self.check_speeds(&track, at, before, after);
                 }
                 Step::Trace => self.autotest.as_mut().unwrap().trace = Some(Vec::new()),
                 Step::CheckTrace(expected) => {
-                    let trace = self.autotest.as_mut().unwrap().trace.take().unwrap_or_default();
-                    self.check(trace == expected, format!("the highlight went through {trace:?}"));
+                    let trace = self
+                        .autotest
+                        .as_mut()
+                        .unwrap()
+                        .trace
+                        .take()
+                        .unwrap_or_default();
+                    self.check(
+                        trace == expected,
+                        format!("the highlight went through {trace:?}"),
+                    );
                 }
                 Step::CheckHighlight(expected) => {
                     let text = self.highlighted();
                     self.check(text == expected, format!("the highlight is on {text:?}"));
                 }
                 Step::CheckMoving => {
-                    let moving = self.animator.as_ref().is_some_and(|a| a.partial(1.0).is_some());
+                    let moving = self
+                        .animator
+                        .as_ref()
+                        .is_some_and(|a| a.partial(1.0).is_some());
                     self.check(moving, "the turtle is part-way through the move".into());
                 }
                 Step::CheckNothingAhead => {
-                    let (ahead, text) = (self.animator.as_ref().map_or(0, |a| a.lines_ahead()), self.highlighted());
-                    self.check(ahead == 0, format!("paused at {text:?} with {ahead} lines run ahead"));
+                    let (ahead, text) = (
+                        self.animator.as_ref().map_or(0, |a| a.lines_ahead()),
+                        self.highlighted(),
+                    );
+                    self.check(
+                        ahead == 0,
+                        format!("paused at {text:?} with {ahead} lines run ahead"),
+                    );
                 }
                 Step::CheckFinishedWithin(limit) => {
                     let took = match (&self.run, self.finished_at) {
@@ -624,8 +1178,14 @@ impl App {
                         _ => None,
                     };
                     let ok = took.is_some_and(|t| t <= limit);
-                    let what = took.map_or("didn't finish".into(), |t| format!("finished in {:.2} s", t.as_secs_f64()));
-                    let detail = format!("{what}, {} lines drawn, {} events", self.canvas.borrow().drawing.segments(), self.events);
+                    let what = took.map_or("didn't finish".into(), |t| {
+                        format!("finished in {:.2} s", t.as_secs_f64())
+                    });
+                    let detail = format!(
+                        "{what}, {} lines drawn, {} events",
+                        self.canvas.borrow().drawing.segments(),
+                        self.events
+                    );
                     self.check(ok, detail);
                 }
                 Step::CheckFramesAtMost(limit) => {
@@ -635,6 +1195,222 @@ impl App {
                 }
                 Step::Console(line) => {
                     self.type_into_console(line, window, cx);
+                }
+                Step::ConsoleKeys(keys) => self.press_in_console(keys, window, cx),
+                Step::UndoConsole => self.undo_console(cx),
+                Step::OpenTeach => self.open_teach(window, cx),
+                Step::TeachAll(ticked) => {
+                    if let Some(dialog) = self.teach_dialog.clone() {
+                        dialog.update(cx, |dialog, cx| dialog.tick_all(ticked, cx));
+                    }
+                }
+                Step::CheckTeachRows(expected) => {
+                    let rows = self
+                        .teach_dialog
+                        .as_ref()
+                        .map_or(String::new(), |d| d.read(cx).describe());
+                    self.check(rows == expected, format!("the dialog's rows are {rows:?}"));
+                }
+                Step::CheckTeachProblem(expected) => {
+                    let problem = self
+                        .teach_dialog
+                        .as_ref()
+                        .and_then(|d| d.read(cx).name_problem(cx))
+                        .unwrap_or_default();
+                    self.check(
+                        problem == expected,
+                        format!("the name's problem is {problem:?}"),
+                    );
+                }
+                Step::CheckTeachPicture => {
+                    let drawn = self
+                        .teach_dialog
+                        .as_ref()
+                        .is_some_and(|d| d.read(cx).has_drawing());
+                    self.check(drawn, format!("the dialog's picture is drawn: {drawn}"));
+                }
+                Step::CheckDialog(open) => {
+                    let found = window.has_active_dialog(cx);
+                    self.check(found == open, format!("a dialog is open: {found}"));
+                }
+                Step::CheckUndoLabel(expected) => {
+                    let found = self
+                        .to_undo()
+                        .map(pendown::console::label)
+                        .unwrap_or_default();
+                    self.check(found == expected, format!("Undo names {found:?}"));
+                }
+                Step::CheckCanTeach(expected) => {
+                    let found = self.can_teach();
+                    self.check(found == expected, format!("Teach Kame is enabled: {found}"));
+                }
+                Step::Keys(keys) => self.press(keys, window, cx),
+                Step::ScrollHelp(y) => {
+                    self.help_panel.update(cx, |p, cx| {
+                        p.page_scroll.set_offset(point(px(0.), px(-y)));
+                        cx.notify();
+                    });
+                }
+                Step::Drive(on) => {
+                    if self.driving.is_some() != on {
+                        self.toggle_driving(window, cx);
+                    }
+                }
+                Step::DriveKeys(keys) => {
+                    use crate::driving::Input;
+                    use pendown::drive::Key;
+                    for key in keys {
+                        let input = match *key {
+                            "up" => Input::Key(Key::Forward),
+                            "down" => Input::Key(Key::Back),
+                            "left" => Input::Key(Key::Left),
+                            "right" => Input::Key(Key::Right),
+                            "space" => Input::Pen,
+                            "undo" => Input::Undo,
+                            "escape" => {
+                                self.stop_driving(cx);
+                                continue;
+                            }
+                            other => panic!("no driving key {other}"),
+                        };
+                        self.drive(input, cx);
+                    }
+                }
+                Step::DriveSteps(moves, turns) => {
+                    self.drive_steps = pendown::drive::Steps { moves, turns };
+                }
+                Step::CheckDriveQueue(expected) => {
+                    let found = self.driving.as_ref().map_or(0, |d| d.queue.len());
+                    self.check(found == expected, format!("{found} presses waiting"));
+                }
+                Step::CheckDriveThinking(expected) => {
+                    let found = self.thinking_described();
+                    self.check(found == expected, format!("Kame is thinking: {found}"));
+                }
+                Step::CheckDriving(expected) => {
+                    let found = self.driving.is_some();
+                    self.check(found == expected, format!("driving: {found}"));
+                }
+                Step::SetThinking(on) => {
+                    if self.show_thinking != on {
+                        self.toggle_thinking(cx);
+                    }
+                }
+                Step::ShowPanel => {
+                    if !self.help_open {
+                        self.toggle_help(cx);
+                    }
+                }
+                Step::ColourField(i, value) => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        let field = page.read(cx).fields[i].clone();
+                        field.update(cx, |f, cx| f.set_value(value.to_string(), window, cx));
+                        // Setting a field's text isn't typing, so say it was.
+                        page.update(cx, |p, cx| p.typed(i, window, cx));
+                    }
+                }
+                Step::WheelAt(x, y) => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        page.update(cx, |p, cx| p.pick_on_wheel(x, y, window, cx));
+                    }
+                }
+                Step::PickPalette(n) => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        page.update(cx, |p, cx| p.pick_palette(n, window, cx));
+                    }
+                }
+                Step::PickName(name) => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        let found = pendown::colours::names_matching(name)
+                            .into_iter()
+                            .find(|(n, _)| *n == name);
+                        if let Some((name, rgba)) = found {
+                            page.update(cx, |p, cx| p.pick_name(name, rgba, window, cx));
+                        }
+                    }
+                }
+                Step::ChooseForm(label) => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        page.update(cx, |p, cx| {
+                            let form = pendown::colours::forms(p.rgba())
+                                .into_iter()
+                                .find(|f| f.label() == label);
+                            if let Some(form) = form {
+                                p.choose(form, cx);
+                            }
+                        });
+                    }
+                }
+                Step::CopyColour => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        // After this update, since copying updates the window.
+                        window.defer(cx, move |window, cx| {
+                            page.update(cx, |p, cx| p.copy(window, cx));
+                        });
+                    }
+                }
+                Step::CheckCurrentColour(expected) => {
+                    let found = self
+                        .help_panel
+                        .read(cx)
+                        .colours
+                        .as_ref()
+                        .map(|p| p.read(cx).text())
+                        .unwrap_or_default();
+                    self.check(found == expected, format!("the current colour is {found}"));
+                }
+                Step::CheckColourProblem(expected) => {
+                    let found = self
+                        .help_panel
+                        .read(cx)
+                        .colours
+                        .as_ref()
+                        .and_then(|p| p.read(cx).problem.clone())
+                        .map(|(_, why)| why)
+                        .unwrap_or_default();
+                    self.check(
+                        found == expected,
+                        format!("the fields' problem is {found:?}"),
+                    );
+                }
+                Step::FilterNames(text) => {
+                    if let Some(page) = self.help_panel.read(cx).colours.clone() {
+                        let filter = page.read(cx).filter.clone();
+                        filter.update(cx, |f, cx| f.set_value(text.to_string(), window, cx));
+                    }
+                }
+                Step::CopyDefinitions => self.copy_definitions(window, cx),
+                Step::EditorKeys(keys) => self.press_in_editor(keys, window, cx),
+                Step::CheckBackground(expected) => {
+                    let found = self.canvas.borrow().drawing.background();
+                    self.check(found == expected, format!("the background is {found:?}"));
+                }
+                Step::TeachName(name) => {
+                    if let Some(dialog) = self.teach_dialog.clone() {
+                        let input = dialog.read(cx).name.clone();
+                        input.update(cx, |input, cx| input.set_value(name, window, cx));
+                        dialog.update(cx, |_, cx| cx.notify());
+                    }
+                }
+                Step::TeachToggle(i, shift) => {
+                    if let Some(dialog) = self.teach_dialog.clone() {
+                        dialog.update(cx, |dialog, cx| dialog.toggle(i, shift, cx));
+                    }
+                }
+                Step::PressTeach => {
+                    if let Some(dialog) = self.teach_dialog.clone() {
+                        // After this update, since teaching updates the window.
+                        window.defer(cx, move |window, cx| {
+                            dialog.update(cx, |dialog, cx| dialog.teach(window, cx));
+                        });
+                    }
+                }
+                Step::CheckConsoleTyped(expected) => {
+                    let typed = self.console_typed(cx);
+                    self.check(
+                        typed == expected,
+                        format!("the console's line holds {typed:?}"),
+                    );
                 }
                 Step::SaveTo(name) => {
                     let path = self.autotest.as_ref().unwrap().dir.join(name);
@@ -652,7 +1428,8 @@ impl App {
                     let text = self.editor.read(cx).value().to_string();
                     let offset = text.find(marker).map_or(0, |i| i + 1);
                     let at = crate::app::position(&text, offset);
-                    self.editor.update(cx, |state, cx| state.set_cursor_position(at, window, cx));
+                    self.editor
+                        .update(cx, |state, cx| state.set_cursor_position(at, window, cx));
                     if matches!(step, Step::F1At(_)) {
                         self.show_help(window, cx);
                     }
@@ -660,10 +1437,16 @@ impl App {
                 Step::CheckHelpPage(expected) => {
                     let page = self.help_panel.read(cx).page;
                     let title = match page {
-                        crate::help_panel::Page::Command(i) => pendown_logo::reference::reference().commands[i].title.clone(),
+                        crate::help_panel::Page::Command(i) => pendown_logo::reference::reference()
+                            .commands[i]
+                            .title
+                            .clone(),
                         crate::help_panel::Page::Contents => "Contents".to_string(),
                     };
-                    self.check(self.help_open && title == expected, format!("the help panel shows {title}"));
+                    self.check(
+                        self.help_open && title == expected,
+                        format!("the help panel shows {title}"),
+                    );
                 }
                 Step::SearchHelp(query) => {
                     let search = self.help_panel.read(cx).search.clone();
@@ -673,17 +1456,29 @@ impl App {
                 Step::CheckFirstResult(expected) => {
                     let query = self.help_panel.read(cx).query(cx);
                     let r = pendown_logo::reference::reference();
-                    let first = r.search(&query, false).first().map(|&i| r.commands[i].title.clone()).unwrap_or_default();
-                    self.check(first == expected, format!("the first result for {query:?} is {first}"));
+                    let first = r
+                        .search(&query, false)
+                        .first()
+                        .map(|&i| r.commands[i].title.clone())
+                        .unwrap_or_default();
+                    self.check(
+                        first == expected,
+                        format!("the first result for {query:?} is {first}"),
+                    );
                 }
                 Step::OpenHelp(name) => {
-                    self.help_panel.update(cx, |p, cx| p.open_name(name, window, cx));
+                    self.help_panel
+                        .update(cx, |p, cx| p.open_name(name, window, cx));
                 }
                 Step::HelpContents => {
-                    self.help_panel.update(cx, |p, cx| p.go(crate::help_panel::Page::Contents, window, cx));
+                    self.help_panel.update(cx, |p, cx| {
+                        p.go(crate::help_panel::Page::Contents, window, cx)
+                    });
                 }
                 Step::RunExample(name, n) => {
-                    let i = pendown_logo::reference::reference().find_index(name).expect("a help page");
+                    let i = pendown_logo::reference::reference()
+                        .find_index(name)
+                        .expect("a help page");
                     self.run_example(i, n, cx);
                 }
                 Step::CheckExampleHighlight(expected) => {
@@ -691,8 +1486,13 @@ impl App {
                     let text = running
                         .as_ref()
                         .and_then(|r| r.highlight.clone())
-                        .map_or(String::new(), |range| self.run_text.get(range).unwrap_or_default().to_string());
-                    self.check(text == expected, format!("the example's highlight is on {text:?}"));
+                        .map_or(String::new(), |range| {
+                            self.run_text.get(range).unwrap_or_default().to_string()
+                        });
+                    self.check(
+                        text == expected,
+                        format!("the example's highlight is on {text:?}"),
+                    );
                 }
                 Step::BackToMyDrawing => self.back_to_my_drawing(cx),
                 Step::CopyExample(name, n) => {
@@ -703,12 +1503,20 @@ impl App {
                 Step::CheckEditorEnds(expected) => {
                     let text = self.editor.read(cx).value().to_string();
                     let tail = &text[text.len().saturating_sub(expected.len() + 20)..];
-                    self.check(text.ends_with(expected), format!("the editor ends with {tail:?}"));
+                    self.check(
+                        text.ends_with(expected),
+                        format!("the editor ends with {tail:?}"),
+                    );
                 }
                 Step::CheckErrorHelp(expected) => {
                     let r = pendown_logo::reference::reference();
-                    let title = self.error_help.map_or(String::new(), |i| r.commands[i].title.clone());
-                    self.check(title == expected, format!("the console offers help on {title:?}"));
+                    let title = self
+                        .error_help
+                        .map_or(String::new(), |i| r.commands[i].title.clone());
+                    self.check(
+                        title == expected,
+                        format!("the console offers help on {title:?}"),
+                    );
                     if let Some(i) = self.error_help {
                         self.open_help(i, window, cx);
                     }
@@ -723,8 +1531,12 @@ impl App {
                         cx.notify();
                     });
                 }
-                Step::LoadLesson(lesson, program) => self.proceed(crate::files::After::Load { lesson, program }, window, cx),
-                Step::RunLesson(lesson, program) => self.run_source(crate::help_panel::Source::Lesson { lesson, program }, cx),
+                Step::LoadLesson(lesson, program) => {
+                    self.proceed(crate::files::After::Load { lesson, program }, window, cx)
+                }
+                Step::RunLesson(lesson, program) => {
+                    self.run_source(crate::help_panel::Source::Lesson { lesson, program }, cx)
+                }
                 Step::CloseHelp => {
                     if self.help_open {
                         self.toggle_help(cx);
@@ -733,7 +1545,9 @@ impl App {
                 Step::Type(text) => {
                     // Like typing: an edit the user could undo, which sends
                     // a change event. `set_value` sends none.
-                    self.editor.update(cx, |state, cx| state.replace_all(text.to_string(), window, cx));
+                    self.editor.update(cx, |state, cx| {
+                        state.replace_all(text.to_string(), window, cx)
+                    });
                 }
                 Step::CheckTitle(expected) => {
                     self.update_title(window, cx);
@@ -742,7 +1556,11 @@ impl App {
                 }
                 Step::CheckDiagnostics(expected) => {
                     let found: Vec<String> = self.editor.update(cx, |state, _| {
-                        state.diagnostics_mut().map_or(Vec::new(), |set| set.iter().map(|d| d.diagnostic.message.to_string()).collect())
+                        state.diagnostics_mut().map_or(Vec::new(), |set| {
+                            set.iter()
+                                .map(|d| d.diagnostic.message.to_string())
+                                .collect()
+                        })
                     });
                     self.check(found == expected, format!("the editor shows {found:?}"));
                 }
@@ -758,7 +1576,9 @@ impl App {
                     };
                     let image = image::open(&path).map(|i| i.to_rgba8());
                     let found = image.as_ref().map(|i| i.dimensions());
-                    let drawn = image.as_ref().map_or(0, |i| i.pixels().filter(|p| p.0 != [0, 0, 0, 255]).count());
+                    let drawn = image
+                        .as_ref()
+                        .map_or(0, |i| i.pixels().filter(|p| p.0 != [0, 0, 0, 255]).count());
                     let ok = found.as_ref().is_ok_and(|s| *s == size) && drawn > 0;
                     self.check(ok, format!("exported a {found:?} PNG with {drawn} drawn pixels, the canvas is {size:?}"));
                 }
@@ -766,13 +1586,38 @@ impl App {
                     let path = self.autotest.as_ref().unwrap().dir.join(name);
                     let svg = std::fs::read_to_string(&path).unwrap_or_default();
                     // The background, then a line for each mark.
-                    let marks = svg.lines().filter(|l| l.starts_with('<') && !l.starts_with("</") && !l.starts_with("<svg") && !l.starts_with("<g")).count() - 1;
+                    let marks = svg
+                        .lines()
+                        .filter(|l| {
+                            l.starts_with('<')
+                                && !l.starts_with("</")
+                                && !l.starts_with("<svg")
+                                && !l.starts_with("<g")
+                        })
+                        .count()
+                        - 1;
                     let drawn = self.canvas.borrow().drawing.segments();
-                    self.check(svg.starts_with("<svg ") && marks == drawn, format!("exported an SVG with {marks} marks, and {drawn} were drawn"));
+                    self.check(
+                        svg.starts_with("<svg ") && marks == drawn,
+                        format!("exported an SVG with {marks} marks, and {drawn} were drawn"),
+                    );
                 }
                 Step::CheckDrawn(expected) => {
                     let drawn = self.canvas.borrow().drawing.segments();
                     self.check(drawn == expected, format!("{drawn} lines and shapes drawn"));
+                }
+                Step::CheckTurtle(x, y, heading) => {
+                    let (fx, fy, found) = self
+                        .animator
+                        .as_ref()
+                        .map_or((0.0, 0.0, 0.0), |a| (a.pos.x, a.pos.y, a.heading));
+                    let ok = (fx - x).abs() < 0.01
+                        && (fy - y).abs() < 0.01
+                        && (found - heading).abs() < 0.01;
+                    self.check(
+                        ok,
+                        format!("the turtle is at {fx:.1}, {fy:.1}, heading {found:.1}"),
+                    );
                 }
                 Step::CheckConsole(expected) => {
                     let found = self.console.iter().any(|l| l.as_ref() == expected);
@@ -780,12 +1625,17 @@ impl App {
                 }
                 Step::MeasureRenders => {
                     pendown_logo::metrics::set_enabled(true);
-                    let start = (self.snapshot(), self.autotest.as_ref().unwrap().highlights, self.console.len());
+                    let start = (
+                        self.snapshot(),
+                        self.autotest.as_ref().unwrap().highlights,
+                        self.console.len(),
+                    );
                     self.autotest.as_mut().unwrap().measuring = Some(start);
                 }
                 Step::CheckRenders(per_second) => {
                     let auto = self.autotest.as_mut().unwrap();
-                    let (start, highlights, lines) = auto.measuring.take().expect("MeasureRenders came first");
+                    let (start, highlights, lines) =
+                        auto.measuring.take().expect("MeasureRenders came first");
                     let highlights = auto.highlights - highlights;
                     let printed = self.console.len().saturating_sub(lines) as u64;
                     let i = self.snapshot().since(&start);
@@ -794,7 +1644,10 @@ impl App {
                     // end the measurement.
                     self.check(
                         rate <= per_second && i.renders <= i.frames + 2,
-                        format!("{} renders at {rate:.0}/s, for {} animation frames", i.renders, i.frames),
+                        format!(
+                            "{} renders at {rate:.0}/s, for {} animation frames",
+                            i.renders, i.frames
+                        ),
                     );
                     self.check(
                         i.editor_renders <= highlights + 2 && i.console_renders <= printed + 2,
@@ -810,31 +1663,50 @@ impl App {
                 }
                 Step::CheckPanelsDrawn => {
                     let watch = self.watched.read(cx).watch.clone();
-                    let same = |drawn: &Option<std::sync::Arc<pendown_logo::Watch>>| match (drawn, &watch) {
-                        (Some(a), Some(b)) => std::sync::Arc::ptr_eq(a, b),
-                        (None, None) => true,
-                        _ => false,
-                    };
+                    let same =
+                        |drawn: &Option<std::sync::Arc<pendown_logo::Watch>>| match (drawn, &watch)
+                        {
+                            (Some(a), Some(b)) => std::sync::Arc::ptr_eq(a, b),
+                            (None, None) => true,
+                            _ => false,
+                        };
                     let counters = same(&self.counters_pane.read(cx).drawn);
                     let variables = same(&self.variables_pane.read(cx).drawn);
-                    self.check(counters && variables, format!("the counters drew the latest: {counters}, the variables: {variables}"));
+                    self.check(
+                        counters && variables,
+                        format!(
+                            "the counters drew the latest: {counters}, the variables: {variables}"
+                        ),
+                    );
                 }
                 Step::CheckColours(expected) => {
                     let watch = self.watched.read(cx).watch.clone();
                     let shown = watch.map_or(String::new(), |w| {
-                        w.colours.iter().map(|c| format!("{}={}", c.name, c.value)).collect::<Vec<_>>().join(" ")
+                        w.colours
+                            .iter()
+                            .map(|c| format!("{}={}", c.name, c.value))
+                            .collect::<Vec<_>>()
+                            .join(" ")
                     });
                     self.check(shown == expected, format!("the colours are {shown:?}"));
                 }
                 Step::CheckPanelsStart(expected) => {
                     let shown = self.panels(cx);
-                    self.check(shown.starts_with(expected), format!("the panels show {shown:?}"));
+                    self.check(
+                        shown.starts_with(expected),
+                        format!("the panels show {shown:?}"),
+                    );
                 }
                 Step::ToggleMetrics => self.toggle_metrics(window, cx),
                 Step::CheckOverlay(shown) => {
                     let lines = self.overlay.as_ref().map(|o| o.lines.clone());
                     let ok = match &lines {
-                        Some(lines) => shown && lines.first().is_some_and(|l| l.contains(" renders/s, UI CPU ")),
+                        Some(lines) => {
+                            shown
+                                && lines
+                                    .first()
+                                    .is_some_and(|l| l.contains(" renders/s, UI CPU "))
+                        }
                         None => !shown,
                     };
                     self.check(ok, format!("the overlay shows {lines:?}"));
@@ -846,7 +1718,10 @@ impl App {
                     let _ = writeln!(log, "\n{failures} checks failed");
                     let path = auto.dir.join("autotest.log");
                     std::fs::write(&path, log).ok();
-                    println!("\n{failures} checks failed; the log is in {}", path.display());
+                    println!(
+                        "\n{failures} checks failed; the log is in {}",
+                        path.display()
+                    );
                     std::process::exit(if failures == 0 { 0 } else { 1 });
                 }
             }
@@ -856,18 +1731,28 @@ impl App {
     /// What the counters and variables panels show, in short: each counter,
     /// with `*` on the one `REPCOUNT` outputs, the globals, then each scope.
     fn panels(&self, cx: &gpui_kit::App) -> String {
-        let Some(watch) = self.watched.read(cx).watch.clone() else { return String::new() };
+        let Some(watch) = self.watched.read(cx).watch.clone() else {
+            return String::new();
+        };
         let mut parts: Vec<String> = watch
             .counters
             .iter()
             .map(|c| {
                 let of = c.of.map_or(String::new(), |of| format!(" of {of}"));
-                format!("{} {}{of}{}", c.name, c.count, if c.repcount { "*" } else { "" })
+                format!(
+                    "{} {}{of}{}",
+                    c.name,
+                    c.count,
+                    if c.repcount { "*" } else { "" }
+                )
             })
             .collect();
         for scope in &watch.scopes {
-            let vars: Vec<String> =
-                scope.variables.iter().map(|v| format!("{}={}", v.name, v.value.as_deref().unwrap_or("-"))).collect();
+            let vars: Vec<String> = scope
+                .variables
+                .iter()
+                .map(|v| format!("{}={}", v.name, v.value.as_deref().unwrap_or("-")))
+                .collect();
             if !scope.name.is_empty() {
                 parts.push(format!("{}: {}", scope.name, vars.join(" ")));
             } else if !vars.is_empty() {
@@ -885,7 +1770,10 @@ impl App {
         // Average speeds over 0.4 s either side of the change, leaving out
         // the frames around it.
         let speed = |from: Duration, to: Duration| {
-            let window: Vec<_> = track.iter().filter(|(t, _)| (from..to).contains(&(*t - start))).collect();
+            let window: Vec<_> = track
+                .iter()
+                .filter(|(t, _)| (from..to).contains(&(*t - start)))
+                .collect();
             match (window.first(), window.last()) {
                 (Some(a), Some(b)) if b.0 > a.0 => (b.1 - a.1) / (b.0 - a.0).as_secs_f64(),
                 _ => 0.0,
@@ -897,7 +1785,9 @@ impl App {
         let close = |measured: f64, expected: f64| (measured - expected).abs() <= expected * 0.1;
         self.check(
             close(measured_before, before) && close(measured_after, after),
-            format!("the turtle moved at {measured_before:.0} steps/s, then {measured_after:.0} steps/s"),
+            format!(
+                "the turtle moved at {measured_before:.0} steps/s, then {measured_after:.0} steps/s"
+            ),
         );
     }
 
@@ -908,9 +1798,20 @@ impl App {
         let title = self.title.replace('\'', "");
         let status = std::process::Command::new("sh")
             .arg("-c")
-            .arg(format!("xwd -silent -name '{title}' | convert xwd:- '{}'", path.display()))
+            .arg(format!(
+                "xwd -silent -name '{title}' | convert xwd:- '{}'",
+                path.display()
+            ))
             .status();
         let ok = status.is_ok_and(|s| s.success());
-        self.say(format!("  screenshot {}{}", path.display(), if ok { "" } else { " (failed: needs xwd and ImageMagick)" }));
+        self.say(format!(
+            "  screenshot {}{}",
+            path.display(),
+            if ok {
+                ""
+            } else {
+                " (failed: needs xwd and ImageMagick)"
+            }
+        ));
     }
 }

@@ -59,3 +59,42 @@ TREE 120
 Walking back to where it started matters: each smaller tree leaves Kame just where it found it, so the next one can start in the right place.
 
 > **Try this:** change the angles, `30` and `60`, or `0.7`. A tree that turns 20 degrees and shrinks by 0.8 looks quite different.
+
+## Help Kame fix the bug
+
+Kame meant to draw the tree above.
+
+```picture
+PU BK 200 PD
+TO TREE :size
+  IF :size < 5 [STOP]
+  FD :size
+  LT 30
+  TREE :size * 0.7
+  RT 60
+  TREE :size * 0.7
+  LT 30
+  BK :size
+END
+
+TREE 120
+```
+
+```logo
+TO TREE :size
+  IF :size < 5 [STOP]
+  FD :size
+  LT 30
+  TREE :size * 0.7
+  RT 60
+  TREE :size * 0.7
+  BK :size
+END
+
+PU BK 200 PD
+TREE 120
+```
+
+This tree comes out in a tangle: its branches wander off, and the trunk ends up pointing the wrong way. Step through it with **Thinking** on, and watch which way Kame faces each time a smaller tree finishes. Does each one leave Kame just where it found it?
+
+One way to fix it: after the second smaller tree, Kame is still turned 30 degrees to the right. `LT 30` before `BK :size` points it back up its trunk.

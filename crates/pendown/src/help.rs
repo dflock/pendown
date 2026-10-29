@@ -13,7 +13,14 @@ pub const PICTURE_SIZE: u32 = 84;
 /// thinner than a pixel, or thin lines would be grey on a 1× screen.
 pub fn picture_options() -> Options {
     let thinnest = 1.0 / PICTURE_SIZE as f64;
-    Options { width: PICTURE_SIZE, height: PICTURE_SIZE, limit: 1_000_000, seed: Some(1), fit: true, svg: Some(thinnest) }
+    Options {
+        width: PICTURE_SIZE,
+        height: PICTURE_SIZE,
+        limit: 1_000_000,
+        seed: Some(1),
+        fit: true,
+        svg: Some(thinnest),
+    }
 }
 
 /// An example's name, for its saved picture: `forward-1` for FORWARD's
@@ -43,8 +50,12 @@ pub fn word_at(text: &str, offset: usize) -> Option<(String, std::ops::Range<usi
         Kind::Number => "numbers".to_string(),
         Kind::Comment => ";".to_string(),
         // `?2` is a template slot, like `?`.
-        _ if word.starts_with('?') && word[1..].chars().all(|c| c.is_ascii_digit()) => "?".to_string(),
-        Kind::Bracket | Kind::Operator | Kind::Keyword | Kind::Command | Kind::Unknown => word.to_string(),
+        _ if word.starts_with('?') && word[1..].chars().all(|c| c.is_ascii_digit()) => {
+            "?".to_string()
+        }
+        Kind::Bracket | Kind::Operator | Kind::Keyword | Kind::Command | Kind::Unknown => {
+            word.to_string()
+        }
     };
     Some((name, range))
 }

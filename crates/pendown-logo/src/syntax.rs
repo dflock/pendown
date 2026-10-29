@@ -75,7 +75,12 @@ fn pieces(text: &str) -> Vec<Piece> {
             }
             _ => {
                 let start = i;
-                while i < b.len() && !matches!(b[i], b' ' | b'\t' | b'\r' | b'\n' | b'[' | b']' | b'{' | b'}' | b';') {
+                while i < b.len()
+                    && !matches!(
+                        b[i],
+                        b' ' | b'\t' | b'\r' | b'\n' | b'[' | b']' | b'{' | b'}' | b';'
+                    )
+                {
                     i += 1;
                 }
                 out.push(Piece::Word(start..i));
@@ -102,7 +107,12 @@ fn defined(text: &str, pieces: &[Piece]) -> HashSet<String> {
 pub fn highlight(text: &str) -> Vec<(Range<usize>, Kind)> {
     let pieces = pieces(text);
     let procedures = defined(text, &pieces);
-    let span = |r: &Range<usize>| Span { source: SourceId::Editor, start: r.start as u32, end: r.end as u32, line: 0 };
+    let span = |r: &Range<usize>| Span {
+        source: SourceId::Editor,
+        start: r.start as u32,
+        end: r.end as u32,
+        line: 0,
+    };
     let mut out = Vec::new();
     for piece in &pieces {
         let word = match piece {
@@ -117,7 +127,12 @@ pub fn highlight(text: &str) -> Vec<(Range<usize>, Kind)> {
             Piece::Word(r) => r,
         };
         let mut tokens: Vec<Token> = Vec::new();
-        parse::split_word(&text[word.clone()], Some(span(word)), span(word), &mut tokens);
+        parse::split_word(
+            &text[word.clone()],
+            Some(span(word)),
+            span(word),
+            &mut tokens,
+        );
         for Token { tok, span } in tokens {
             let range = span.range();
             let kind = match tok {
@@ -127,8 +142,12 @@ pub fn highlight(text: &str) -> Vec<(Range<usize>, Kind)> {
                 Tok::Op(_) | Tok::Neg => Kind::Operator,
                 Tok::LParen | Tok::RParen => Kind::Bracket,
                 Tok::List(_) => continue,
-                Tok::Word(w) if w.eq_ignore_ascii_case("to") || w.eq_ignore_ascii_case("end") => Kind::Keyword,
-                Tok::Word(w) if prims::lookup(&w).is_some() || parse::slot_number(&w).is_some() => Kind::Command,
+                Tok::Word(w) if w.eq_ignore_ascii_case("to") || w.eq_ignore_ascii_case("end") => {
+                    Kind::Keyword
+                }
+                Tok::Word(w) if prims::lookup(&w).is_some() || parse::slot_number(&w).is_some() => {
+                    Kind::Command
+                }
                 Tok::Word(w) if procedures.contains(&w.to_lowercase()) => Kind::Procedure,
                 Tok::Word(_) => Kind::Unknown,
             };
@@ -146,7 +165,11 @@ pub fn highlight(text: &str) -> Vec<(Range<usize>, Kind)> {
 pub fn check(text: &str) -> Vec<Error> {
     let mut names = Names::default();
     let no_procedures = |_| None;
-    let mut cx = Cx { names: &mut names, known: &no_procedures, defining: Default::default() };
+    let mut cx = Cx {
+        names: &mut names,
+        known: &no_procedures,
+        defining: Default::default(),
+    };
     let (program, mut errors) = parse::parse_program_partly(text, SourceId::Editor, &mut cx);
     check_block(&program.top, &mut cx, &mut errors);
     for def in &program.procs {
@@ -173,7 +196,11 @@ fn check_expr(expr: &Expr, cx: &mut Cx, errors: &mut Vec<Error>) {
                     (Imp::Repeat, _) => &[1],
                     (Imp::Forever, _) => &[0],
                     (Imp::If | Imp::IfElse, _) => &[1, 2],
-                    (_, "run" | "runresult" | "apply" | "invoke" | "map" | "map.se" | "filter" | "find" | "reduce") => &[0],
+                    (
+                        _,
+                        "run" | "runresult" | "apply" | "invoke" | "map" | "map.se" | "filter"
+                        | "find" | "reduce",
+                    ) => &[0],
                     (_, "for" | "catch") => &[1],
                     (_, "while" | "until" | "do.while" | "do.until") => &[0, 1],
                     (_, "foreach") => std::slice::from_ref(&last),
@@ -183,10 +210,12 @@ fn check_expr(expr: &Expr, cx: &mut Cx, errors: &mut Vec<Error>) {
             };
             for (i, arg) in call.args.iter().enumerate() {
                 match arg {
-                    Expr::Lit(Value::List(list), span) if lists.contains(&i) => match parse::parse_list(list, *span, cx) {
-                        Ok(block) => check_block(&block, cx, errors),
-                        Err(e) => errors.push(e),
-                    },
+                    Expr::Lit(Value::List(list), span) if lists.contains(&i) => {
+                        match parse::parse_list(list, *span, cx) {
+                            Ok(block) => check_block(&block, cx, errors),
+                            Err(e) => errors.push(e),
+                        }
+                    }
                     arg => check_expr(arg, cx, errors),
                 }
             }
@@ -200,7 +229,10 @@ mod tests {
     use super::*;
 
     fn kinds(text: &str) -> Vec<(&str, Kind)> {
-        highlight(text).into_iter().map(|(r, k)| (&text[r], k)).collect()
+        highlight(text)
+            .into_iter()
+            .map(|(r, k)| (&text[r], k))
+            .collect()
     }
 
     #[test]
@@ -231,50 +263,96 @@ mod tests {
                 ("5", Number),
             ]
         );
-        assert_eq!(kinds("SHOW {a [b]}@0 ?2"), [
-            ("SHOW", Command),
-            ("{", Bracket),
-            ("a", Unknown),
-            ("[", Bracket),
-            ("b", Unknown),
-            ("]", Bracket),
-            ("}@0", Bracket),
-            ("?2", Command),
-        ]);
-        assert_eq!(kinds("(SUM :a-1 2)"), [
-            ("(", Bracket),
-            ("SUM", Command),
-            (":a", Variable),
-            ("-", Operator),
-            ("1", Number),
-            ("2", Number),
-            (")", Bracket),
-        ]);
+        assert_eq!(
+            kinds("SHOW {a [b]}@0 ?2"),
+            [
+                ("SHOW", Command),
+                ("{", Bracket),
+                ("a", Unknown),
+                ("[", Bracket),
+                ("b", Unknown),
+                ("]", Bracket),
+                ("}@0", Bracket),
+                ("?2", Command),
+            ]
+        );
+        assert_eq!(
+            kinds("(SUM :a-1 2)"),
+            [
+                ("(", Bracket),
+                ("SUM", Command),
+                (":a", Variable),
+                ("-", Operator),
+                ("1", Number),
+                ("2", Number),
+                (")", Bracket),
+            ]
+        );
     }
 
     fn messages(text: &str) -> Vec<(String, String)> {
         check(text)
             .into_iter()
-            .map(|e| (e.message, e.span.map_or(String::new(), |s| text[s.range()].to_string())))
+            .map(|e| {
+                (
+                    e.message,
+                    e.span
+                        .map_or(String::new(), |s| text[s.range()].to_string()),
+                )
+            })
             .collect()
     }
 
     #[test]
     fn errors_while_typing() {
-        assert_eq!(messages("FD 10\nFOOBAR 3"), [("I don't know how to FOOBAR".into(), "FOOBAR".into())]);
-        assert_eq!(messages("REPEAT 4 [FD]"), [("Not enough inputs to FD".into(), "FD".into())]);
-        assert_eq!(messages("IF 1 < 2 [PRINT 1] IFELSE \"true [BOX] [FD 1]"), [("I don't know how to BOX".into(), "BOX".into())]);
-        assert_eq!(messages("TO SPIN\n FOREVER [RT 1 REPEAT 2 [FD]]\nEND"), [("Not enough inputs to FD".into(), "FD".into())]);
-        assert_eq!(messages("REPEAT 4 [BOX 10]\nTO BOX :n\nFD :n\nEND"), [], "definitions anywhere in the text count");
+        assert_eq!(
+            messages("FD 10\nFOOBAR 3"),
+            [("I don't know how to FOOBAR".into(), "FOOBAR".into())]
+        );
+        assert_eq!(
+            messages("REPEAT 4 [FD]"),
+            [("Not enough inputs to FD".into(), "FD".into())]
+        );
+        assert_eq!(
+            messages("IF 1 < 2 [PRINT 1] IFELSE \"true [BOX] [FD 1]"),
+            [("I don't know how to BOX".into(), "BOX".into())]
+        );
+        assert_eq!(
+            messages("TO SPIN\n FOREVER [RT 1 REPEAT 2 [FD]]\nEND"),
+            [("Not enough inputs to FD".into(), "FD".into())]
+        );
+        assert_eq!(
+            messages("REPEAT 4 [BOX 10]\nTO BOX :n\nFD :n\nEND"),
+            [],
+            "definitions anywhere in the text count"
+        );
         // Lists that aren't instructions aren't checked.
         assert_eq!(messages("MAKE \"x [FD] SETPOS [1 2]"), []);
-        assert_eq!(messages("PRINT [1 2"), [("This [ has no matching ]".into(), "[".into())]);
+        assert_eq!(
+            messages("PRINT [1 2"),
+            [("This [ has no matching ]".into(), "[".into())]
+        );
         // Phase 2's lists and templates.
-        assert_eq!(messages("FOR [i 1 3] [FD]"), [("Not enough inputs to FD".into(), "FD".into())]);
-        assert_eq!(messages("WHILE [FOO] [FD 1]"), [("I don't know how to FOO".into(), "FOO".into())]);
-        assert_eq!(messages("SHOW MAP [SQRT] [1 2]"), [("Not enough inputs to SQRT".into(), "SQRT".into())]);
-        assert_eq!(messages("FOREACH [1 2] [PRINT BAR ?]"), [("I don't know how to BAR".into(), "BAR".into())]);
-        assert_eq!(messages("SHOW MAP [[x] :x * 2] [1] SHOW MAP \"FIRST [ab] CATCH \"error [FD 1]"), []);
+        assert_eq!(
+            messages("FOR [i 1 3] [FD]"),
+            [("Not enough inputs to FD".into(), "FD".into())]
+        );
+        assert_eq!(
+            messages("WHILE [FOO] [FD 1]"),
+            [("I don't know how to FOO".into(), "FOO".into())]
+        );
+        assert_eq!(
+            messages("SHOW MAP [SQRT] [1 2]"),
+            [("Not enough inputs to SQRT".into(), "SQRT".into())]
+        );
+        assert_eq!(
+            messages("FOREACH [1 2] [PRINT BAR ?]"),
+            [("I don't know how to BAR".into(), "BAR".into())]
+        );
+        assert_eq!(
+            messages("SHOW MAP [[x] :x * 2] [1] SHOW MAP \"FIRST [ab] CATCH \"error [FD 1]"),
+            []
+        );
         assert_eq!(messages("SHOW {1 2}@0 PRINT ?1"), []);
         assert!(check("").is_empty());
     }
@@ -290,7 +368,11 @@ mod timing {
         let mut n = 0;
         while s.lines().count() < 500 {
             n += 1;
-            s.push_str(&format!("TO SHAPE{n} :size\n  REPEAT {} [FD :size RT {}] ; side {n}\n  SETPC \"gold\nEND\n", 3 + n % 5, 360 / (3 + n % 5)));
+            s.push_str(&format!(
+                "TO SHAPE{n} :size\n  REPEAT {} [FD :size RT {}] ; side {n}\n  SETPC \"gold\nEND\n",
+                3 + n % 5,
+                360 / (3 + n % 5)
+            ));
         }
         s
     }

@@ -51,9 +51,18 @@ mod tests {
 
     #[test]
     fn the_same_seed_gives_the_same_numbers() {
-        let a: Vec<_> = { let mut r = Random::new(42); (0..5).map(|_| r.below(100)).collect() };
-        let b: Vec<_> = { let mut r = Random::new(42); (0..5).map(|_| r.below(100)).collect() };
-        let c: Vec<_> = { let mut r = Random::new(43); (0..5).map(|_| r.below(100)).collect() };
+        let a: Vec<_> = {
+            let mut r = Random::new(42);
+            (0..5).map(|_| r.below(100)).collect()
+        };
+        let b: Vec<_> = {
+            let mut r = Random::new(42);
+            (0..5).map(|_| r.below(100)).collect()
+        };
+        let c: Vec<_> = {
+            let mut r = Random::new(43);
+            (0..5).map(|_| r.below(100)).collect()
+        };
         assert_eq!(a, b);
         assert_ne!(a, c);
     }

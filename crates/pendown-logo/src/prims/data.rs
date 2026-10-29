@@ -115,7 +115,9 @@ pub(super) fn butfirst(_: &mut Interpreter, a: &Args) -> Out {
 pub(super) fn butlast(_: &mut Interpreter, a: &Args) -> Out {
     match parts(&a.vals[0]) {
         Parts::Letters(l) if !l.is_empty() => Ok(Some(word(&l[..l.len() - 1]))),
-        Parts::Items(l) if !l.items.is_empty() => Ok(Some(list(l.items[..l.items.len() - 1].to_vec()))),
+        Parts::Items(l) if !l.items.is_empty() => {
+            Ok(Some(list(l.items[..l.items.len() - 1].to_vec())))
+        }
         _ => Err(a.doesnt_like(0)),
     }
 }
@@ -127,7 +129,9 @@ pub(super) fn item(_: &mut Interpreter, a: &Args) -> Out {
     match parts(&a.vals[1]) {
         Parts::Letters(l) => at(l.len()).map(|i| word(&l[i..=i])),
         Parts::Items(l) => at(l.items.len()).map(|i| l.items[i].clone()),
-        Parts::Array(array) => array.position(index).map(|i| array.items.borrow()[i].clone()),
+        Parts::Array(array) => array
+            .position(index)
+            .map(|i| array.items.borrow()[i].clone()),
     }
     .map(Some)
     .ok_or_else(|| a.doesnt_like(0))
@@ -170,7 +174,9 @@ pub(super) fn fput(_: &mut Interpreter, a: &Args) -> Out {
             Ok(Some(list(items)))
         }
         Value::Array(_) => Err(a.doesnt_like(1)),
-        w => Ok(Some(Value::Word(format!("{}{}", letter(a, 0)?, text(w).expect("a word")).into()))),
+        w => Ok(Some(Value::Word(
+            format!("{}{}", letter(a, 0)?, text(w).expect("a word")).into(),
+        ))),
     }
 }
 
@@ -182,7 +188,9 @@ pub(super) fn lput(_: &mut Interpreter, a: &Args) -> Out {
             Ok(Some(list(items)))
         }
         Value::Array(_) => Err(a.doesnt_like(1)),
-        w => Ok(Some(Value::Word(format!("{}{}", text(w).expect("a word"), letter(a, 0)?).into()))),
+        w => Ok(Some(Value::Word(
+            format!("{}{}", text(w).expect("a word"), letter(a, 0)?).into(),
+        ))),
     }
 }
 
@@ -191,7 +199,9 @@ pub(super) fn combine(it: &mut Interpreter, a: &Args) -> Out {
     match &a.vals[1] {
         Value::List(_) => fput(it, a),
         Value::Array(_) => Err(a.doesnt_like(1)),
-        w => Ok(Some(Value::Word(format!("{}{}", a.word(0)?, text(w).expect("a word")).into()))),
+        w => Ok(Some(Value::Word(
+            format!("{}{}", a.word(0)?, text(w).expect("a word")).into(),
+        ))),
     }
 }
 
@@ -206,11 +216,16 @@ pub(super) fn reverse(_: &mut Interpreter, a: &Args) -> Out {
 
 /// The `FIRST`, or `BUTFIRST`, of each member of a list.
 fn each(it: &mut Interpreter, a: &Args, f: fn(&mut Interpreter, &Args) -> Out) -> Out {
-    let Value::List(l) = &a.vals[0] else { return Err(a.doesnt_like(0)) };
+    let Value::List(l) = &a.vals[0] else {
+        return Err(a.doesnt_like(0));
+    };
     let mut out = Vec::with_capacity(l.items.len());
     for item in &l.items {
         let one = [item.clone()];
-        let inner = Args { call: a.call, vals: &one };
+        let inner = Args {
+            call: a.call,
+            vals: &one,
+        };
         // An empty member: the error names the whole input.
         match f(it, &inner) {
             Ok(v) => out.push(v.expect("selectors output")),
@@ -261,7 +276,9 @@ pub(super) fn remdup(it: &mut Interpreter, a: &Args) -> Out {
 pub(super) fn quoted(_: &mut Interpreter, a: &Args) -> Out {
     match &a.vals[0] {
         Value::List(_) | Value::Array(_) => Ok(Some(a.vals[0].clone())),
-        w => Ok(Some(Value::Word(format!("\"{}", text(w).expect("a word")).into()))),
+        w => Ok(Some(Value::Word(
+            format!("\"{}", text(w).expect("a word")).into(),
+        ))),
     }
 }
 
@@ -270,7 +287,11 @@ pub(super) fn quoted(_: &mut Interpreter, a: &Args) -> Out {
 impl Args<'_> {
     /// An origin: input `i` if there is one, or 1.
     fn origin(&self, i: usize) -> Result<i64, Flow> {
-        if self.vals.len() > i { self.int(i) } else { Ok(1) }
+        if self.vals.len() > i {
+            self.int(i)
+        } else {
+            Ok(1)
+        }
     }
 
     fn array(&self, i: usize) -> Result<Rc<Array>, Flow> {
@@ -282,18 +303,28 @@ impl Args<'_> {
 
     /// A list of whole numbers, as `MDARRAY` and `MDITEM` take.
     fn ints(&self, i: usize) -> Result<Vec<i64>, Flow> {
-        let Value::List(l) = &self.vals[i] else { return Err(self.doesnt_like(i)) };
+        let Value::List(l) = &self.vals[i] else {
+            return Err(self.doesnt_like(i));
+        };
         let ints: Option<Vec<i64>> = l
             .items
             .iter()
-            .map(|v| v.as_num().filter(|n| n.fract() == 0.0 && n.abs() < 2f64.powi(53)).map(|n| n as i64))
+            .map(|v| {
+                v.as_num()
+                    .filter(|n| n.fract() == 0.0 && n.abs() < 2f64.powi(53))
+                    .map(|n| n as i64)
+            })
             .collect();
-        ints.filter(|ints| !ints.is_empty()).ok_or_else(|| self.doesnt_like(i))
+        ints.filter(|ints| !ints.is_empty())
+            .ok_or_else(|| self.doesnt_like(i))
     }
 }
 
 fn new_array(size: i64, origin: i64) -> Value {
-    Value::Array(Rc::new(Array::new(vec![list(Vec::new()); size as usize], origin)))
+    Value::Array(Rc::new(Array::new(
+        vec![list(Vec::new()); size as usize],
+        origin,
+    )))
 }
 
 /// `ARRAY size`, or `(ARRAY size origin)`: each member starts as `[]`.
@@ -314,7 +345,11 @@ pub(super) fn mdarray(_: &mut Interpreter, a: &Args) -> Out {
     if sizes.iter().any(|&s| s < 1) {
         return Err(a.doesnt_like(0));
     }
-    if sizes.iter().try_fold(1i64, |total, &s| total.checked_mul(s)).is_none_or(|total| total > super::arithmetic::MAX_MEMBERS) {
+    if sizes
+        .iter()
+        .try_fold(1i64, |total, &s| total.checked_mul(s))
+        .is_none_or(|total| total > super::arithmetic::MAX_MEMBERS)
+    {
         return Err(super::arithmetic::too_many(a));
     }
     let origin = a.origin(1)?;
@@ -332,8 +367,13 @@ pub(super) fn mdarray(_: &mut Interpreter, a: &Args) -> Out {
 }
 
 pub(super) fn listtoarray(_: &mut Interpreter, a: &Args) -> Out {
-    let Value::List(l) = &a.vals[0] else { return Err(a.doesnt_like(0)) };
-    Ok(Some(Value::Array(Rc::new(Array::new(l.items.clone(), a.origin(1)?)))))
+    let Value::List(l) = &a.vals[0] else {
+        return Err(a.doesnt_like(0));
+    };
+    Ok(Some(Value::Array(Rc::new(Array::new(
+        l.items.clone(),
+        a.origin(1)?,
+    )))))
 }
 
 pub(super) fn arraytolist(_: &mut Interpreter, a: &Args) -> Out {
@@ -342,10 +382,21 @@ pub(super) fn arraytolist(_: &mut Interpreter, a: &Args) -> Out {
 
 /// Replaces a member of `array`, unless that would put the array inside
 /// itself.
-fn set_member(a: &Args, array: &Rc<Array>, index: i64, value: &Value, index_input: usize) -> Result<(), Flow> {
-    let Some(i) = array.position(index) else { return Err(a.doesnt_like(index_input)) };
+fn set_member(
+    a: &Args,
+    array: &Rc<Array>,
+    index: i64,
+    value: &Value,
+    index_input: usize,
+) -> Result<(), Flow> {
+    let Some(i) = array.position(index) else {
+        return Err(a.doesnt_like(index_input));
+    };
     if array.is_in(value) {
-        return Err(a.error(format!("{} can't put an array inside itself", a.call.name.to_uppercase())));
+        return Err(a.error(format!(
+            "{} can't put an array inside itself",
+            a.call.name.to_uppercase()
+        )));
     }
     array.items.borrow_mut()[i] = value.clone();
     Ok(())
@@ -362,7 +413,10 @@ pub(super) fn setitem(_: &mut Interpreter, a: &Args) -> Out {
 fn inner_array(a: &Args, indices: &[i64], array: Rc<Array>) -> Result<Rc<Array>, Flow> {
     let mut array = array;
     for &index in indices {
-        let next = match array.position(index).map(|i| array.items.borrow()[i].clone()) {
+        let next = match array
+            .position(index)
+            .map(|i| array.items.borrow()[i].clone())
+        {
             Some(Value::Array(inner)) => inner,
             _ => return Err(a.doesnt_like(0)),
         };
@@ -376,7 +430,9 @@ pub(super) fn mditem(_: &mut Interpreter, a: &Args) -> Out {
     let indices = a.ints(0)?;
     let (last, path) = indices.split_last().expect("not empty");
     let array = inner_array(a, path, a.array(1)?)?;
-    let item = array.position(*last).map(|i| array.items.borrow()[i].clone());
+    let item = array
+        .position(*last)
+        .map(|i| array.items.borrow()[i].clone());
     item.map(Some).ok_or_else(|| a.doesnt_like(0))
 }
 
@@ -400,7 +456,11 @@ fn named_list(it: &mut Interpreter, a: &Args) -> Result<(crate::names::Sym, Rc<L
     let sym = it.intern(&name);
     match &it.vars[sym as usize] {
         Some(Value::List(l)) => Ok((sym, l.clone())),
-        Some(v) => Err(a.error(format!("{} doesn't like {} as the value of {name}", a.call.name.to_uppercase(), v.show()))),
+        Some(v) => Err(a.error(format!(
+            "{} doesn't like {} as the value of {name}",
+            a.call.name.to_uppercase(),
+            v.show()
+        ))),
         None => Err(a.error(format!("{name} has no value"))),
     }
 }
@@ -456,7 +516,11 @@ pub(super) fn numberp(it: &mut Interpreter, a: &Args) -> Out {
 
 /// A word, lowercased if `CASEIGNOREDP` is true.
 fn folded(it: &Interpreter, w: &str) -> String {
-    if it.ignore_case() { w.to_lowercase() } else { w.to_string() }
+    if it.ignore_case() {
+        w.to_lowercase()
+    } else {
+        w.to_string()
+    }
 }
 
 /// `BEFOREP word1 word2`: in character order, so `BEFOREP 3 12` is false.
@@ -477,13 +541,17 @@ fn find_member(it: &Interpreter, thing: &Value, within: &Value) -> Option<usize>
                 return None;
             }
             let letter = folded(it, &letter);
-            text(w)?.chars().position(|c| folded(it, &c.to_string()) == letter)
+            text(w)?
+                .chars()
+                .position(|c| folded(it, &c.to_string()) == letter)
         }
     }
 }
 
 pub(super) fn memberp(it: &mut Interpreter, a: &Args) -> Out {
-    Ok(Some(it.bool(find_member(it, &a.vals[0], &a.vals[1]).is_some())))
+    Ok(Some(
+        it.bool(find_member(it, &a.vals[0], &a.vals[1]).is_some()),
+    ))
 }
 
 /// `SUBSTRINGP thing1 thing2`: false for lists and arrays.
@@ -503,7 +571,9 @@ pub(super) fn member(it: &mut Interpreter, a: &Args) -> Out {
     let found = find_member(it, &a.vals[0], &a.vals[1]);
     match &a.vals[1] {
         Value::Array(_) => Err(a.doesnt_like(1)),
-        Value::List(l) => Ok(Some(list(found.map_or(Vec::new(), |i| l.items[i..].to_vec())))),
+        Value::List(l) => Ok(Some(list(
+            found.map_or(Vec::new(), |i| l.items[i..].to_vec()),
+        ))),
         w => {
             let letters: Vec<char> = text(w).expect("a word").chars().collect();
             Ok(Some(word(found.map_or(&[], |i| &letters[i..]))))

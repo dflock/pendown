@@ -34,7 +34,9 @@ fn waits_are_measured() {
     let sink = BatchSender::new(tx, 1, Duration::from_millis(4)).measured(control.clone());
     let job = {
         let control = control.clone();
-        thread::spawn(move || Interpreter::new(Box::new(sink), control).run_program("FD 1\nFD 2\nFD 3"))
+        thread::spawn(move || {
+            Interpreter::new(Box::new(sink), control).run_program("FD 1\nFD 2\nFD 3")
+        })
     };
     // A slow front end: it takes a while to read each batch, and to reply
     // to each Sync.
@@ -50,7 +52,15 @@ fn waits_are_measured() {
     job.join().unwrap().unwrap();
     let m = &control.metrics;
     assert_eq!(m.lockstep.count(), 3, "a Sync at each line");
-    assert!(m.lockstep.total() >= Duration::from_millis(15), "{:?}", m.lockstep.total());
-    assert!(m.channel.total() >= Duration::from_millis(10), "{:?}", m.channel.total());
+    assert!(
+        m.lockstep.total() >= Duration::from_millis(15),
+        "{:?}",
+        m.lockstep.total()
+    );
+    assert!(
+        m.channel.total() >= Duration::from_millis(10),
+        "{:?}",
+        m.channel.total()
+    );
     assert!(m.running.total() >= m.lockstep.total() + m.channel.total());
 }

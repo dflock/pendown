@@ -50,7 +50,7 @@ syntax {
     eg "\"word"
     names "\""
     help """
-    A quote in front of a word, `"red`, means the word itself, rather than a command or procedure to run. It's how you give a name to [MAKE], a colour to [SETPENCOLOR], or a word to [PRINT].
+    A quote in front of a word, `"red`, means the word itself, rather than a command or procedure to run. It's how you give a name to [MAKE], a colour to [SETPENCOLOR] (see [Colours]), or a word to [PRINT].
 
     The quote goes only at the front: there's no closing one. A word ends at a space or a bracket.
     """
@@ -61,6 +61,20 @@ syntax {
     REPEAT 3 [FD :size RT 120]
     """
     see "variables" "lists" "word"
+  }
+  colours {
+    title "Colours"
+    names "COLOURS" "COLORS" "COLOUR" "COLOR"
+    help """
+    Every command that takes a colour, such as [SETPENCOLOR], [SETBACKGROUND] or [SETFILLCOLOR], takes it in any of the forms below. Find a colour here, and copy it into your program at the cursor.
+    """
+    example title="Colours in four forms" """
+    SETBG "midnightblue
+    SETPC "#ff9a26
+    SETFC [255 99 71 128]
+    CIRCLE 100
+    """
+    see "setpencolor" "setbackground" "setfillcolor" "setpalette" "palette"
   }
   variables {
     title "Variables: :name"
@@ -3366,6 +3380,8 @@ logo {
         - the same with a fourth number for how solid it is, from 0 for invisible to 255 for solid, such as `[255 128 0 128]`;
         - a hex word, such as `"#ff8000`, `"#f80`, or `"#ff800080` with how solid it is.
 
+        Every colour, with a picker to find one and copy it into your program, is on [Colours].
+
         Kame starts with 7, white.
         """
         example title="Rainbow" """
@@ -3377,7 +3393,7 @@ logo {
         SETPENSIZE 12
         REPEAT 16 [SETPC REPCOUNT - 1 FD 120 BK 120 RT 22.5]
         """
-        see "pencolor" "setbackground" "setfillcolor" "setpalette"
+        see "colours" "pencolor" "setbackground" "setfillcolor" "setpalette"
       }
       setpalette {
         eg "SETPALETTE colornumber rgblist"
@@ -3387,7 +3403,7 @@ logo {
         obsolete #false
         phase 2
         help """
-        Changes the colour a palette number stands for. The first input is a number from 8 to 15, and the second is any colour except a palette number: see [SETPENCOLOR]. Run puts the palette back as it was.
+        Changes the colour a palette number stands for. The first input is a number from 8 to 15, and the second is any colour except a palette number: see [Colours]. Run puts the palette back as it was.
         """
         example title="My own colour 8" """
         SETPALETTE 8 [255 105 180]
@@ -3395,7 +3411,7 @@ logo {
         SETPENSIZE 6
         REPEAT 5 [FD 150 RT 144]
         """
-        see "palette" "setpencolor"
+        see "colours" "palette" "setpencolor"
       }
       setpensize {
         eg "SETPENSIZE size"
@@ -3439,14 +3455,14 @@ logo {
         obsolete #false
         phase 1
         help """
-        Sets the colour behind the drawing, in any of the forms [SETPENCOLOR] takes. What's already drawn stays. The background is always solid, so how solid the colour is doesn't matter. It starts as 0, black.
+        Sets the colour behind the drawing, in any of the forms on [Colours]. What's already drawn stays. The background is always solid, so how solid the colour is doesn't matter. It starts as 0, black.
         """
         example title="Stars at night" """
         SETBG "midnightblue
         SETPC "yellow
         REPEAT 5 [FD 150 RT 144]
         """
-        see "background" "setpencolor"
+        see "colours" "background" "setpencolor"
       }
       setfillcolor {
         eg """
@@ -3462,7 +3478,7 @@ logo {
         extension #true
         source "LibreLogo (FILLCOLOR), FMSLogo (SETFLOODCOLOR)"
         help """
-        Sets the colour that shapes, [CIRCLE], [ELLIPSE], [SQUARE] and [RECTANGLE], are filled with, in any of the forms [SETPENCOLOR] takes. `SETFC "none` turns filling off, and that's how Kame starts, so shapes are only outlines.
+        Sets the colour that shapes, [CIRCLE], [ELLIPSE], [SQUARE] and [RECTANGLE], are filled with, in any of the forms on [Colours]. `SETFC "none` turns filling off, and that's how Kame starts, so shapes are only outlines.
 
         A shape is filled even when the pen is up, so with the pen up you get a filled shape with no outline.
         """
@@ -3477,7 +3493,7 @@ logo {
         PU
         REPEAT 3 [CIRCLE 80 FD 70 RT 120]
         """
-        see "fillcolor" "setpencolor" "circle"
+        see "colours" "fillcolor" "setpencolor" "circle"
       }
     }
     pen-queries {
@@ -3527,14 +3543,14 @@ logo {
         obsolete #false
         phase 1
         help """
-        Outputs the colour Kame draws with, in the form it was set: a palette number, a list, a colour name or a hex word. See [SETPENCOLOR].
+        Outputs the colour Kame draws with, in the form it was set: a palette number, a list, a colour name or a hex word. See [Colours].
         """
         example title="Which colour?" """
         PRINT PENCOLOR
         SETPC "tomato
         PRINT PENCOLOR
         """
-        see "setpencolor"
+        see "colours" "setpencolor"
       }
       palette {
         eg "PALETTE colornumber"
@@ -3544,13 +3560,13 @@ logo {
         obsolete #false
         phase 2
         help """
-        Outputs the colour a palette number stands for, as a list of red, green and blue from 0 to 255, with a fourth number if it isn't solid.
+        Outputs the colour a palette number stands for, as a list of red, green and blue from 0 to 255, with a fourth number if it isn't solid. The palette's colours are on [Colours].
         """
         example title="What's in the palette" """
         SHOW PALETTE 4
         SHOW PALETTE 14
         """
-        see "setpalette"
+        see "colours" "setpalette"
       }
       pensize {
         eg "PENSIZE"
@@ -3592,13 +3608,13 @@ logo {
         obsolete #false
         phase 1
         help """
-        Outputs the background colour, in the form it was set. See [SETPENCOLOR].
+        Outputs the background colour, in the form it was set. See [Colours].
         """
         example title="What's behind?" """
         SETBG [20 40 80]
         SHOW BACKGROUND
         """
-        see "setbackground"
+        see "colours" "setbackground"
       }
       fillcolor {
         eg """
@@ -3612,14 +3628,14 @@ logo {
         extension #true
         source "LibreLogo, FMSLogo (FLOODCOLOR)"
         help """
-        Outputs the colour shapes are filled with, in the form it was set, or `none` if filling is off.
+        Outputs the colour shapes are filled with, in the form it was set, or `none` if filling is off. See [Colours].
         """
         example title="Which fill?" """
         PRINT FILLCOLOR
         SETFC "gold
         PRINT FILLCOLOR
         """
-        see "setfillcolor"
+        see "colours" "setfillcolor"
       }
     }
     saving-and-loading-pictures {

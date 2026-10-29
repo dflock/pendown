@@ -3,12 +3,15 @@
 //! modules it declares are the window.
 
 pub mod animator;
+pub mod colours;
 pub mod console;
 pub mod document;
+pub mod drive;
 pub mod errors;
 pub mod help;
 pub mod markup;
 pub mod metrics;
 pub mod run;
 pub mod speed;
+pub mod teach;
 pub mod tutorial;

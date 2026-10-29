@@ -19,16 +19,33 @@ fn check(name: &str, program: &str, width: u32, height: u32) {
 
 /// Checks the picture, and returns what the program printed.
 fn check_output(name: &str, program: &str, width: u32, height: u32) -> String {
-    let output = render(program, Options { width, height, limit: 10_000_000, seed: Some(1), fit: false, svg: None });
+    let output = render(
+        program,
+        Options {
+            width,
+            height,
+            limit: 10_000_000,
+            seed: Some(1),
+            fit: false,
+            svg: None,
+        },
+    );
     assert_eq!(output.result, Ok(()), "{name} should run without errors");
     let printed = output.printed.clone();
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/pictures").join(format!("{name}.png"));
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/pictures")
+        .join(format!("{name}.png"));
     if std::env::var_os("UPDATE_PICTURES").is_some() {
         std::fs::write(&path, &output.png).unwrap();
         return printed;
     }
     let expected = image::open(&path)
-        .unwrap_or_else(|e| panic!("{}: {e}. Run with UPDATE_PICTURES=1 to create it", path.display()))
+        .unwrap_or_else(|e| {
+            panic!(
+                "{}: {e}. Run with UPDATE_PICTURES=1 to create it",
+                path.display()
+            )
+        })
         .to_rgba8();
     let actual = image::load_from_memory(&output.png).unwrap().to_rgba8();
     assert_eq!(actual.dimensions(), expected.dimensions(), "{name}: size");
@@ -41,7 +58,11 @@ fn check_output(name: &str, program: &str, width: u32, height: u32) -> String {
     if share > MAX_DIFFERENT {
         let failed = path.with_extension("actual.png");
         std::fs::write(&failed, &output.png).unwrap();
-        panic!("{name}: {different} pixels differ ({:.2}%); the new picture is in {}", share * 100.0, failed.display());
+        panic!(
+            "{name}: {different} pixels differ ({:.2}%); the new picture is in {}",
+            share * 100.0,
+            failed.display()
+        );
     }
     printed
 }
@@ -51,7 +72,8 @@ fn check_output(name: &str, program: &str, width: u32, height: u32) -> String {
 /// one's picture and printed output are saved, as `example-NAME.png` and
 /// `.txt` for phase 1, and `phase-N-NAME` after that.
 fn examples(phase: u32) {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("../../examples/phase-{phase}"));
+    let dir =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("../../examples/phase-{phase}"));
     // Only the programs: the folder may hold pictures of them too.
     let mut programs: Vec<_> = std::fs::read_dir(&dir)
         .unwrap()
@@ -62,10 +84,16 @@ fn examples(phase: u32) {
     assert!(programs.len() >= 4);
     for path in programs {
         let stem = path.file_stem().unwrap().to_string_lossy();
-        let name = if phase == 1 { format!("example-{stem}") } else { format!("phase-{phase}-{stem}") };
+        let name = if phase == 1 {
+            format!("example-{stem}")
+        } else {
+            format!("phase-{phase}-{stem}")
+        };
         let program = std::fs::read_to_string(&path).unwrap();
         let printed = check_output(&name, &program, 400, 400);
-        let expected_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/pictures").join(format!("{name}.txt"));
+        let expected_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/pictures")
+            .join(format!("{name}.txt"));
         if std::env::var_os("UPDATE_PICTURES").is_some() {
             std::fs::write(&expected_path, &printed).unwrap();
             continue;
@@ -161,7 +189,12 @@ SETPOS [-400 400]
 #[test]
 fn wrapping_spiral() {
     // Starts near the right edge, so the spiral wraps round on itself.
-    check("wrapping-spiral", "PU SETXY 350 0 PD\nREPEAT 120 [FD REPCOUNT * 6 RT 61]", 300, 300);
+    check(
+        "wrapping-spiral",
+        "PU SETXY 350 0 PD\nREPEAT 120 [FD REPCOUNT * 6 RT 61]",
+        300,
+        300,
+    );
 }
 
 #[test]

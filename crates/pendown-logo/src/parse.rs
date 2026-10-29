@@ -24,7 +24,11 @@ pub struct Arity {
 
 impl Arity {
     pub const fn fixed(n: usize) -> Arity {
-        Arity { min: n, default: n, max: Some(n) }
+        Arity {
+            min: n,
+            default: n,
+            max: Some(n),
+        }
     }
 }
 
@@ -115,7 +119,11 @@ impl Expr {
                     Target::Infix(op) => prims::infix_prim(op).names[0].to_string(),
                 };
                 let args: Vec<_> = call.args.iter().map(|a| a.sexp(names)).collect();
-                if args.is_empty() { format!("({name})") } else { format!("({name} {})", args.join(" ")) }
+                if args.is_empty() {
+                    format!("({name})")
+                } else {
+                    format!("({name} {})", args.join(" "))
+                }
             }
         }
     }
@@ -151,7 +159,10 @@ pub struct Cx<'a> {
 
 impl Cx<'_> {
     fn arity(&self, sym: Sym) -> Option<Arity> {
-        self.defining.get(&sym).copied().or_else(|| (self.known)(sym))
+        self.defining
+            .get(&sym)
+            .copied()
+            .or_else(|| (self.known)(sym))
     }
 }
 
@@ -160,7 +171,11 @@ impl Cx<'_> {
 /// line, so the editor can show them all.
 pub fn parse_program(text: &str, source: SourceId, cx: &mut Cx) -> Result<Program, Vec<Error>> {
     let (program, errors) = parse_program_partly(text, source, cx);
-    if errors.is_empty() { Ok(program) } else { Err(errors) }
+    if errors.is_empty() {
+        Ok(program)
+    } else {
+        Err(errors)
+    }
 }
 
 /// Like `parse_program`, but also returns whatever parsed, alongside the
@@ -168,7 +183,15 @@ pub fn parse_program(text: &str, source: SourceId, cx: &mut Cx) -> Result<Progra
 pub fn parse_program_partly(text: &str, source: SourceId, cx: &mut Cx) -> (Program, Vec<Error>) {
     let all = match reader::read(text, source) {
         Ok(all) => all,
-        Err(e) => return (Program { procs: Vec::new(), top: Vec::new() }, vec![e]),
+        Err(e) => {
+            return (
+                Program {
+                    procs: Vec::new(),
+                    top: Vec::new(),
+                },
+                vec![e],
+            );
+        }
     };
     let items = &all.items;
     let spans = all.spans.as_ref().expect("source lists have spans");
@@ -176,7 +199,12 @@ pub fn parse_program_partly(text: &str, source: SourceId, cx: &mut Cx) -> (Progr
 
     enum Seg {
         Top(Range<usize>),
-        Def { sym: Sym, inputs: Vec<Sym>, body: Range<usize>, title: Span },
+        Def {
+            sym: Sym,
+            inputs: Vec<Sym>,
+            body: Range<usize>,
+            title: Span,
+        },
     }
     let starts_line = |i: usize| i == 0 || spans[i - 1].line != spans[i].line;
     let word = |i: usize| match &items[i] {
@@ -211,12 +239,18 @@ pub fn parse_program_partly(text: &str, source: SourceId, cx: &mut Cx) -> (Progr
         let mut title = title_start;
         let sym = match name {
             Some(name) if name.starts_with([':', '"']) || parse_number(name).is_some() => {
-                errors.push(Error::new(format!("{name} can't be the name of a procedure"), Some(spans[j])));
+                errors.push(Error::new(
+                    format!("{name} can't be the name of a procedure"),
+                    Some(spans[j]),
+                ));
                 None
             }
             Some(name) if prims::lookup(name).is_some() => {
                 errors.push(Error::new(
-                    format!("{} is already a Pendown command, so pick another name", name.to_uppercase()),
+                    format!(
+                        "{} is already a Pendown command, so pick another name",
+                        name.to_uppercase()
+                    ),
                     Some(spans[j]),
                 ));
                 None
@@ -225,12 +259,18 @@ pub fn parse_program_partly(text: &str, source: SourceId, cx: &mut Cx) -> (Progr
                 let sym = cx.names.define(name);
                 title = title.to(spans[j]);
                 if cx.defining.contains_key(&sym) {
-                    errors.push(Error::new(format!("{name} is defined twice"), Some(spans[j])));
+                    errors.push(Error::new(
+                        format!("{name} is defined twice"),
+                        Some(spans[j]),
+                    ));
                 }
                 Some(sym)
             }
             None => {
-                errors.push(Error::new("TO needs the name of the new procedure", Some(title_start)));
+                errors.push(Error::new(
+                    "TO needs the name of the new procedure",
+                    Some(title_start),
+                ));
                 None
             }
         };
@@ -238,7 +278,9 @@ pub fn parse_program_partly(text: &str, source: SourceId, cx: &mut Cx) -> (Progr
             j += 1;
         }
         let mut inputs = Vec::new();
-        while on_line(j) && let Some(w) = word(j).and_then(|w| w.strip_prefix(':')) {
+        while on_line(j)
+            && let Some(w) = word(j).and_then(|w| w.strip_prefix(':'))
+        {
             inputs.push(cx.names.define(w));
             title = title.to(spans[j]);
             j += 1;
@@ -261,7 +303,12 @@ pub fn parse_program_partly(text: &str, source: SourceId, cx: &mut Cx) -> (Progr
             Some(end) => {
                 if let Some(sym) = sym {
                     cx.defining.insert(sym, Arity::fixed(inputs.len()));
-                    segs.push(Seg::Def { sym, inputs, body: body_start..end, title });
+                    segs.push(Seg::Def {
+                        sym,
+                        inputs,
+                        body: body_start..end,
+                        title,
+                    });
                 }
                 i = end + 1;
             }
@@ -276,18 +323,31 @@ pub fn parse_program_partly(text: &str, source: SourceId, cx: &mut Cx) -> (Progr
     segs.push(Seg::Top(top_start..items.len()));
 
     // Pass 2: parse every line, now that all the arities are known.
-    let mut program = Program { procs: Vec::new(), top: Vec::new() };
+    let mut program = Program {
+        procs: Vec::new(),
+        top: Vec::new(),
+    };
     for seg in segs {
         match seg {
             Seg::Top(range) => {
                 let tokens = runparse(&items[range.clone()], Some(&spans[range]), None);
                 parse_lines(&tokens, cx, &mut program.top, &mut errors);
             }
-            Seg::Def { sym, inputs, body, title } => {
+            Seg::Def {
+                sym,
+                inputs,
+                body,
+                title,
+            } => {
                 let tokens = runparse(&items[body.clone()], Some(&spans[body]), None);
                 let mut block = Vec::new();
                 parse_lines(&tokens, cx, &mut block, &mut errors);
-                program.procs.push(ProcDef { sym, inputs, body: block, title });
+                program.procs.push(ProcDef {
+                    sym,
+                    inputs,
+                    body: block,
+                    title,
+                });
             }
         }
     }
@@ -300,7 +360,12 @@ pub fn parse_program_partly(text: &str, source: SourceId, cx: &mut Cx) -> (Progr
 /// it (ADR 0001). Newlines inside a list don't end instructions.
 pub fn parse_list(list: &List, fallback: Span, cx: &mut Cx) -> Result<Block, Error> {
     let tokens = runparse(&list.items, list.spans.as_deref(), Some(fallback));
-    let mut parser = Parser { tokens: &tokens, pos: 0, cx, depth: 0 };
+    let mut parser = Parser {
+        tokens: &tokens,
+        pos: 0,
+        cx,
+        depth: 0,
+    };
     let mut block = Vec::new();
     while parser.pos < tokens.len() {
         block.push(parser.instruction()?);
@@ -325,7 +390,12 @@ fn parse_lines(tokens: &[Token], cx: &mut Cx, block: &mut Block, errors: &mut Ve
             }
             end += 1;
         }
-        let mut parser = Parser { tokens: &tokens[start..end], pos: 0, cx, depth: 0 };
+        let mut parser = Parser {
+            tokens: &tokens[start..end],
+            pos: 0,
+            cx,
+            depth: 0,
+        };
         while parser.pos < parser.tokens.len() {
             match parser.instruction() {
                 Ok(instr) => block.push(instr),
@@ -366,9 +436,18 @@ fn runparse(items: &[Value], spans: Option<&[Span]>, fallback: Option<Span>) -> 
         let span = spans.map(|s| s[i]);
         let whole = span.or(fallback).expect("either spans or a fallback");
         match item {
-            Value::List(list) => out.push(Token { tok: Tok::List(list.clone()), span: whole }),
-            Value::Num(n) => out.push(Token { tok: Tok::Lit(Value::Num(*n)), span: whole }),
-            Value::Array(_) => out.push(Token { tok: Tok::Lit(item.clone()), span: whole }),
+            Value::List(list) => out.push(Token {
+                tok: Tok::List(list.clone()),
+                span: whole,
+            }),
+            Value::Num(n) => out.push(Token {
+                tok: Tok::Lit(Value::Num(*n)),
+                span: whole,
+            }),
+            Value::Array(_) => out.push(Token {
+                tok: Tok::Lit(item.clone()),
+                span: whole,
+            }),
             Value::Word(w) => split_word(w, span, whole, &mut out),
         }
     }
@@ -385,7 +464,11 @@ fn is_infix(c: u8) -> bool {
 
 pub(crate) fn split_word(text: &str, span: Option<Span>, whole: Span, out: &mut Vec<Token>) {
     let sub = |a: usize, b: usize| match span {
-        Some(s) => Span { start: s.start + a as u32, end: s.start + b as u32, ..s },
+        Some(s) => Span {
+            start: s.start + a as u32,
+            end: s.start + b as u32,
+            ..s
+        },
         None => whole,
     };
     let b = text.as_bytes();
@@ -443,7 +526,10 @@ pub(crate) fn split_word(text: &str, span: Option<Span>, whole: Span, out: &mut 
                 // that a sign straight after a number's `e` is kept: `1e-3`.
                 let mut after_e = false;
                 let mut digits = false;
-                while i < n && !is_paren(b[i]) && (!is_infix(b[i]) || (after_e && matches!(b[i], b'+' | b'-'))) {
+                while i < n
+                    && !is_paren(b[i])
+                    && (!is_infix(b[i]) || (after_e && matches!(b[i], b'+' | b'-')))
+                {
                     after_e = digits && matches!(b[i], b'e' | b'E');
                     digits |= b[i].is_ascii_digit();
                     i += 1;
@@ -456,7 +542,10 @@ pub(crate) fn split_word(text: &str, span: Option<Span>, whole: Span, out: &mut 
                 }
             }
         };
-        out.push(Token { tok, span: sub(start, i) });
+        out.push(Token {
+            tok,
+            span: sub(start, i),
+        });
     }
 }
 
@@ -487,7 +576,10 @@ impl Parser<'_, '_, '_> {
 
     fn instruction(&mut self) -> Result<Instr, Error> {
         let expr = self.expr(1)?;
-        Ok(Instr { span: expr.span(), expr })
+        Ok(Instr {
+            span: expr.span(),
+            expr,
+        })
     }
 
     /// Infix expressions by precedence climbing, left-associative.
@@ -495,7 +587,10 @@ impl Parser<'_, '_, '_> {
         self.depth += 1;
         if self.depth > MAX_NESTING {
             let span = self.tokens[self.pos.min(self.tokens.len() - 1)].span;
-            return Err(Error::new("This expression is nested too deeply", Some(span)));
+            return Err(Error::new(
+                "This expression is nested too deeply",
+                Some(span),
+            ));
         }
         let mut lhs = self.unary()?;
         while let Some(&Tok::Op(op)) = self.peek()
@@ -528,7 +623,10 @@ impl Parser<'_, '_, '_> {
             }
             Some(&Tok::Op(op)) => {
                 let span = self.tokens[self.pos].span;
-                Err(Error::new(format!("{} needs something before it", op.symbol()), Some(span)))
+                Err(Error::new(
+                    format!("{} needs something before it", op.symbol()),
+                    Some(span),
+                ))
             }
             _ => self.primary(),
         }
@@ -536,7 +634,11 @@ impl Parser<'_, '_, '_> {
 
     fn primary(&mut self) -> Result<Expr, Error> {
         let Some(token) = self.tokens.get(self.pos) else {
-            let span = self.tokens.last().expect("not called on an empty line").span;
+            let span = self
+                .tokens
+                .last()
+                .expect("not called on an empty line")
+                .span;
             return Err(Error::new("Expected an input here", Some(span)));
         };
         let span = token.span;
@@ -545,7 +647,9 @@ impl Parser<'_, '_, '_> {
             Tok::Lit(v) => Ok(Expr::Lit(v.clone(), span)),
             Tok::Quoted(w) => Ok(Expr::Lit(Value::Word(w.clone()), span)),
             Tok::List(list) => Ok(Expr::Lit(Value::List(list.clone()), span)),
-            Tok::Var(name) if name.is_empty() => Err(Error::new("A variable name is missing after :", Some(span))),
+            Tok::Var(name) if name.is_empty() => {
+                Err(Error::new("A variable name is missing after :", Some(span)))
+            }
             Tok::Var(name) => Ok(Expr::Var(self.cx.names.intern(name), span)),
             Tok::RParen => Err(Error::new("Unexpected )", Some(span))),
             // `?2` is `(? 2)`, the second slot of a template.
@@ -553,7 +657,12 @@ impl Parser<'_, '_, '_> {
                 let n = slot_number(name).expect("checked");
                 let id = prims::lookup("?").expect("? is a primitive");
                 let args = vec![Expr::Lit(Value::Num(n as f64), span)];
-                Ok(Expr::Call(Box::new(Call { target: Target::Prim(id), name: name.clone(), args, span })))
+                Ok(Expr::Call(Box::new(Call {
+                    target: Target::Prim(id),
+                    name: name.clone(),
+                    args,
+                    span,
+                })))
             }
             Tok::Word(name) => {
                 let name = name.clone();
@@ -567,7 +676,12 @@ impl Parser<'_, '_, '_> {
                     args.push(self.expr(1)?);
                 }
                 let span = args.last().map_or(span, |a| span.to(a.span()));
-                Ok(Expr::Call(Box::new(Call { target, name, args, span })))
+                Ok(Expr::Call(Box::new(Call {
+                    target,
+                    name,
+                    args,
+                    span,
+                })))
             }
             Tok::LParen => self.parenthesized(span),
             Tok::Neg | Tok::Op(_) => unreachable!("handled by unary"),
@@ -595,12 +709,24 @@ impl Parser<'_, '_, '_> {
             self.pos += 1;
             let upper = name.to_uppercase();
             if args.len() < arity.min {
-                return Err(Error::new(format!("Not enough inputs to {upper}"), Some(name_span)).about(&name));
+                return Err(
+                    Error::new(format!("Not enough inputs to {upper}"), Some(name_span))
+                        .about(&name),
+                );
             }
             if arity.max.is_some_and(|max| args.len() > max) {
-                return Err(Error::new(format!("Too many inputs to {upper}"), Some(open.to(close))).about(&name));
+                return Err(Error::new(
+                    format!("Too many inputs to {upper}"),
+                    Some(open.to(close)),
+                )
+                .about(&name));
             }
-            return Ok(Expr::Call(Box::new(Call { target, name, args, span: open.to(close) })));
+            return Ok(Expr::Call(Box::new(Call {
+                target,
+                name,
+                args,
+                span: open.to(close),
+            })));
         }
         let expr = self.expr(1)?;
         match self.peek() {
@@ -611,7 +737,10 @@ impl Parser<'_, '_, '_> {
             None => Err(missing(open)),
             Some(_) => {
                 let span = self.tokens[self.pos].span;
-                Err(Error::new("Too much inside ( ): is an operator missing?", Some(span)))
+                Err(Error::new(
+                    "Too much inside ( ): is an operator missing?",
+                    Some(span),
+                ))
             }
         }
     }

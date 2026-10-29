@@ -35,7 +35,11 @@ pub(super) fn product(_: &mut Interpreter, a: &Args) -> Result<Option<Value>, Fl
 
 /// With one input, `(QUOTIENT x)` is the reciprocal.
 pub(super) fn quotient(_: &mut Interpreter, a: &Args) -> Result<Option<Value>, Flow> {
-    let (x, y) = if a.vals.len() == 1 { (1.0, a.num(0)?) } else { (a.num(0)?, a.num(1)?) };
+    let (x, y) = if a.vals.len() == 1 {
+        (1.0, a.num(0)?)
+    } else {
+        (a.num(0)?, a.num(1)?)
+    };
     if y == 0.0 {
         return Err(a.error("Can't divide by zero".into()));
     }
@@ -54,7 +58,11 @@ pub(super) fn notequalp(it: &mut Interpreter, a: &Args) -> Result<Option<Value>,
     Ok(Some(it.bool(!it.equal(&a.vals[0], &a.vals[1]))))
 }
 
-fn compare(it: &mut Interpreter, a: &Args, test: fn(Ordering) -> bool) -> Result<Option<Value>, Flow> {
+fn compare(
+    it: &mut Interpreter,
+    a: &Args,
+    test: fn(Ordering) -> bool,
+) -> Result<Option<Value>, Flow> {
     Ok(Some(it.bool(test(number::compare(a.num(0)?, a.num(1)?)))))
 }
 
@@ -132,7 +140,12 @@ pub(super) fn cos(_: &mut Interpreter, a: &Args) -> Out {
 /// In degrees. `(ARCTAN x y)` is the angle of the point `x, y`, from -180 to
 /// 180, which is 90 or -90 when `x` is 0.
 pub(super) fn arctan(_: &mut Interpreter, a: &Args) -> Out {
-    let degrees = if a.vals.len() == 2 { a.num(1)?.atan2(a.num(0)?) } else { a.num(0)?.atan() }.to_degrees();
+    let degrees = if a.vals.len() == 2 {
+        a.num(1)?.atan2(a.num(0)?)
+    } else {
+        a.num(0)?.atan()
+    }
+    .to_degrees();
     a.result(degrees)
 }
 
@@ -222,7 +235,11 @@ pub(super) fn radcos(_: &mut Interpreter, a: &Args) -> Out {
 
 /// Like `ARCTAN`, in radians.
 pub(super) fn radarctan(_: &mut Interpreter, a: &Args) -> Out {
-    a.result(if a.vals.len() == 2 { a.num(1)?.atan2(a.num(0)?) } else { a.num(0)?.atan() })
+    a.result(if a.vals.len() == 2 {
+        a.num(1)?.atan2(a.num(0)?)
+    } else {
+        a.num(0)?.atan()
+    })
 }
 
 /// The most members `ISEQ`, `RSEQ` and `ARRAY` will make, so a typing
@@ -230,11 +247,16 @@ pub(super) fn radarctan(_: &mut Interpreter, a: &Args) -> Out {
 pub(super) const MAX_MEMBERS: i64 = 10_000_000;
 
 pub(super) fn too_many(a: &Args) -> Flow {
-    a.error(format!("{} would make more than {MAX_MEMBERS} members", a.call.name.to_uppercase()))
+    a.error(format!(
+        "{} would make more than {MAX_MEMBERS} members",
+        a.call.name.to_uppercase()
+    ))
 }
 
 fn numbers(items: impl Iterator<Item = f64>) -> Out {
-    Ok(Some(Value::List(std::rc::Rc::new(crate::value::List::new(items.map(Value::Num).collect())))))
+    Ok(Some(Value::List(std::rc::Rc::new(
+        crate::value::List::new(items.map(Value::Num).collect()),
+    ))))
 }
 
 /// `ISEQ from to`: the whole numbers from `from` to `to`, counting down if
@@ -244,7 +266,11 @@ pub(super) fn iseq(_: &mut Interpreter, a: &Args) -> Out {
     if (to - from).abs() >= MAX_MEMBERS {
         return Err(too_many(a));
     }
-    if from <= to { numbers((from..=to).map(|n| n as f64)) } else { numbers((to..=from).rev().map(|n| n as f64)) }
+    if from <= to {
+        numbers((from..=to).map(|n| n as f64))
+    } else {
+        numbers((to..=from).rev().map(|n| n as f64))
+    }
 }
 
 /// `RSEQ from to count`: `count` numbers evenly spaced from `from` to `to`.
@@ -260,7 +286,13 @@ pub(super) fn rseq(_: &mut Interpreter, a: &Args) -> Out {
         return numbers(std::iter::once(from));
     }
     let step = (to - from) / (count - 1) as f64;
-    numbers((0..count).map(|i| if i == count - 1 { to } else { from + i as f64 * step }))
+    numbers((0..count).map(|i| {
+        if i == count - 1 {
+            to
+        } else {
+            from + i as f64 * step
+        }
+    }))
 }
 
 /// `RERANDOM` starts `RANDOM`'s sequence again from the start, and
@@ -279,7 +311,9 @@ pub(super) fn form(_: &mut Interpreter, a: &Args) -> Out {
     let x = a.num(0)?;
     let width = a.int(1)?;
     if width < 0 {
-        return Err(a.error("FORM's printf formats aren't supported: give a width of 0 or more".into()));
+        return Err(
+            a.error("FORM's printf formats aren't supported: give a width of 0 or more".into())
+        );
     }
     let precision = a.int(2)?;
     if !(0..=100).contains(&precision) {
@@ -288,6 +322,10 @@ pub(super) fn form(_: &mut Interpreter, a: &Args) -> Out {
     if width > 1000 {
         return Err(a.doesnt_like(1));
     }
-    let text = format!("{x:>width$.precision$}", width = width as usize, precision = precision as usize);
+    let text = format!(
+        "{x:>width$.precision$}",
+        width = width as usize,
+        precision = precision as usize
+    );
     Ok(Some(Value::Word(text.into())))
 }

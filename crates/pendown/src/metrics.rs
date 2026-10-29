@@ -194,7 +194,11 @@ impl Interval {
     /// The overlay's lines.
     pub fn lines(&self) -> Vec<String> {
         vec![
-            format!("{:.0} renders/s, UI CPU {:.2} ms a frame", self.per_second(self.renders), ms(self.ui_per_frame())),
+            format!(
+                "{:.0} renders/s, UI CPU {:.2} ms a frame",
+                self.per_second(self.renders),
+                ms(self.ui_per_frame())
+            ),
             format!(
                 "ours {:.2} ms, canvas {:.2} ms, animator {:.2} ms",
                 ms(self.per_render(self.render)),
@@ -233,7 +237,11 @@ mod tests {
     fn the_summary_divides_by_renders() {
         let interval = Interval {
             wall: Duration::from_secs(2),
-            cpu: ThreadCpu { main: Duration::from_millis(500), interpreter: Duration::from_millis(40), other: Duration::ZERO },
+            cpu: ThreadCpu {
+                main: Duration::from_millis(500),
+                interpreter: Duration::from_millis(40),
+                other: Duration::ZERO,
+            },
             renders: 100,
             render: Duration::from_millis(30),
             instructions: 2_000_000,
@@ -241,9 +249,21 @@ mod tests {
         };
         let summary = interval.summary();
         assert!(summary.starts_with("run 2.0 s: 100 renders at 50/s (editor 0, console 0), UI 5.00 ms a frame (ours 0.30 ms"), "{summary}");
-        assert!(summary.contains("2.0 M instructions at 1.0 M/s"), "{summary}");
-        assert!(summary.ends_with("CPU UI 25% interpreter 2% other 0%"), "{summary}");
-        let none = Interval { renders: 0, ..interval };
-        assert!(none.summary().contains("UI 0.00 ms a frame"), "no renders, no frames to cost");
+        assert!(
+            summary.contains("2.0 M instructions at 1.0 M/s"),
+            "{summary}"
+        );
+        assert!(
+            summary.ends_with("CPU UI 25% interpreter 2% other 0%"),
+            "{summary}"
+        );
+        let none = Interval {
+            renders: 0,
+            ..interval
+        };
+        assert!(
+            none.summary().contains("UI 0.00 ms a frame"),
+            "no renders, no frames to cost"
+        );
     }
 }

@@ -13,8 +13,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use pendown_logo::{Control, Event, Pen, Point, Span, SyncPoint, Watch};
 use pendown_logo::arc_point;
+use pendown_logo::{Control, Event, Pen, Point, Span, SyncPoint, Watch};
 use pendown_render::{Mark, Segment};
 
 use crate::metrics::AnimatorMetrics;
@@ -49,6 +49,43 @@ pub const INSTANT_SLICE: Duration = Duration::from_millis(8);
 /// limit the program to one line a frame.
 pub const SYNC_WAIT: Duration = Duration::from_millis(4);
 
+/// How long Kame's last thought takes to fade once the next move or turn
+/// starts, in seconds.
+pub const FADE: f64 = 1.0 / 3.0;
+
+/// What Kame is thinking about, for "Show Kame thinking": the turn or move
+/// it's making, so far.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Thought {
+    /// Turning `at` a point, from heading `from`, by `by` degrees so far:
+    /// positive for right, and past 360 for more than a whole turn. `done`
+    /// once it's turned all the way.
+    Turn {
+        at: Point,
+        from: f64,
+        by: f64,
+        done: bool,
+    },
+    /// Moving `from` a point, to where it's got `to`, `length` steps so far,
+    /// facing `heading`: backwards for `BK`. `done` once it's got there.
+    Move {
+        from: Point,
+        to: Point,
+        length: f64,
+        heading: f64,
+        done: bool,
+    },
+}
+
+/// What to show of Kame thinking in a frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Thinking {
+    /// The turn or move in progress, or the last one, until the next starts.
+    pub current: Option<Thought>,
+    /// The one before, fading: how much of it is left, from 1 to 0.
+    pub fading: Option<(Thought, f64)>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Mode {
     Running,
@@ -59,17 +96,33 @@ pub enum Mode {
     StepInstruction,
 }
 
-
 enum Current {
-    Move { from: Point, to: Point, pen: Pen, done: f64 },
+    Move {
+        from: Point,
+        to: Point,
+        pen: Pen,
+        done: f64,
+    },
     /// An arc, which moves the turtle, or a shape, which doesn't: `done` of
     /// its `length` in steps so far.
-    Mark { mark: Mark, length: f64, done: f64 },
-    Turn { from: f64, by: f64, done: f64 },
+    Mark {
+        mark: Mark,
+        length: f64,
+        done: f64,
+    },
+    Turn {
+        from: f64,
+        by: f64,
+        done: f64,
+    },
     /// Keeps the highlight on an instruction that drew nothing.
-    Dwell { left: f64 },
+    Dwell {
+        left: f64,
+    },
     /// `WAIT`: seconds left, counted in real time at every speed.
-    Wait { left: f64 },
+    Wait {
+        left: f64,
+    },
 }
 
 /// What a frame produced.
@@ -125,6 +178,10 @@ pub struct Animator {
     /// Line starts shown, to compare with `Control::lines_started`.
     pub lines_shown: u64,
     pub instructions_shown: u64,
+    /// What Kame is thinking about, and the last thought fading, with its
+    /// seconds left: only at animated speeds.
+    thought: Option<Thought>,
+    fading: Option<(Thought, f64)>,
     /// The interpreter has finished, and every event has been taken.
     disconnected: bool,
     pub stopped: bool,
@@ -152,11 +209,16 @@ impl Animator {
             shown_this_step: 0,
             lines_shown: 0,
             instructions_shown: 0,
+            thought: None,
+            fading: None,
             disconnected: false,
             stopped: false,
             metrics: AnimatorMetrics::default(),
         };
-        animator.control.speed.store(crate::speed::speed_level(speed), Ordering::Relaxed);
+        animator
+            .control
+            .speed
+            .store(crate::speed::speed_level(speed), Ordering::Relaxed);
         animator.update_lockstep();
         animator
     }
@@ -176,7 +238,11 @@ impl Animator {
 
     /// Whether the window needs another frame.
     pub fn wants_frames(&self) -> bool {
-        !self.finished() && matches!(self.mode, Mode::Running | Mode::StepLine | Mode::StepInstruction)
+        !self.finished()
+            && matches!(
+                self.mode,
+                Mode::Running | Mode::StepLine | Mode::StepInstruction
+            )
     }
 
     /// How long until the picture changes by about a device pixel, so the
@@ -186,18 +252,29 @@ impl Animator {
     /// the turtle reaches from its position, which says how far its head
     /// moves as it turns.
     pub fn next_change(&self, px_per_step: f64, turtle_px: f64) -> Duration {
-        let Speed::Animated(steps) = self.speed else { return Duration::ZERO };
+        let Speed::Animated(steps) = self.speed else {
+            return Duration::ZERO;
+        };
         let secs = |s: f64| Duration::from_secs_f64(s.max(0.0));
         // The time for `remaining` steps (or degrees, at `rate`) to play,
         // and for one pixel's change at `px_per_unit`.
         let gap = |remaining: f64, rate: f64, px_per_unit: f64| {
             let to_end = remaining / rate;
-            let pixel = if px_per_unit > 0.0 { 1.0 / (rate * px_per_unit) } else { to_end };
+            let pixel = if px_per_unit > 0.0 {
+                1.0 / (rate * px_per_unit)
+            } else {
+                to_end
+            };
             secs(to_end.min(pixel))
         };
         let gap = match &self.current {
             None => Duration::ZERO,
-            Some(Current::Move { from, to, pen, done }) => {
+            Some(Current::Move {
+                from,
+                to,
+                pen,
+                done,
+            }) => {
                 let length = ((to.x - from.x).powi(2) + (to.y - from.y).powi(2)).sqrt();
                 let seen = pen.down || self.shown;
                 gap(length - done, steps, if seen { px_per_step } else { 0.0 })
@@ -207,12 +284,38 @@ impl Animator {
                 gap(length - done, steps, if seen { px_per_step } else { 0.0 })
             }
             Some(Current::Turn { by, done, .. }) => {
-                let tip = if self.shown { turtle_px * std::f64::consts::PI / 180.0 } else { 0.0 };
+                let tip = if self.shown {
+                    turtle_px * std::f64::consts::PI / 180.0
+                } else {
+                    0.0
+                };
                 gap(by.abs() - done, steps * DEGREES_PER_STEP, tip)
             }
             Some(Current::Dwell { left } | Current::Wait { left }) => secs(*left),
         };
         gap.min(MAX_FRAME_GAP)
+    }
+
+    /// What to show of Kame thinking: nothing at Instant, where a thousand
+    /// arcs a second would be noise.
+    pub fn thinking(&self) -> Thinking {
+        Thinking {
+            current: self.thought,
+            fading: self
+                .fading
+                .map(|(t, left)| (t, (left / FADE).clamp(0.0, 1.0))),
+        }
+    }
+
+    /// A move or turn starts: it's what Kame thinks about now, and the last
+    /// thought starts to fade.
+    fn think(&mut self, thought: Thought) {
+        if self.speed == Speed::Instant {
+            return;
+        }
+        if let Some(last) = self.thought.replace(thought) {
+            self.fading = Some((last, FADE));
+        }
     }
 
     /// Whether a move, turn or dwell is part-way through.
@@ -224,7 +327,9 @@ impl Animator {
     /// polyline within `tolerance` turtle steps of the curve, with its pen.
     pub fn partial(&self, tolerance: f64) -> Option<(Vec<Point>, Pen)> {
         match &self.current {
-            Some(Current::Move { from, pen, .. }) if pen.down => Some((vec![*from, self.pos], *pen)),
+            Some(Current::Move { from, pen, .. }) if pen.down => {
+                Some((vec![*from, self.pos], *pen))
+            }
             Some(Current::Mark { mark, length, done }) if mark.pen().down => {
                 let fraction = if *length > 0.0 { done / length } else { 1.0 };
                 Some((mark.partial(fraction, tolerance), mark.pen()))
@@ -255,7 +360,9 @@ impl Animator {
     /// Changes the speed, and tells the interpreter the level, for `SPEED`.
     pub fn set_speed(&mut self, speed: Speed) {
         self.speed = speed;
-        self.control.speed.store(crate::speed::speed_level(speed), Ordering::Relaxed);
+        self.control
+            .speed
+            .store(crate::speed::speed_level(speed), Ordering::Relaxed);
         self.update_lockstep();
     }
 
@@ -325,6 +432,12 @@ impl Animator {
         // window was hidden, say) doesn't make the turtle jump.
         let mut budget = dt.min(MAX_FRAME_GAP).as_secs_f64();
         let mut replied = false;
+        if instant {
+            (self.thought, self.fading) = (None, None);
+        } else if let Some((thought, left)) = self.fading {
+            let left = left - dt.as_secs_f64();
+            self.fading = (left > 0.0).then_some((thought, left));
+        }
 
         loop {
             if !self.is_playing() {
@@ -347,7 +460,9 @@ impl Animator {
             } else {
                 replied.then_some(sync_wait_end)
             };
-            let Some(event) = self.next_event(wait_until) else { break };
+            let Some(event) = self.next_event(wait_until) else {
+                break;
+            };
             out.events += 1;
             match event {
                 Event::Instruction { span, starts_line } => {
@@ -355,7 +470,8 @@ impl Animator {
                         // Show the instruction that did nothing for a moment,
                         // then come back to this one.
                         self.idle_instruction = false;
-                        self.queue.push_front(Event::Instruction { span, starts_line });
+                        self.queue
+                            .push_front(Event::Instruction { span, starts_line });
                         out.events -= 1;
                         self.current = Some(Current::Dwell { left: self.dwell() });
                         continue;
@@ -377,22 +493,90 @@ impl Animator {
                 }
                 Event::Move { from, to, pen } => {
                     self.idle_instruction = false;
-                    self.current = Some(Current::Move { from, to, pen, done: 0.0 });
+                    if from != to {
+                        self.think(Thought::Move {
+                            from,
+                            to: from,
+                            length: 0.0,
+                            heading: self.heading,
+                            done: false,
+                        });
+                    }
+                    self.current = Some(Current::Move {
+                        from,
+                        to,
+                        pen,
+                        done: 0.0,
+                    });
                 }
                 Event::Turn { from, by } => {
                     self.idle_instruction = false;
-                    self.current = Some(Current::Turn { from, by, done: 0.0 });
+                    if by != 0.0 {
+                        self.think(Thought::Turn {
+                            at: self.pos,
+                            from,
+                            by: 0.0,
+                            done: false,
+                        });
+                    }
+                    self.current = Some(Current::Turn {
+                        from,
+                        by,
+                        done: 0.0,
+                    });
                 }
-                Event::Arc { center, radius, start_heading, angle, pen } => {
+                Event::Arc {
+                    center,
+                    radius,
+                    start_heading,
+                    angle,
+                    pen,
+                } => {
                     self.idle_instruction = false;
-                    let mark = Mark::Arc { center, radius, start_heading, angle, pen };
-                    self.current = Some(Current::Mark { mark, length: mark.length(), done: 0.0 });
+                    let mark = Mark::Arc {
+                        center,
+                        radius,
+                        start_heading,
+                        angle,
+                        pen,
+                    };
+                    self.current = Some(Current::Mark {
+                        mark,
+                        length: mark.length(),
+                        done: 0.0,
+                    });
                 }
-                Event::Ellipse { center, radii, heading, pen, fill } => {
-                    self.start_shape(Mark::Ellipse { center, radii, heading, pen, fill });
+                Event::Ellipse {
+                    center,
+                    radii,
+                    heading,
+                    pen,
+                    fill,
+                } => {
+                    self.start_shape(Mark::Ellipse {
+                        center,
+                        radii,
+                        heading,
+                        pen,
+                        fill,
+                    });
                 }
-                Event::Rect { center, size, corner, heading, pen, fill } => {
-                    self.start_shape(Mark::Rect { center, size, corner, heading, pen, fill });
+                Event::Rect {
+                    center,
+                    size,
+                    corner,
+                    heading,
+                    pen,
+                    fill,
+                } => {
+                    self.start_shape(Mark::Rect {
+                        center,
+                        size,
+                        corner,
+                        heading,
+                        pen,
+                        fill,
+                    });
                 }
                 Event::Watch(watch) => {
                     // It belongs to the next instruction, so it waits for
@@ -418,7 +602,9 @@ impl Animator {
                 Event::SetBackground { color } => out.background = Some(color),
                 Event::Wait(duration) => {
                     self.idle_instruction = false;
-                    self.current = Some(Current::Wait { left: duration.as_secs_f64() });
+                    self.current = Some(Current::Wait {
+                        left: duration.as_secs_f64(),
+                    });
                 }
                 Event::SetSpeed(level) => {
                     let speed = crate::speed::level_speed(level);
@@ -452,7 +638,11 @@ impl Animator {
     fn start_shape(&mut self, mark: Mark) {
         if mark.visible() {
             self.idle_instruction = false;
-            self.current = Some(Current::Mark { mark, length: mark.length(), done: 0.0 });
+            self.current = Some(Current::Mark {
+                mark,
+                length: mark.length(),
+                done: 0.0,
+            });
         }
     }
 
@@ -488,26 +678,52 @@ impl Animator {
             }
         };
         match current {
-            Current::Move { from, to, pen, done } => {
+            Current::Move {
+                from,
+                to,
+                pen,
+                done,
+            } => {
                 let length = ((to.x - from.x).powi(2) + (to.y - from.y).powi(2)).sqrt();
-                let done = done + progress(length - done, rate);
+                let done = (done + progress(length - done, rate)).min(length);
                 if done >= length {
                     self.pos = to;
+                    self.thought_moved(done, true);
                     if pen.down {
                         out.marks.push(Segment { from, to, pen }.into());
                     }
                     return true;
                 }
                 let t = done / length;
-                self.pos = Point { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
-                self.current = Some(Current::Move { from, to, pen, done });
+                self.pos = Point {
+                    x: from.x + (to.x - from.x) * t,
+                    y: from.y + (to.y - from.y) * t,
+                };
+                self.thought_moved(done, false);
+                self.current = Some(Current::Move {
+                    from,
+                    to,
+                    pen,
+                    done,
+                });
                 false
             }
             Current::Mark { mark, length, done } => {
                 let done = done + progress(length - done, rate);
-                let t = if length > 0.0 { (done / length).min(1.0) } else { 1.0 };
+                let t = if length > 0.0 {
+                    (done / length).min(1.0)
+                } else {
+                    1.0
+                };
                 // An arc carries the turtle with it; a shape leaves it put.
-                if let Mark::Arc { center, radius, start_heading, angle, .. } = mark {
+                if let Mark::Arc {
+                    center,
+                    radius,
+                    start_heading,
+                    angle,
+                    ..
+                } = mark
+                {
                     (self.pos, self.heading) = arc_point(center, radius, start_heading, angle, t);
                 }
                 if done >= length {
@@ -519,7 +735,17 @@ impl Animator {
             }
             Current::Turn { from, by, done } => {
                 let done = done + progress(by.abs() - done, rate.map(|r| r * DEGREES_PER_STEP));
+                let done = done.min(by.abs());
                 self.heading = (from + by.signum() * done).rem_euclid(360.0);
+                if let Some(Thought::Turn {
+                    by: so_far,
+                    done: finished,
+                    ..
+                }) = &mut self.thought
+                {
+                    *so_far = by.signum() * done;
+                    *finished = done >= by.abs();
+                }
                 if done >= by.abs() {
                     return true;
                 }
@@ -533,7 +759,9 @@ impl Animator {
                     *budget -= left;
                     return true;
                 }
-                self.current = Some(Current::Wait { left: left - *budget });
+                self.current = Some(Current::Wait {
+                    left: left - *budget,
+                });
                 *budget = 0.0;
                 false
             }
@@ -545,6 +773,20 @@ impl Animator {
                 self.current = Some(Current::Dwell { left: left - done });
                 false
             }
+        }
+    }
+
+    /// The move Kame is thinking about has got to where Kame is, `done`
+    /// steps along.
+    fn thought_moved(&mut self, done: f64, there: bool) {
+        if let Some(Thought::Move {
+            to,
+            length,
+            done: finished,
+            ..
+        }) = &mut self.thought
+        {
+            (*to, *length, *finished) = (self.pos, done, there);
         }
     }
 

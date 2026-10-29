@@ -50,16 +50,34 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let output_path = args.output.unwrap_or_else(|| args.program.with_extension("png"));
+    let output_path = args
+        .output
+        .unwrap_or_else(|| args.program.with_extension("png"));
     let (width, height) = args.size;
-    let svg = output_path.extension().is_some_and(|e| e.eq_ignore_ascii_case("svg")).then_some(0.0);
-    let output = render(&source, Options { width, height, limit: args.limit, seed: args.seed, fit: args.fit, svg });
+    let svg = output_path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("svg"))
+        .then_some(0.0);
+    let output = render(
+        &source,
+        Options {
+            width,
+            height,
+            limit: args.limit,
+            seed: args.seed,
+            fit: args.fit,
+            svg,
+        },
+    );
     print!("{}", output.printed);
     if let Some(summary) = &output.summary {
         eprintln!("{summary}");
     }
 
-    let picture = output.svg.as_ref().map_or(&output.png[..], |svg| svg.as_bytes());
+    let picture = output
+        .svg
+        .as_ref()
+        .map_or(&output.png[..], |svg| svg.as_bytes());
     let save = || match std::fs::write(&output_path, picture) {
         Ok(()) => true,
         Err(e) => {
@@ -84,7 +102,10 @@ fn main() -> ExitCode {
         Err(RunError::Runtime(e)) => {
             eprintln!("{}", describe(&path, &source, e));
             if save() {
-                eprintln!("Saved the drawing as far as it got to {}", output_path.display());
+                eprintln!(
+                    "Saved the drawing as far as it got to {}",
+                    output_path.display()
+                );
             }
             ExitCode::FAILURE
         }

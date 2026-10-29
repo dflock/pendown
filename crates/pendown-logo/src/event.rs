@@ -27,27 +27,58 @@ pub struct Pen {
 pub enum Event {
     /// Sent before each instruction runs. `starts_line` is set on the first
     /// instruction run from a line, and is where Step pauses.
-    Instruction { span: Span, starts_line: bool },
-    Move { from: Point, to: Point, pen: Pen },
+    Instruction {
+        span: Span,
+        starts_line: bool,
+    },
+    Move {
+        from: Point,
+        to: Point,
+        pen: Pen,
+    },
     /// `by` is the signed angle turned, clockwise, in degrees.
-    Turn { from: f64, by: f64 },
+    Turn {
+        from: f64,
+        by: f64,
+    },
     /// The turtle walks along an arc (ADR 0016), starting at `start_heading`
     /// and turning through `angle` degrees, clockwise if positive, around
     /// `center`. See `arc_point` for where it is part-way along.
-    Arc { center: Point, radius: f64, start_heading: f64, angle: f64, pen: Pen },
+    Arc {
+        center: Point,
+        radius: f64,
+        start_heading: f64,
+        angle: f64,
+        pen: Pen,
+    },
     /// `CIRCLE` and `ELLIPSE` (ADR 0017): `radii` are across and along the
     /// heading. The turtle doesn't move.
-    Ellipse { center: Point, radii: (f64, f64), heading: f64, pen: Pen, fill: Option<[u8; 4]> },
+    Ellipse {
+        center: Point,
+        radii: (f64, f64),
+        heading: f64,
+        pen: Pen,
+        fill: Option<[u8; 4]>,
+    },
     /// `SQUARE` and `RECTANGLE`: `size` is the full width across and length
     /// along the heading, and `corner` the radius of the rounded corners.
-    Rect { center: Point, size: (f64, f64), corner: f64, heading: f64, pen: Pen, fill: Option<[u8; 4]> },
+    Rect {
+        center: Point,
+        size: (f64, f64),
+        corner: f64,
+        heading: f64,
+        pen: Pen,
+        fill: Option<[u8; 4]>,
+    },
     ShowTurtle,
     HideTurtle,
     /// Clear the drawing. The turtle doesn't move.
     Clean,
     /// A new background colour, always opaque. It goes under everything
     /// already drawn.
-    SetBackground { color: [u8; 4] },
+    SetBackground {
+        color: [u8; 4],
+    },
     /// Console output, including the newline if there is one.
     Print(String),
     /// `WAIT`: the animator waits this long at every speed, including
@@ -134,13 +165,23 @@ pub struct BatchSender {
 
 impl BatchSender {
     pub fn new(tx: SyncSender<Vec<Event>>, size: usize, max_wait: Duration) -> BatchSender {
-        BatchSender { tx, batch: Vec::with_capacity(size), size, opened: Instant::now(), max_wait, control: None }
+        BatchSender {
+            tx,
+            batch: Vec::with_capacity(size),
+            size,
+            opened: Instant::now(),
+            max_wait,
+            control: None,
+        }
     }
 
     /// Records the time spent waiting on a full channel in `control`'s
     /// metrics.
     pub fn measured(self, control: Arc<Control>) -> BatchSender {
-        BatchSender { control: Some(control), ..self }
+        BatchSender {
+            control: Some(control),
+            ..self
+        }
     }
 }
 
@@ -152,7 +193,9 @@ impl EventSink for BatchSender {
         self.batch.push(event);
         // Checking the clock costs about as much as an event, so only every
         // 16 events.
-        if self.batch.len() >= self.size || (self.batch.len().is_multiple_of(16) && self.opened.elapsed() >= self.max_wait) {
+        if self.batch.len() >= self.size
+            || (self.batch.len().is_multiple_of(16) && self.opened.elapsed() >= self.max_wait)
+        {
             self.flush()?;
         }
         Ok(())
@@ -163,7 +206,10 @@ impl EventSink for BatchSender {
             return Ok(());
         }
         let batch = std::mem::replace(&mut self.batch, Vec::with_capacity(self.size));
-        let waiting = self.control.as_ref().and_then(|c| c.metrics.channel.start());
+        let waiting = self
+            .control
+            .as_ref()
+            .and_then(|c| c.metrics.channel.start());
         let sent = self.tx.send(batch).map_err(|_| Halted);
         if let Some(control) = &self.control {
             control.metrics.channel.stop(waiting);

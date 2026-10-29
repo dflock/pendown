@@ -18,18 +18,31 @@ impl Document {
     /// A new, unsaved document that starts with `text`. It only counts as
     /// changed once it's edited.
     pub fn new(text: &str) -> Document {
-        Document { path: None, saved: text.to_string() }
+        Document {
+            path: None,
+            saved: text.to_string(),
+        }
     }
 
     pub fn open(path: &Path) -> io::Result<(Document, String)> {
         let text = std::fs::read_to_string(path)?;
-        Ok((Document { path: Some(path.to_path_buf()), saved: text.clone() }, text))
+        Ok((
+            Document {
+                path: Some(path.to_path_buf()),
+                saved: text.clone(),
+            },
+            text,
+        ))
     }
 
     /// Saves `text` to `path`, giving it the `.logo` extension if it has
     /// none, and remembers it as this document's file.
     pub fn save_as(&mut self, path: &Path, text: &str) -> io::Result<PathBuf> {
-        let path = if path.extension().is_none() { path.with_extension("logo") } else { path.to_path_buf() };
+        let path = if path.extension().is_none() {
+            path.with_extension("logo")
+        } else {
+            path.to_path_buf()
+        };
         std::fs::write(&path, text)?;
         self.path = Some(path.clone());
         self.saved = text.to_string();
@@ -42,7 +55,10 @@ impl Document {
 
     /// The file's name, or "Untitled".
     pub fn name(&self) -> String {
-        self.path.as_ref().and_then(|p| p.file_name()).map_or("Untitled".into(), |n| n.to_string_lossy().into_owned())
+        self.path
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .map_or("Untitled".into(), |n| n.to_string_lossy().into_owned())
     }
 
     /// The window title: the file's name, with a dot when there are unsaved
@@ -55,7 +71,11 @@ impl Document {
     /// A name for saving or exporting, from the file's: `flower.logo` is
     /// exported as `flower.png`.
     pub fn suggested_name(&self, extension: &str) -> String {
-        let stem = self.path.as_ref().and_then(|p| p.file_stem()).map_or("untitled".into(), |s| s.to_string_lossy().into_owned());
+        let stem = self
+            .path
+            .as_ref()
+            .and_then(|p| p.file_stem())
+            .map_or("untitled".into(), |s| s.to_string_lossy().into_owned());
         format!("{stem}.{extension}")
     }
 }
@@ -69,7 +89,9 @@ pub fn last_folder() -> Option<PathBuf> {
 }
 
 pub fn remember_folder(file: &Path) {
-    let (Some(dir), Some(folder)) = (settings_dir(), file.parent()) else { return };
+    let (Some(dir), Some(folder)) = (settings_dir(), file.parent()) else {
+        return;
+    };
     if std::fs::create_dir_all(&dir).is_ok() {
         let _ = std::fs::write(dir.join("last-folder"), folder.to_string_lossy().as_bytes());
     }
@@ -90,7 +112,8 @@ mod tests {
     use super::*;
 
     fn temp(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("pendown-document-{}-{name}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("pendown-document-{}-{name}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -119,7 +142,10 @@ mod tests {
         assert_eq!(opened.path, Some(path.clone()));
         assert!(!opened.changed("FLOWER 80"));
         // An extension that's already there is kept.
-        assert_eq!(doc.save_as(&dir.join("star.txt"), "x").unwrap(), dir.join("star.txt"));
+        assert_eq!(
+            doc.save_as(&dir.join("star.txt"), "x").unwrap(),
+            dir.join("star.txt")
+        );
     }
 
     #[test]

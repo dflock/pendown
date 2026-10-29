@@ -26,7 +26,11 @@ pub struct Channel {
 }
 
 /// Batches of 256 events, with room for 4 batches (spikes 03 and 04).
-pub const DEFAULT_CHANNEL: Channel = Channel { batch: 256, capacity: 4, max_wait: Duration::from_millis(4) };
+pub const DEFAULT_CHANNEL: Channel = Channel {
+    batch: 256,
+    capacity: 4,
+    max_wait: Duration::from_millis(4),
+};
 
 /// What the interpreter runs.
 #[derive(Clone, Debug)]
@@ -35,6 +39,11 @@ pub enum Job {
     Program(String),
     /// A console entry, against what the last run left.
     Console(String),
+    /// Undo at the console (ADR 0025): Kame back as the last entry found it.
+    Undo,
+    /// Defines Teach Kame's procedure at the console, without saving Kame
+    /// for Undo, since it isn't one of the user's entries.
+    Define(String),
 }
 
 /// One job's progress, as the GUI sees it.
@@ -97,16 +106,24 @@ impl Session {
                 it.limits.stack_bytes = Some(STACK);
                 // Jobs run one at a time, until the session is dropped.
                 for command in rx {
-                    let sink = BatchSender::new(command.events, command.channel.batch, command.channel.max_wait)
-                        .measured(command.control.clone());
+                    let sink = BatchSender::new(
+                        command.events,
+                        command.channel.batch,
+                        command.channel.max_wait,
+                    )
+                    .measured(command.control.clone());
                     it.set_output(Box::new(sink), command.control);
                     let result = match &command.job {
                         Job::Program(text) => it.run_program(text),
                         Job::Console(text) => it.run_console(text),
+                        Job::Undo => it.undo_console(),
+                        Job::Define(text) => it.define_console(text),
                     };
-                    // Dropping the sender tells the animator the job is over.
-                    it.set_output(Box::new(Discard), Arc::default());
+                    // The result first: dropping the sender tells the
+                    // animator the job is over, and the window reads the
+                    // result as soon as it sees that.
                     *command.result.lock().unwrap() = Some(result);
+                    it.set_output(Box::new(Discard), Arc::default());
                     *command.exited.lock().unwrap() = Some(Instant::now());
                 }
             })
@@ -119,11 +136,25 @@ impl Session {
     pub fn start(&self, job: Job, speed: Speed, channel: Channel) -> (Animator, Run) {
         let control = Arc::new(Control::default());
         let (events, rx) = mpsc::sync_channel::<Vec<Event>>(channel.capacity);
-        let run = Run { control: control.clone(), started: Instant::now(), result: Arc::default(), exited: Arc::default() };
+        let run = Run {
+            control: control.clone(),
+            started: Instant::now(),
+            result: Arc::default(),
+            exited: Arc::default(),
+        };
         // The animator sets the lockstep flag and the speed before the job starts.
         let animator = Animator::new(rx, control.clone(), speed);
-        let command = Command { job, events, channel, control, result: run.result.clone(), exited: run.exited.clone() };
-        self.commands.send(command).expect("the interpreter thread is running");
+        let command = Command {
+            job,
+            events,
+            channel,
+            control,
+            result: run.result.clone(),
+            exited: run.exited.clone(),
+        };
+        self.commands
+            .send(command)
+            .expect("the interpreter thread is running");
         (animator, run)
     }
 }

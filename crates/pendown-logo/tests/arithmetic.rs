@@ -31,7 +31,11 @@ fn the_basics() {
         ("POWER -2 3", "-8"),
     ];
     for (expr, expected) in cases {
-        assert_eq!(output(&format!("PRINT {expr}")), format!("{expected}\n"), "{expr}");
+        assert_eq!(
+            output(&format!("PRINT {expr}")),
+            format!("{expected}\n"),
+            "{expr}"
+        );
     }
 }
 
@@ -48,7 +52,11 @@ fn remainder_and_modulo_signs() {
         ("MODULO -7 -3", "-1"),
     ];
     for (expr, expected) in cases {
-        assert_eq!(output(&format!("PRINT {expr}")), format!("{expected}\n"), "{expr}");
+        assert_eq!(
+            output(&format!("PRINT {expr}")),
+            format!("{expected}\n"),
+            "{expr}"
+        );
     }
 }
 
@@ -68,7 +76,11 @@ fn trig_in_degrees() {
         ("(ARCTAN -1 0)", "180"),
     ];
     for (expr, expected) in cases {
-        assert_eq!(output(&format!("PRINT {expr}")), format!("{expected}\n"), "{expr}");
+        assert_eq!(
+            output(&format!("PRINT {expr}")),
+            format!("{expected}\n"),
+            "{expr}"
+        );
     }
 }
 
@@ -91,7 +103,11 @@ fn comparisons_and_logic() {
         ("AND 1 < 2 2 < 3", "true"),
     ];
     for (expr, expected) in cases {
-        assert_eq!(output(&format!("PRINT {expr}")), format!("{expected}\n"), "{expr}");
+        assert_eq!(
+            output(&format!("PRINT {expr}")),
+            format!("{expected}\n"),
+            "{expr}"
+        );
     }
 }
 
@@ -101,27 +117,56 @@ fn logic_runs_list_inputs_only_when_needed() {
     assert_eq!(output("PRINT AND [1 > 2] [1 / 0 = 1]"), "false\n");
     assert_eq!(output("PRINT OR [1 < 2] [1 / 0 = 1]"), "true\n");
     assert_eq!(output("PRINT NOT [3 = 3]"), "false\n");
-    assert_eq!(error("PRINT AND [1 < 2] [1 / 0 = 1]"), "Can't divide by zero");
+    assert_eq!(
+        error("PRINT AND [1 < 2] [1 / 0 = 1]"),
+        "Can't divide by zero"
+    );
 }
 
 #[test]
 fn errors() {
-    assert_eq!(error("PRINT REMAINDER 7.5 2"), "REMAINDER doesn't like 7.5 as input");
+    assert_eq!(
+        error("PRINT REMAINDER 7.5 2"),
+        "REMAINDER doesn't like 7.5 as input"
+    );
     assert_eq!(error("PRINT MODULO 7 0"), "Can't divide by zero");
     assert_eq!(error("PRINT SQRT -1"), "SQRT doesn't like -1 as input");
-    assert_eq!(error("PRINT POWER -8 0.5"), "POWER doesn't like 0.5 as input");
+    assert_eq!(
+        error("PRINT POWER -8 0.5"),
+        "POWER doesn't like 0.5 as input"
+    );
     assert_eq!(error("PRINT POWER 10 400"), "That number is too big");
-    assert_eq!(error("PRINT AND \"yes \"true"), "AND doesn't like yes as input");
+    assert_eq!(
+        error("PRINT AND \"yes \"true"),
+        "AND doesn't like yes as input"
+    );
     assert_eq!(error("PRINT NOT 5"), "NOT doesn't like 5 as input");
     assert_eq!(error("PRINT RANDOM 0"), "RANDOM doesn't like 0 as input");
-    assert_eq!(error("PRINT RANDOM 2.5"), "RANDOM doesn't like 2.5 as input");
-    assert_eq!(error("PRINT (RANDOM 5 1)"), "RANDOM doesn't like 1 as input");
+    assert_eq!(
+        error("PRINT RANDOM 2.5"),
+        "RANDOM doesn't like 2.5 as input"
+    );
+    assert_eq!(
+        error("PRINT (RANDOM 5 1)"),
+        "RANDOM doesn't like 1 as input"
+    );
 }
 
 fn printed(it: &mut Interpreter, events: &Shared, src: &str) -> String {
     events.0.borrow_mut().clear();
     it.run_program(src).unwrap();
-    events.0.borrow().iter().filter_map(|e| if let Event::Print(t) = e { Some(t.clone()) } else { None }).collect()
+    events
+        .0
+        .borrow()
+        .iter()
+        .filter_map(|e| {
+            if let Event::Print(t) = e {
+                Some(t.clone())
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 #[test]
@@ -131,12 +176,25 @@ fn random() {
     it.set_seed(Some(1));
     let program = "REPEAT 20 [PRINT RANDOM 10]";
     let first = printed(&mut it, &events, program);
-    assert_eq!(printed(&mut it, &events, program), first, "the same seed draws the same picture");
-    let numbers: Vec<i64> = first.split_whitespace().map(|n| n.parse().unwrap()).collect();
+    assert_eq!(
+        printed(&mut it, &events, program),
+        first,
+        "the same seed draws the same picture"
+    );
+    let numbers: Vec<i64> = first
+        .split_whitespace()
+        .map(|n| n.parse().unwrap())
+        .collect();
     assert!(numbers.iter().all(|n| (0..10).contains(n)), "{numbers:?}");
     let ranged = printed(&mut it, &events, "REPEAT 50 [PRINT (RANDOM 3 5)]");
-    let ranged: Vec<i64> = ranged.split_whitespace().map(|n| n.parse().unwrap()).collect();
-    assert!(ranged.iter().all(|n| (3..=5).contains(n)) && ranged.contains(&3) && ranged.contains(&5), "{ranged:?}");
+    let ranged: Vec<i64> = ranged
+        .split_whitespace()
+        .map(|n| n.parse().unwrap())
+        .collect();
+    assert!(
+        ranged.iter().all(|n| (3..=5).contains(n)) && ranged.contains(&3) && ranged.contains(&5),
+        "{ranged:?}"
+    );
     // Without a seed, each Run is different.
     it.set_seed(None);
     let runs: Vec<_> = (0..3).map(|_| printed(&mut it, &events, program)).collect();
@@ -163,7 +221,11 @@ fn phase_2_arithmetic() {
         ("FORM -1.5 1 3", "-1.500"),
     ];
     for (expr, expected) in cases {
-        assert_eq!(output(&format!("SHOW {expr}")), format!("{expected}\n"), "{expr}");
+        assert_eq!(
+            output(&format!("SHOW {expr}")),
+            format!("{expected}\n"),
+            "{expr}"
+        );
     }
 }
 
@@ -182,8 +244,17 @@ fn phase_2_arithmetic_errors() {
     assert_eq!(error("SHOW LOG10 -1"), "LOG10 doesn't like -1 as input");
     assert_eq!(error("SHOW EXP 1000"), "That number is too big");
     assert_eq!(error("SHOW ISEQ 1 1.5"), "ISEQ doesn't like 1.5 as input");
-    assert_eq!(error("SHOW ISEQ 1 1e12"), "ISEQ would make more than 10000000 members");
+    assert_eq!(
+        error("SHOW ISEQ 1 1e12"),
+        "ISEQ would make more than 10000000 members"
+    );
     assert_eq!(error("SHOW RSEQ 1 2 0"), "RSEQ doesn't like 0 as input");
-    assert_eq!(error("SHOW FORM 1 -1 \"%x"), "FORM's printf formats aren't supported: give a width of 0 or more");
-    assert_eq!(error("SHOW ARRAY 1e9"), "ARRAY would make more than 10000000 members");
+    assert_eq!(
+        error("SHOW FORM 1 -1 \"%x"),
+        "FORM's printf formats aren't supported: give a width of 0 or more"
+    );
+    assert_eq!(
+        error("SHOW ARRAY 1e9"),
+        "ARRAY would make more than 10000000 members"
+    );
 }

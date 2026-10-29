@@ -48,3 +48,28 @@ POLYGON 8 60
 ```
 
 > **Try this:** use `REPEAT` and [REPCOUNT] to draw `POLYGON REPCOUNT + 2 60` for each of 8 times. Every shape has one more side than the last.
+
+## Help Kame fix the bug
+
+Kame wanted three boxes, each bigger than the last.
+
+```picture
+PU LT 90 FD 75 RT 90 BK 75 PD
+REPEAT 4 [FD 50 RT 90]
+REPEAT 4 [FD 100 RT 90]
+REPEAT 4 [FD 150 RT 90]
+```
+
+```logo
+TO BOX :size
+  REPEAT 4 [FD 100 RT 90]
+END
+
+BOX 50
+BOX 100
+BOX 150
+```
+
+Kame was given three sizes, but all three boxes come out the same. Watch the variables panel as it runs: `size` changes each time. Where does `:size` go?
+
+One way to fix it: `BOX` has to use its input, so `FD 100` becomes `FD :size`.

@@ -2,19 +2,19 @@
 //! 0011 and 0012).
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     rc::Rc,
     time::{Duration, Instant},
 };
 
 use gpui_kit::component::{
-    ActiveTheme, Disableable as _, Sizable,
+    ActiveTheme, Disableable as _, Sizable, WindowExt as _,
     button::{Button, ButtonVariants as _},
     h_flex,
     highlighter::{Diagnostic, DiagnosticSeverity},
     input::{
-        EditorState, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position, RangeDecoration,
-        RangeDecorationCollection, RangeDecorationStyle, TextareaState,
+        EditorState, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position,
+        RangeDecoration, RangeDecorationCollection, RangeDecorationStyle, TextareaState, Undo,
     },
     resizable::{h_resizable, resizable_panel},
     slider::{SliderEvent, SliderState},
@@ -22,23 +22,29 @@ use gpui_kit::component::{
 };
 use gpui_kit::{assets::IconName, prelude::FluentBuilder as _, *};
 use pendown::{
-    animator::{Animator, MAX_FRAME_GAP, Mode, Speed},
-    console::{ConsoleInput, Submit, defines},
+    animator::{Animator, MAX_FRAME_GAP, Mode, Speed, Thinking},
+    console::{ConsoleInput, Ending, Submit, defines, label},
     document::Document,
     errors,
     metrics::{Snapshot, WindowMetrics},
     run::{Channel, DEFAULT_CHANNEL, Job, Run, Session},
     speed::{INSTANT_LEVEL, level_speed, speed_level},
+    teach,
 };
-use pendown_logo::{RunError, SourceId};
+use pendown_logo::{Point, RunError, SourceId};
+use pendown_render::Mark;
 
 use crate::{
     autotest::Autotest,
     canvas::{Canvas, Overlay, TURTLE_SIZE},
-    files::{After, ExportPicture, NewFile, OpenFile, Picture, RunProgram, SaveFile, SaveFileAs, ShowHelp, ToggleMetrics},
+    files::{
+        After, ExportPicture, NewFile, OpenFile, Picture, RunProgram, SaveFile, SaveFileAs,
+        ShowHelp, ToggleMetrics,
+    },
     help_panel::HelpPanel,
     highlighter::LogoHighlighter,
     panes::{ConsolePane, EditorPane, ToolbarPane, ToolbarState},
+    teach_dialog::{self, TeachKame},
     watching::{CountersPane, VariablesPane, Watched},
 };
 
@@ -94,6 +100,24 @@ const TOOLBAR_HEIGHT: f32 = 41.0;
 /// The status bar's height, at the bottom of the window.
 const STATUS_BAR_HEIGHT: f32 = 24.0;
 
+/// The console's Undo button's tooltip.
+const UNDO_TOOLTIP: &str = if cfg!(target_os = "macos") {
+    "Undo (Cmd+Z)"
+} else {
+    "Undo (Ctrl+Z)"
+};
+
+/// What a console entry found, so Undo can put it back (ADR 0025).
+struct Before {
+    /// How many marks the drawing had.
+    marks: usize,
+    background: [u8; 4],
+    /// Kame's position, heading and whether it was shown, if a job had run.
+    kame: Option<(Point, f64, bool)>,
+    /// The marks the entry's first `CLEAN` threw away.
+    cleaned: Option<Vec<Mark>>,
+}
+
 /// The console area's height, with the counters and variables beside the
 /// console.
 const CONSOLE_HEIGHT: f32 = 190.0;
@@ -116,7 +140,8 @@ impl Samples {
     pub fn percentile(&self, p: usize) -> Option<Duration> {
         let mut v = self.0.clone();
         v.sort();
-        v.get((v.len() * p / 100).min(v.len().saturating_sub(1))).copied()
+        v.get((v.len() * p / 100).min(v.len().saturating_sub(1)))
+            .copied()
     }
 
     pub fn summary(&self) -> String {
@@ -154,7 +179,7 @@ pub struct App {
     checked: bool,
     /// Console output, one line each.
     pub(crate) console: Vec<SharedString>,
-    console_dirty: bool,
+    pub(crate) console_dirty: bool,
     console_output: Entity<TextareaState>,
     console_input: Entity<InputState>,
     /// The editor and console, drawn as cached views (issue 08).
@@ -176,7 +201,22 @@ pub struct App {
     /// The help page for the last error's command, for the console's Help
     /// button (issue 07).
     pub(crate) error_help: Option<usize>,
-    console_entry: ConsoleInput,
+    pub(crate) console_entry: ConsoleInput,
+    /// What each console entry not undone yet found, oldest first: one for
+    /// each in `console_entry`'s record.
+    console_before: Vec<Before>,
+    /// The job running is a console entry.
+    console_job: bool,
+    /// Show Kame thinking: arcs on turns and rulers on moves.
+    pub(crate) show_thinking: bool,
+    /// Drive Kame, while it's on, and the steps it uses, which last the
+    /// session.
+    pub(crate) driving: Option<crate::driving::Driving>,
+    pub(crate) drive_steps: pendown::drive::Steps,
+    /// The canvas takes the keys while driving.
+    pub(crate) canvas_focus: FocusHandle,
+    /// Teach Kame's dialog, while it's open.
+    pub(crate) teach_dialog: Option<Entity<TeachKame>>,
     /// Definitions typed at the console since the last Run, which "Copy to
     /// editor" keeps.
     console_definitions: Vec<String>,
@@ -203,27 +243,44 @@ pub struct App {
 impl App {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> App {
         let editor = cx.new(|cx| {
-            EditorState::new(window, cx).language("logo").line_number(true).soft_wrap(false).default_value(WELCOME)
+            EditorState::new(window, cx)
+                .language("logo")
+                .line_number(true)
+                .soft_wrap(false)
+                .default_value(WELCOME)
         });
         let highlight = editor.update(cx, |state, cx| {
             state.set_highlighter_factory(
-                Rc::new(|language| (language == "logo").then(|| Box::new(LogoHighlighter::default()) as Box<dyn InputHighlighter>)),
+                Rc::new(|language| {
+                    (language == "logo")
+                        .then(|| Box::new(LogoHighlighter::default()) as Box<dyn InputHighlighter>)
+                }),
                 cx,
             );
             state.create_range_decorations_collection(vec![], cx)
         });
         let console_output = cx.new(|cx| TextareaState::new(window, cx));
-        let console_input = cx.new(|cx| InputState::new(window, cx).placeholder("Type an instruction and press Enter"));
+        let console_input = cx.new(|cx| {
+            InputState::new(window, cx).placeholder("Type an instruction and press Enter")
+        });
         let speed = level_speed(5);
         let speed_slider = cx.new(|_| {
-            SliderState::new().min(1.0).max(INSTANT_LEVEL as f32).step(1.0).default_value(speed_level(speed) as f32)
+            SliderState::new()
+                .min(1.0)
+                .max(INSTANT_LEVEL as f32)
+                .step(1.0)
+                .default_value(speed_level(speed) as f32)
         });
         let subscriptions = vec![
-            cx.subscribe_in(&speed_slider, window, |this, _, event: &SliderEvent, window, cx| {
-                if let SliderEvent::Change(value) = event {
-                    this.set_speed(level_speed(value.end().round() as u8), window, cx);
-                }
-            }),
+            cx.subscribe_in(
+                &speed_slider,
+                window,
+                |this, _, event: &SliderEvent, window, cx| {
+                    if let SliderEvent::Change(value) = event {
+                        this.set_speed(level_speed(value.end().round() as u8), window, cx);
+                    }
+                },
+            ),
             // Parse errors show while typing (ADRs 0001 and 0005).
             cx.subscribe(&editor, |this, _, event: &InputEvent, cx| {
                 if let InputEvent::Change = event
@@ -232,17 +289,34 @@ impl App {
                     this.check_program(cx);
                 }
             }),
-            cx.subscribe_in(&console_input, window, |this, _, event: &InputEvent, window, cx| {
-                if let InputEvent::PressEnter { .. } = event {
-                    this.submit_console(window, cx);
-                }
-            }),
+            cx.subscribe_in(
+                &console_input,
+                window,
+                |this, _, event: &InputEvent, window, cx| {
+                    if let InputEvent::PressEnter { .. } = event {
+                        this.submit_console(window, cx);
+                    }
+                },
+            ),
         ];
         let metrics = Rc::new(WindowMetrics::default());
         let editor_pane = cx.new(|_| EditorPane::new(editor.clone(), metrics.clone()));
-        let console_pane = cx.new(|_| ConsolePane::new(console_output.clone(), console_input.clone(), metrics.clone()));
+        let console_pane = cx.new(|_| {
+            ConsolePane::new(
+                console_output.clone(),
+                console_input.clone(),
+                metrics.clone(),
+            )
+        });
         let app = cx.entity().downgrade();
-        let toolbar = ToolbarState { running: false, paused: false, speed, help: false };
+        let toolbar = ToolbarState {
+            running: false,
+            paused: false,
+            speed,
+            help: false,
+            thinking: false,
+            driving: false,
+        };
         let toolbar_pane = cx.new(|_| ToolbarPane::new(app.clone(), speed_slider.clone(), toolbar));
         let watched = cx.new(|_| Watched::default());
         let counters_pane = cx.new(|_| CountersPane::new(watched.clone()));
@@ -253,7 +327,8 @@ impl App {
         // follows.
         subscriptions.push(cx.observe(&editor, |this, _, cx| this.follow_cursor(cx)));
         window.on_window_should_close(cx, move |window, cx| {
-            app.update(cx, |this, cx| this.should_close(window, cx)).unwrap_or(true)
+            app.update(cx, |this, cx| this.should_close(window, cx))
+                .unwrap_or(true)
         });
         if std::env::var_os("PENDOWN_AUTOTEST").is_some() {
             cx.spawn_in(window, async move |this, cx| {
@@ -303,6 +378,13 @@ impl App {
             example: None,
             error_help: None,
             console_entry: ConsoleInput::default(),
+            console_before: Vec::new(),
+            console_job: false,
+            teach_dialog: None,
+            show_thinking: false,
+            driving: None,
+            drive_steps: pendown::drive::Steps::default(),
+            canvas_focus: cx.focus_handle(),
             console_definitions: Vec::new(),
             defining: None,
             definitions_cleared: false,
@@ -329,8 +411,15 @@ impl App {
         }
         let level = speed_level(speed);
         if self.speed_slider.read(cx).value().end().round() as u8 != level {
-            self.speed_slider.update(cx, |s, cx| s.set_value(level as f32, window, cx));
+            self.speed_slider
+                .update(cx, |s, cx| s.set_value(level as f32, window, cx));
         }
+        cx.notify();
+    }
+
+    /// The toolbar's Show thinking.
+    pub(crate) fn toggle_thinking(&mut self, cx: &mut Context<Self>) {
+        self.show_thinking = !self.show_thinking;
         cx.notify();
     }
 
@@ -341,6 +430,7 @@ impl App {
     /// Run (ADR 0006): stop any running program, clear the drawing, and
     /// start the editor's program from a clean slate.
     pub(crate) fn start(&mut self, channel: Channel, cx: &mut Context<Self>) {
+        self.stop_driving(cx);
         self.stop(cx);
         // Run replaces an example's picture, as it would the user's.
         self.forget_example(cx);
@@ -349,7 +439,12 @@ impl App {
         self.canvas.borrow_mut().drawing.reset();
         self.console.clear();
         self.console_dirty = true;
-        if !self.console_definitions.is_empty() && !std::mem::replace(&mut self.definitions_cleared, true) {
+        // Run starts again with nothing to undo (ADR 0025).
+        self.console_entry.clear_entries();
+        self.console_before.clear();
+        if !self.console_definitions.is_empty()
+            && !std::mem::replace(&mut self.definitions_cleared, true)
+        {
             self.print("Run cleared the procedures you defined in the console. \"Copy to editor\" keeps them.");
         }
         self.set_diagnostics(Vec::new(), cx);
@@ -359,22 +454,93 @@ impl App {
     }
 
     /// Runs a console entry against whatever the last run left (ADR 0006).
-    fn run_console(&mut self, entry: String, cx: &mut Context<Self>) {
+    pub(crate) fn run_console(&mut self, entry: String, cx: &mut Context<Self>) {
         self.stop(cx);
         // The console works on what the user's program left.
         self.back_to_my_drawing(cx);
         self.defining = defines(&entry).then(|| entry.clone());
+        // A new animator puts the turtle in the centre, and a turn doesn't
+        // say where the turtle is: so carry on from where the last one left
+        // it.
+        let left = self.animator.as_ref().map(|a| (a.pos, a.heading, a.shown));
+        let canvas = self.canvas.borrow();
+        self.console_before.push(Before {
+            marks: canvas.drawing.segments(),
+            background: canvas.drawing.background(),
+            kame: left,
+            cleaned: None,
+        });
+        drop(canvas);
         self.start_job(Job::Console(entry), DEFAULT_CHANNEL, cx);
+        self.console_job = true;
+        self.put_kame(left);
     }
 
-    fn start_job(&mut self, job: Job, channel: Channel, cx: &mut Context<Self>) {
-        let (animator, run) = self.session.start(job, self.speed, channel);
+    /// Puts the new animator's Kame where `kame` says, if it says.
+    pub(crate) fn put_kame(&mut self, kame: Option<(Point, f64, bool)>) {
+        if let (Some((pos, heading, shown)), Some(animator)) = (kame, &mut self.animator) {
+            (animator.pos, animator.heading, animator.shown) = (pos, heading, shown);
+        }
+    }
+
+    /// The console entry Undo would take back, if it can now.
+    pub(crate) fn to_undo(&self) -> Option<&str> {
+        if self.running() {
+            return None;
+        }
+        self.console_entry.to_undo().map(|e| e.text.as_str())
+    }
+
+    /// Undo at the console (ADR 0025): takes back the newest entry not
+    /// undone yet, putting the drawing and Kame back as it found them.
+    pub(crate) fn undo_console(&mut self, cx: &mut Context<Self>) {
+        if self.running() {
+            return;
+        }
+        let Some(text) = self.console_entry.undo().map(|e| e.text.clone()) else {
+            return;
+        };
+        self.driven_undo(&text);
+        let before = self
+            .console_before
+            .pop()
+            .expect("one for each console entry");
+        self.back_to_my_drawing(cx);
+        let mut canvas = self.canvas.borrow_mut();
+        match before.cleaned {
+            Some(marks) => {
+                canvas.drawing.clean();
+                canvas.drawing.push(&marks[..before.marks.min(marks.len())]);
+            }
+            None => canvas.drawing.truncate(before.marks),
+        }
+        if canvas.drawing.background() != before.background {
+            canvas.drawing.set_background(before.background);
+        }
+        drop(canvas);
+        // The interpreter puts Kame's pen and colours back, and the panels
+        // follow; the window puts back where it is.
+        self.start_job(Job::Undo, DEFAULT_CHANNEL, cx);
+        self.put_kame(before.kame);
+        self.print(format!("Undid: {}", text.replace('\n', " ")));
+        cx.notify();
+    }
+
+    pub(crate) fn start_job(&mut self, job: Job, channel: Channel, cx: &mut Context<Self>) {
+        // Driving plays at a speed of its own, whatever the slider says.
+        let speed = if self.driving.is_some() {
+            Speed::Animated(pendown::drive::DRIVE_SPEED)
+        } else {
+            self.speed
+        };
+        let (animator, run) = self.session.start(job, speed, channel);
         self.play(animator, run, cx);
     }
 
     /// Starts playing a job's events: the user's, or an example's.
     pub(crate) fn play(&mut self, animator: Animator, run: Run, cx: &mut Context<Self>) {
         self.error_help = None;
+        self.console_job = false;
         self.animator = Some(animator);
         self.run = Some(run);
         self.finished_at = None;
@@ -410,14 +576,20 @@ impl App {
                     }
                 }
             });
-            self.overlay = Some(MetricsOverlay { since: self.snapshot(), lines: vec!["Measuring…".into()], _refresh: refresh });
+            self.overlay = Some(MetricsOverlay {
+                since: self.snapshot(),
+                lines: vec!["Measuring…".into()],
+                _refresh: refresh,
+            });
         }
         cx.notify();
     }
 
     /// Brings the overlay's numbers up to date, every `OVERLAY_EVERY`.
     fn update_overlay(&mut self) {
-        let Some(since) = self.overlay.as_ref().map(|o| o.since) else { return };
+        let Some(since) = self.overlay.as_ref().map(|o| o.since) else {
+            return;
+        };
         if since.at.elapsed() < OVERLAY_EVERY {
             return;
         }
@@ -433,9 +605,14 @@ impl App {
     /// costs the UI thread a few milliseconds.
     fn schedule_frame(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.wake = None;
-        let Some(animator) = self.animator.as_ref().filter(|a| a.wants_frames()) else { return };
+        let Some(animator) = self.animator.as_ref().filter(|a| a.wants_frames()) else {
+            return;
+        };
         let px_per_step = self.canvas.borrow().drawing.scale();
-        let mut gap = animator.next_change(px_per_step, TURTLE_SIZE as f64 / 2. * window.scale_factor() as f64);
+        let mut gap = animator.next_change(
+            px_per_step,
+            TURTLE_SIZE as f64 / 2. * window.scale_factor() as f64,
+        );
         if gap < FRAME_SOON {
             window.request_animation_frame();
             // gpui can drop an animation frame, as when it throttles a window
@@ -470,6 +647,9 @@ impl App {
             && !animator.finished()
         {
             animator.stop();
+            if self.console_job {
+                self.console_entry.finish(Ending::Stopped);
+            }
             self.show_watch(cx, Watched::stopped);
             self.stop_at = Some(Instant::now());
             self.print("Stopped.");
@@ -489,9 +669,55 @@ impl App {
         self.console_dirty = true;
     }
 
+    /// For the scripted session: what's typed in the console's input line.
+    pub(crate) fn console_typed(&self, cx: &Context<Self>) -> String {
+        self.console_input.read(cx).value().to_string()
+    }
+
+    /// For the scripted session: presses `keys` in the console's input line,
+    /// as `Keystroke::parse` reads them.
+    pub(crate) fn press_in_console(
+        &mut self,
+        keys: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let focus = self.console_input.read(cx).focus_handle(cx);
+        window.focus(&focus, cx);
+        self.press(keys, window, cx);
+    }
+
+    /// For the scripted session: presses `keys` in the editor.
+    pub(crate) fn press_in_editor(
+        &mut self,
+        keys: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let focus = self.editor.read(cx).focus_handle(cx);
+        window.focus(&focus, cx);
+        self.press(keys, window, cx);
+    }
+
+    /// For the scripted session: presses `keys` wherever the focus is.
+    pub(crate) fn press(&mut self, keys: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let keystroke = Keystroke::parse(keys).expect("a keystroke");
+        // After this update, since the key's actions update the window.
+        window.defer(cx, move |window, cx| {
+            window.dispatch_keystroke(keystroke, cx);
+        });
+    }
+
     /// For the scripted session: as if the user typed `line` and pressed Enter.
-    pub(crate) fn type_into_console(&mut self, line: &str, window: &mut Window, cx: &mut Context<Self>) {
-        self.console_input.update(cx, |input, cx| input.set_value(line.to_string(), window, cx));
+    pub(crate) fn type_into_console(
+        &mut self,
+        line: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.console_input.update(cx, |input, cx| {
+            input.set_value(line.to_string(), window, cx)
+        });
         self.submit_console(window, cx);
     }
 
@@ -500,8 +726,15 @@ impl App {
             return;
         }
         let line = self.console_input.read(cx).value().to_string();
-        self.console_input.update(cx, |input, cx| input.set_value("", window, cx));
-        let prompt = if self.console_entry.continuing() { "…" } else { ">" };
+        self.console_input
+            .update(cx, |input, cx| input.set_value("", window, cx));
+        // Typing ends a driven entry: the next key press starts a new one.
+        self.end_driven_entry();
+        let prompt = if self.console_entry.continuing() {
+            "…"
+        } else {
+            ">"
+        };
         self.print(format!("{prompt} {line}"));
         match self.console_entry.submit(&line) {
             Submit::More => {}
@@ -512,28 +745,131 @@ impl App {
 
     /// Up and Down in the console's input line go through its history.
     fn recall(&mut self, older: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let text = if older { self.console_entry.older() } else { self.console_entry.newer() };
+        let text = if older {
+            self.console_entry.older()
+        } else {
+            self.console_entry.newer()
+        };
         if let Some(text) = text.map(str::to_string) {
             // A multi-line entry comes back on one line, which runs the same.
             let text = text.replace('\n', " ");
-            self.console_input.update(cx, |input, cx| input.set_value(text, window, cx));
+            self.console_input
+                .update(cx, |input, cx| input.set_value(text, window, cx));
         }
     }
 
     /// Appends the definitions typed at the console to the editor's program.
-    fn copy_definitions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let mut text = self.editor.read(cx).value().to_string();
-        for definition in self.console_definitions.drain(..) {
-            if !text.ends_with('\n') && !text.is_empty() {
-                text.push('\n');
-            }
-            text.push('\n');
-            text.push_str(&definition);
-            text.push('\n');
-        }
-        self.editor.update(cx, |state, cx| state.set_value(text, window, cx));
-        self.check_program(cx);
+    pub(crate) fn copy_definitions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let definitions = self.newest_definitions();
+        self.console_definitions.clear();
+        self.append_to_program(&definitions, window, cx);
         self.print("Copied the console's definitions to the editor.");
+    }
+
+    /// The definitions typed at the console, keeping only the newest of each
+    /// name: one can be typed again after a Run, which keeps the old one for
+    /// Copy to editor.
+    fn newest_definitions(&self) -> Vec<String> {
+        let mut newest: Vec<String> = Vec::new();
+        for definition in self.console_definitions.iter().rev() {
+            let names = teach::defined(definition);
+            if newest
+                .iter()
+                .all(|d| teach::defined(d).iter().all(|n| !names.contains(n)))
+            {
+                newest.insert(0, definition.clone());
+            }
+        }
+        newest
+    }
+
+    /// Adds definitions to the end of the editor's program, each after a
+    /// blank line, as one edit that the editor's Undo takes back out.
+    fn append_to_program(
+        &mut self,
+        definitions: &[String],
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let code: Vec<&str> = definitions.iter().map(|d| d.trim_end()).collect();
+        self.copy_to_editor(&code.join("\n\n"), window, cx);
+    }
+
+    /// Whether Teach Kame has something to offer: an entry since the last
+    /// Run that isn't a definition, with nothing running.
+    pub(crate) fn can_teach(&self) -> bool {
+        !self.running() && self.console_entry.teachable().any(|e| !defines(&e.text))
+    }
+
+    /// Opens Teach Kame's dialog on the entries since the last Run.
+    pub(crate) fn open_teach(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.can_teach() {
+            return;
+        }
+        let program = self.editor.read(cx).value().to_string();
+        let in_program = teach::defined(&program);
+        // The console's definitions, unless a Run has cleared them all.
+        let console = if self.definitions_cleared {
+            Vec::new()
+        } else {
+            self.newest_definitions()
+        };
+        let at_console = teach::defined(&console.join("\n"));
+        // The picture uses the program's procedures, and the console's that
+        // aren't in it.
+        let mut definitions = teach::definitions(&program);
+        for definition in &console {
+            if teach::defined(definition)
+                .iter()
+                .all(|name| !in_program.contains(name))
+            {
+                definitions.push_str(definition);
+                definitions.push('\n');
+            }
+        }
+        let entries = self.console_entry.teachable().cloned().collect();
+        let app = cx.entity().downgrade();
+        let view = cx.new(|cx| {
+            TeachKame::new(
+                app,
+                entries,
+                in_program,
+                at_console,
+                definitions,
+                window,
+                cx,
+            )
+        });
+        self.teach_dialog = Some(view.clone());
+        let focus_name = Cell::new(true);
+        window.open_dialog(cx, move |dialog, window, cx| {
+            if focus_name.replace(false) {
+                let name = view.read(cx).name.focus_handle(cx);
+                window.focus(&name, cx);
+            }
+            dialog.w(teach_dialog::width()).child(view.clone())
+        });
+    }
+
+    /// Teach Kame (from its dialog): the procedure goes at the end of the
+    /// program, and is defined at the console, so `name` works straight
+    /// away. Defining it isn't an entry, so Undo goes past it.
+    pub(crate) fn teach(
+        &mut self,
+        name: &str,
+        procedure: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.teach_dialog = None;
+        self.append_to_program(std::slice::from_ref(&procedure), window, cx);
+        self.back_to_my_drawing(cx);
+        let left = self.animator.as_ref().map(|a| (a.pos, a.heading, a.shown));
+        self.start_job(Job::Define(procedure), DEFAULT_CHANNEL, cx);
+        self.put_kame(left);
+        self.print(format!(
+            "Kame knows {name} now. It's at the end of your program."
+        ));
     }
 
     /// Puts new console lines into the text area, scrolled to the newest.
@@ -541,11 +877,18 @@ impl App {
         if !std::mem::take(&mut self.console_dirty) {
             return;
         }
-        let text = self.console.iter().map(|l| l.as_ref()).collect::<Vec<_>>().join("\n");
+        let text = self
+            .console
+            .iter()
+            .map(|l| l.as_ref())
+            .collect::<Vec<_>>()
+            .join("\n");
         let lines = self.console.len();
         self.console_output.update(cx, |output, cx| {
             output.set_value(text, window, cx);
-            if let (Some(rows), Some(line_height)) = (output.visible_row_range(), output.line_height()) {
+            if let (Some(rows), Some(line_height)) =
+                (output.visible_row_range(), output.line_height())
+            {
                 let top = lines.saturating_sub(rows.len()) as f32;
                 output.set_scroll_offset(point(px(0.), -line_height * top), cx);
             }
@@ -580,7 +923,8 @@ impl App {
             .into_iter()
             .filter_map(|e| {
                 let span = e.span?;
-                let range = position(&text, span.start as usize)..position(&text, span.end as usize);
+                let range =
+                    position(&text, span.start as usize)..position(&text, span.end as usize);
                 Some(Diagnostic::new(range, e.message).with_severity(DiagnosticSeverity::Error))
             })
             .collect();
@@ -595,7 +939,10 @@ impl App {
         let mut diagnostics = Vec::new();
         let example = self.example.is_some();
         let reference = pendown_logo::reference::reference();
-        self.error_help = errors.iter().filter_map(|e| reference.find_index(e.command.as_deref()?)).next();
+        self.error_help = errors
+            .iter()
+            .filter_map(|e| reference.find_index(e.command.as_deref()?))
+            .next();
         for e in &errors {
             let where_ = match e.span {
                 // An example's spans are in its own text, not the editor's.
@@ -613,7 +960,10 @@ impl App {
                 && !example
             {
                 let range = self.position(span.start as usize)..self.position(span.end as usize);
-                diagnostics.push(Diagnostic::new(range, e.message.clone()).with_severity(DiagnosticSeverity::Error));
+                diagnostics.push(
+                    Diagnostic::new(range, e.message.clone())
+                        .with_severity(DiagnosticSeverity::Error),
+                );
             }
         }
         if !diagnostics.is_empty() {
@@ -629,16 +979,31 @@ impl App {
             return;
         }
         // Console entries aren't in the editor, so they aren't highlighted there.
-        let Some(span) = self.animator.as_ref().and_then(|a| a.highlight).filter(|s| s.source == SourceId::Editor) else {
+        let Some(span) = self
+            .animator
+            .as_ref()
+            .and_then(|a| a.highlight)
+            .filter(|s| s.source == SourceId::Editor)
+        else {
             self.highlight.set(vec![], cx);
             return;
         };
         let color = cx.theme().warning.opacity(0.35);
-        self.highlight.set(vec![RangeDecoration::new(span.range()).with_style(RangeDecorationStyle::Fill).with_color(color)], cx);
+        self.highlight.set(
+            vec![
+                RangeDecoration::new(span.range())
+                    .with_style(RangeDecorationStyle::Fill)
+                    .with_color(color),
+            ],
+            cx,
+        );
         let line = span.line as usize;
         let lines = self.run_text.matches('\n').count() + 1;
         self.editor.update(cx, |state, cx| {
-            let (Some(rows), Some(line_height)) = (state.visible_row_range(), state.line_height()) else { return };
+            let (Some(rows), Some(line_height)) = (state.visible_row_range(), state.line_height())
+            else {
+                return;
+            };
             // Only scroll where there's more text to see, and never past the
             // end: the editor springs back from there, animating for a third
             // of a second each time (issue 08).
@@ -656,17 +1021,27 @@ impl App {
     /// and notice when the run has ended.
     fn tick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let now = Instant::now();
-        let Some(animator) = &mut self.animator else { return };
+        let Some(animator) = &mut self.animator else {
+            return;
+        };
         if !animator.wants_frames() {
             self.last_frame = None;
         } else {
-            let dt = self.last_frame.map_or(Duration::from_millis(16), |t| now - t);
+            let dt = self
+                .last_frame
+                .map_or(Duration::from_millis(16), |t| now - t);
             if self.last_frame.is_some() {
                 self.frame_intervals.push(dt);
             }
             self.last_frame = Some(now);
-            let per_segment = self.canvas.borrow().drawing.per_segment.max(Duration::from_nanos(200));
-            let max_marks = (INSTANT_DRAWING.as_nanos() / per_segment.as_nanos()).clamp(500, 100_000) as usize;
+            let per_segment = self
+                .canvas
+                .borrow()
+                .drawing
+                .per_segment
+                .max(Duration::from_nanos(200));
+            let max_marks =
+                (INSTANT_DRAWING.as_nanos() / per_segment.as_nanos()).clamp(500, 100_000) as usize;
             let frame = animator.frame(dt, max_marks);
             self.events += frame.events;
             if frame.watch_changed {
@@ -679,6 +1054,12 @@ impl App {
 
             let mut canvas = self.canvas.borrow_mut();
             if frame.cleaned {
+                // Undo brings back what a console entry's first CLEAN took.
+                if let Some(before) = self.console_before.last_mut().filter(|_| self.console_job)
+                    && before.cleaned.is_none()
+                {
+                    before.cleaned = Some(canvas.drawing.marks().to_vec());
+                }
                 canvas.drawing.clean();
             }
             if let Some(color) = frame.background {
@@ -707,7 +1088,21 @@ impl App {
             self.example_finished(cx);
             self.report();
             let defining = self.defining.take();
-            match self.run.as_ref().and_then(|r| r.result()) {
+            let result = self.run.as_ref().and_then(|r| r.result());
+            if self.console_job {
+                self.console_entry.finish(match &result {
+                    Some(Ok(())) => Ending::Ran,
+                    Some(Err(RunError::Parse(errors))) => Ending::Error(
+                        errors
+                            .first()
+                            .map(|e| e.message.clone())
+                            .unwrap_or_default(),
+                    ),
+                    Some(Err(RunError::Runtime(e))) => Ending::Error(e.message.clone()),
+                    _ => Ending::Stopped,
+                });
+            }
+            match result {
                 Some(Err(RunError::Parse(errors))) => self.show_errors(errors, cx),
                 Some(Err(RunError::Runtime(e))) => self.show_errors(vec![e], cx),
                 Some(Ok(())) => {
@@ -718,11 +1113,15 @@ impl App {
                 }
                 _ => {}
             }
+            // A press made while this one played.
+            self.drive_next(cx);
         }
     }
 
     fn status(&self) -> String {
-        let Some(animator) = &self.animator else { return String::new() };
+        let Some(animator) = &self.animator else {
+            return String::new();
+        };
         let state = if animator.stopped {
             "Stopped"
         } else if animator.finished() {
@@ -735,22 +1134,44 @@ impl App {
             }
         };
         let run = self.run.as_ref().expect("a run goes with an animator");
-        let elapsed = self.finished_at.or(self.stop_at).unwrap_or_else(Instant::now) - run.started;
-        let example = if self.example.is_some() { "Example: " } else { "" };
-        format!("{example}{state} · {:.1} s · {} lines drawn", elapsed.as_secs_f64(), self.canvas.borrow().drawing.segments())
+        let elapsed = self
+            .finished_at
+            .or(self.stop_at)
+            .unwrap_or_else(Instant::now)
+            - run.started;
+        let example = if self.example.is_some() {
+            "Example: "
+        } else {
+            ""
+        };
+        format!(
+            "{example}{state} · {:.1} s · {} lines drawn",
+            elapsed.as_secs_f64(),
+            self.canvas.borrow().drawing.segments()
+        )
     }
 
     /// Step, or Step instruction.
     pub(crate) fn step(&mut self, instruction: bool, cx: &mut Context<Self>) {
+        self.stop_driving(cx);
         if let Some(a) = &mut self.animator {
-            if instruction { a.step_instruction() } else { a.step_line() }
+            if instruction {
+                a.step_instruction()
+            } else {
+                a.step_line()
+            }
         }
         cx.notify();
     }
 
     pub(crate) fn toggle_pause(&mut self, cx: &mut Context<Self>) {
+        self.stop_driving(cx);
         if let Some(a) = &mut self.animator {
-            if a.mode() == Mode::Paused { a.resume() } else { a.pause() }
+            if a.mode() == Mode::Paused {
+                a.resume()
+            } else {
+                a.pause()
+            }
         }
         cx.notify();
     }
@@ -767,7 +1188,11 @@ impl Render for App {
 }
 
 impl App {
-    fn render_window(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+    fn render_window(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
         if !std::mem::replace(&mut self.checked, true) {
             self.check_program(cx);
         }
@@ -779,21 +1204,66 @@ impl App {
 
         let theme = cx.theme().clone();
         let running = self.running();
-        self.editor_pane.update(cx, |pane, cx| pane.set_readonly(running, cx));
-        self.console_pane.update(cx, |pane, cx| pane.set_disabled(running, cx));
-        let paused = self.animator.as_ref().is_some_and(|a| a.mode() == Mode::Paused && !a.finished());
+        self.editor_pane
+            .update(cx, |pane, cx| pane.set_readonly(running, cx));
+        self.console_pane
+            .update(cx, |pane, cx| pane.set_disabled(running, cx));
+        self.help_panel
+            .update(cx, |panel, cx| panel.set_program_running(running, cx));
+        let paused = self
+            .animator
+            .as_ref()
+            .is_some_and(|a| a.mode() == Mode::Paused && !a.finished());
         let canvas = self.canvas.clone();
+        // Driving thinks about the whole entry, across its presses.
+        let drive_thinking = {
+            let now = self
+                .animator
+                .as_ref()
+                .map(|a| a.thinking())
+                .unwrap_or_default();
+            self.drive_thinking(now)
+        };
+        if self.drive_fading() {
+            window.request_animation_frame();
+        }
         let overlay = match &self.animator {
             Some(a) => {
                 // A fifth of a pixel, as the buffer is drawn.
                 let tolerance = 0.2 / self.canvas.borrow().drawing.scale().max(1e-6);
-                Overlay { partial: a.partial(tolerance), turtle: a.shown.then_some((a.pos, a.heading)) }
+                Overlay {
+                    partial: a.partial(tolerance),
+                    turtle: a.shown.then_some((a.pos, a.heading)),
+                    thinking: if self.driving.is_some() {
+                        drive_thinking
+                    } else if self.show_thinking {
+                        a.thinking()
+                    } else {
+                        Thinking::default()
+                    },
+                    heading_line: self.driving.is_some(),
+                    caption: self.drive_caption(),
+                }
             }
-            None => Overlay { partial: None, turtle: Some((pendown_logo::Point { x: 0.0, y: 0.0 }, 0.0)) },
+            None => Overlay {
+                partial: None,
+                turtle: Some((pendown_logo::Point { x: 0.0, y: 0.0 }, 0.0)),
+                thinking: Thinking::default(),
+                heading_line: self.driving.is_some(),
+                caption: None,
+            },
         };
 
-        let toolbar = ToolbarState { running, paused, speed: self.speed, help: self.help_open };
-        self.toolbar_pane.update(cx, |pane, cx| pane.set(toolbar, cx));
+        let toolbar = ToolbarState {
+            running,
+            paused,
+            speed: self.speed,
+            help: self.help_open,
+            thinking: self.show_thinking,
+            driving: self.driving.is_some(),
+        };
+        self.toolbar_pane
+            .update(cx, |pane, cx| pane.set(toolbar, cx));
 
         let canvas_area = div()
             .relative()
@@ -801,7 +1271,11 @@ impl App {
             .child(
                 gpui_kit::canvas(
                     move |bounds, _, _| bounds,
-                    move |_, bounds, window, cx| canvas.borrow_mut().paint(bounds, window, overlay.clone(), cx),
+                    move |_, bounds, window, cx| {
+                        canvas
+                            .borrow_mut()
+                            .paint(bounds, window, overlay.clone(), cx)
+                    },
                 )
                 .size_full(),
             )
@@ -820,17 +1294,47 @@ impl App {
                         .children(metrics.lines.iter().map(|line| div().child(line.clone()))),
                 )
             })
-            .children(self.example_banner(cx));
+            .children(self.example_banner(cx))
+            .children(self.drive_strip(cx))
+            // The canvas takes the arrow keys while driving.
+            .track_focus(&self.canvas_focus)
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                if this.drive_key(event, window, cx) {
+                    cx.stop_propagation();
+                }
+            }))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, window, cx| {
+                    if this.driving.is_some() {
+                        window.focus(&this.canvas_focus, cx);
+                    }
+                }),
+            );
 
         v_flex()
             .size_full()
-            .on_action(cx.listener(|this, _: &NewFile, window, cx| this.then(After::NewFile, window, cx)))
-            .on_action(cx.listener(|this, _: &OpenFile, window, cx| this.then(After::OpenFile, window, cx)))
-            .on_action(cx.listener(|this, _: &SaveFile, window, cx| this.save(After::Nothing, window, cx)))
-            .on_action(cx.listener(|this, _: &SaveFileAs, window, cx| this.save_as(After::Nothing, window, cx)))
-            .on_action(cx.listener(|this, _: &ExportPicture, window, cx| this.export(Picture::Png, window, cx)))
+            .on_action(
+                cx.listener(|this, _: &NewFile, window, cx| this.then(After::NewFile, window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &OpenFile, window, cx| {
+                    this.then(After::OpenFile, window, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &SaveFile, window, cx| this.save(After::Nothing, window, cx)),
+            )
+            .on_action(cx.listener(|this, _: &SaveFileAs, window, cx| {
+                this.save_as(After::Nothing, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &ExportPicture, window, cx| {
+                this.export(Picture::Png, window, cx)
+            }))
             .on_action(cx.listener(|this, _: &RunProgram, _, cx| this.start(DEFAULT_CHANNEL, cx)))
-            .on_action(cx.listener(|this, _: &ToggleMetrics, window, cx| this.toggle_metrics(window, cx)))
+            .on_action(
+                cx.listener(|this, _: &ToggleMetrics, window, cx| this.toggle_metrics(window, cx)),
+            )
             .on_action(cx.listener(|this, _: &ShowHelp, window, cx| this.show_help(window, cx)))
             .bg(theme.background)
             .text_color(theme.foreground)
@@ -841,42 +1345,56 @@ impl App {
                     .gap_2()
                     .border_b_1()
                     .border_color(theme.border)
-                    .child(self.toolbar_pane.clone().cached(StyleRefinement::default().h_full().flex_1())),
+                    .child(
+                        self.toolbar_pane
+                            .clone()
+                            .cached(StyleRefinement::default().h_full().flex_1()),
+                    ),
             )
-            .child(
-                div().flex_1().min_h_0().child({
-                    let editor = resizable_panel()
-                        .size(px(460.))
-                        .child(self.editor_pane.clone().cached(StyleRefinement::default().size_full()));
-                    let canvas = resizable_panel().child(canvas_area);
-                    // The side panel, when it's open (phase 5). Each layout
-                    // has its own id, so each remembers its sizes.
-                    if self.help_open {
-                        h_resizable("main-help").child(editor).child(canvas).child(
-                            resizable_panel()
-                                .size(px(380.))
-                                .child(self.help_panel.clone().cached(StyleRefinement::default().size_full())),
-                        )
-                    } else {
-                        h_resizable("main").child(editor).child(canvas)
-                    }
-                }),
-            )
-            .child(
-                div().h(px(CONSOLE_HEIGHT)).border_t_1().border_color(theme.border).child(
-                    h_resizable("console-area")
-                        .child(resizable_panel().child(self.render_console(running, cx)))
-                        .child(
-                            resizable_panel()
-                                .size(px(220.))
-                                .child(self.counters_pane.clone().cached(StyleRefinement::default().size_full())),
-                        )
-                        .child(
-                            resizable_panel()
-                                .size(px(340.))
-                                .child(self.variables_pane.clone().cached(StyleRefinement::default().size_full())),
+            .child(div().flex_1().min_h_0().child({
+                let editor = resizable_panel().size(px(460.)).child(
+                    self.editor_pane
+                        .clone()
+                        .cached(StyleRefinement::default().size_full()),
+                );
+                let canvas = resizable_panel().child(canvas_area);
+                // The side panel, when it's open (phase 5). Each layout
+                // has its own id, so each remembers its sizes.
+                if self.help_open {
+                    h_resizable("main-help").child(editor).child(canvas).child(
+                        resizable_panel().size(px(380.)).child(
+                            self.help_panel
+                                .clone()
+                                .cached(StyleRefinement::default().size_full()),
                         ),
-                ),
+                    )
+                } else {
+                    h_resizable("main").child(editor).child(canvas)
+                }
+            }))
+            .child(
+                div()
+                    .h(px(CONSOLE_HEIGHT))
+                    .border_t_1()
+                    .border_color(theme.border)
+                    .child(
+                        h_resizable("console-area")
+                            .child(resizable_panel().child(self.render_console(running, cx)))
+                            .child(
+                                resizable_panel().size(px(220.)).child(
+                                    self.counters_pane
+                                        .clone()
+                                        .cached(StyleRefinement::default().size_full()),
+                                ),
+                            )
+                            .child(
+                                resizable_panel().size(px(340.)).child(
+                                    self.variables_pane
+                                        .clone()
+                                        .cached(StyleRefinement::default().size_full()),
+                                ),
+                            ),
+                    ),
             )
             // The status bar: how the run is going.
             .child(
@@ -893,7 +1411,11 @@ impl App {
     }
 
     /// The console's title, buttons, output and input.
-    fn render_console(&mut self, running: bool, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+    fn render_console(
+        &mut self,
+        running: bool,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
         let theme = cx.theme().clone();
         v_flex()
             .size_full()
@@ -902,7 +1424,12 @@ impl App {
                     .px_2()
                     .py_1()
                     .gap_2()
-                    .child(div().text_sm().text_color(theme.muted_foreground).child("Console"))
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(theme.muted_foreground)
+                            .child("Console"),
+                    )
                     .child(div().flex_1())
                     .when_some(self.error_help, |row, i| {
                         let title = &pendown_logo::reference::reference().commands[i].title;
@@ -912,9 +1439,37 @@ impl App {
                                 .ghost()
                                 .icon(IconName::BookOpen)
                                 .label(format!("Help on {title}"))
-                                .on_click(cx.listener(move |this, _, window, cx| this.open_help(i, window, cx))),
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.open_help(i, window, cx)
+                                })),
                         )
                     })
+                    .child({
+                        let undo = self.to_undo().map(label);
+                        Button::new("undo-entry")
+                            .xsmall()
+                            .ghost()
+                            .icon(IconName::Undo2)
+                            .label(match &undo {
+                                Some(entry) => format!("Undo {entry}"),
+                                None => "Undo".to_string(),
+                            })
+                            .tooltip(UNDO_TOOLTIP)
+                            .disabled(undo.is_none())
+                            .on_click(cx.listener(|this, _, _, cx| this.undo_console(cx)))
+                    })
+                    .child(
+                        Button::new("teach-kame")
+                            .xsmall()
+                            .ghost()
+                            .icon(IconName::MessageSquarePlus)
+                            .label("Teach Kame")
+                            .tooltip("Make a procedure from what you typed")
+                            .disabled(!self.can_teach())
+                            .on_click(
+                                cx.listener(|this, _, window, cx| this.open_teach(window, cx)),
+                            ),
+                    )
                     .when(!self.console_definitions.is_empty(), |row| {
                         row.child(
                             Button::new("copy-definitions")
@@ -922,21 +1477,36 @@ impl App {
                                 .ghost()
                                 .label("Copy to editor")
                                 .disabled(running)
-                                .on_click(cx.listener(|this, _, window, cx| this.copy_definitions(window, cx))),
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.copy_definitions(window, cx)
+                                })),
                         )
                     })
-                    .child(Button::new("clear-console").xsmall().ghost().label("Clear").on_click(cx.listener(
-                        |this, _, _, cx| {
-                            this.console.clear();
-                            this.console_dirty = true;
-                            cx.notify();
-                        },
-                    ))),
+                    .child(
+                        Button::new("clear-console")
+                            .xsmall()
+                            .label("Clear")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.console.clear();
+                                this.console_dirty = true;
+                                cx.notify();
+                            })),
+                    ),
             )
             .child(
                 div()
                     .flex_1()
                     .min_h_0()
+                    // Ctrl+Z with nothing typed takes back the last entry;
+                    // with something typed, it undoes the typing.
+                    .capture_action(cx.listener(|this, _: &Undo, _, cx| {
+                        if this.console_input.read(cx).value().is_empty()
+                            && this.to_undo().is_some()
+                        {
+                            this.undo_console(cx);
+                            cx.stop_propagation();
+                        }
+                    }))
                     .capture_action(cx.listener(|this, _: &MoveUp, window, cx| {
                         this.recall(true, window, cx);
                         cx.stop_propagation();
@@ -945,7 +1515,11 @@ impl App {
                         this.recall(false, window, cx);
                         cx.stop_propagation();
                     }))
-                    .child(self.console_pane.clone().cached(StyleRefinement::default().size_full())),
+                    .child(
+                        self.console_pane
+                            .clone()
+                            .cached(StyleRefinement::default().size_full()),
+                    ),
             )
     }
 }

@@ -3,3 +3,4 @@ target/
 
 # Pictures from failing picture tests
 *.actual.png
+mindstorms/conversion/build/

@@ -10,7 +10,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use gpui_kit::*;
+use gpui_kit::{component::WindowExt as _, *};
 use pendown::{
     animator::{Mode, Speed},
     metrics::Snapshot,
@@ -117,6 +117,27 @@ enum Step {
     TeachToggle(usize, bool),
     /// Press the dialog's Teach Kame button.
     PressTeach,
+    /// Press the dialog's All (true) or None (false).
+    TeachAll(bool),
+    /// The dialog's rows, as `TeachKame::describe` gives them.
+    CheckTeachRows(&'static str),
+    /// Why the dialog won't take the name, or "" if it will.
+    CheckTeachProblem(&'static str),
+    /// The dialog's picture has been drawn.
+    CheckTeachPicture,
+    /// A dialog is open, or not.
+    CheckDialog(bool),
+    /// The console's Undo button names this entry, or is disabled for "".
+    CheckUndoLabel(&'static str),
+    /// The console's Teach Kame button is enabled, or not.
+    CheckCanTeach(bool),
+    /// Press keys wherever the focus is, or in the editor.
+    Keys(&'static str),
+    EditorKeys(&'static str),
+    /// Press the console's Copy to editor.
+    CopyDefinitions,
+    /// The drawing's background, as RGBA.
+    CheckBackground([u8; 4]),
     /// How many lines, arcs and shapes are drawn.
     CheckDrawn(usize),
     /// Where the turtle sprite is, and its heading.
@@ -596,6 +617,121 @@ fn script() -> Vec<Step> {
         WaitFinished,
         CheckDrawn(3),
         CheckTurtle(100.0, 0.0, 180.0),
+        Say("Console undo: the background comes back"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        Console("FD 10"),
+        WaitFinished,
+        Console("SETBG 1 FD 10"),
+        WaitFinished,
+        CheckColours("PENCOLOR=7 FILLCOLOR=none BACKGROUND=1"),
+        UndoConsole,
+        WaitFinished,
+        CheckBackground([0, 0, 0, 255]),
+        CheckColours("PENCOLOR=7 FILLCOLOR=none BACKGROUND=0"),
+        CheckDrawn(1),
+        Say("Console undo: long entries are cut short, and Run leaves nothing to undo"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        CheckUndoLabel(""),
+        CheckCanTeach(false),
+        Console("TO TRI :n"),
+        Console("REPEAT 3 [FD :n RT 120]"),
+        Console("END"),
+        WaitFinished,
+        CheckUndoLabel("TO TRI :n…"),
+        CheckCanTeach(false),
+        Console("REPEAT 36 [FD 10 RT 10 FD 5]"),
+        WaitFinished,
+        CheckUndoLabel("REPEAT 36 [FD 10 RT 10…"),
+        CheckCanTeach(true),
+        Run("FD 10", Speed::Instant),
+        WaitFinished,
+        CheckUndoLabel(""),
+        CheckCanTeach(false),
+        Say("Console undo: with an example showing, your drawing comes back first"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        Console("FD 50"),
+        WaitFinished,
+        Console("RT 90 FD 50"),
+        WaitFinished,
+        CheckDrawn(2),
+        OpenHelp("forward"),
+        RunExample("forward", 0),
+        WaitFinished,
+        CheckDrawn(8),
+        UndoConsole,
+        WaitFinished,
+        CheckDrawn(1),
+        CheckTurtle(0.0, 50.0, 0.0),
+        CloseHelp,
+        Say("Teach Kame: rows that can't be ticked, notes, All and None"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        Console("TO TRI :n"),
+        Console("REPEAT 3 [FD :n RT 120]"),
+        Console("END"),
+        WaitFinished,
+        Console("TRI 40"),
+        WaitFinished,
+        Console("FD"),
+        WaitFinished,
+        Console("RT 30"),
+        WaitFinished,
+        OpenTeach,
+        Wait(ms(800)),
+        CheckTeachRows(
+            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | x TRI 40 (uses TRI) | - FD (Not enough inputs to FD) | x RT 30",
+        ),
+        CheckTeachPicture,
+        TeachName("tri"),
+        Wait(ms(100)),
+        CheckTeachProblem("TRI is already defined at the console. Choose another name."),
+        Screenshot("teach-rows"),
+        TeachAll(false),
+        CheckTeachRows(
+            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | - TRI 40 (uses TRI) | - FD (Not enough inputs to FD) | - RT 30",
+        ),
+        TeachAll(true),
+        CheckTeachRows(
+            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | x TRI 40 (uses TRI) | x FD (Not enough inputs to FD) | x RT 30",
+        ),
+        Say("Teach Kame: Escape closes the dialog, and nothing changes"),
+        Keys("escape"),
+        Wait(ms(400)),
+        CheckDialog(false),
+        CheckEditor(""),
+        CheckCanTeach(true),
+        Say("Teach Kame: the editor's Undo takes the procedure back out"),
+        Run("; mine", Speed::Instant),
+        WaitFinished,
+        Console("FD 20"),
+        WaitFinished,
+        OpenTeach,
+        Wait(ms(300)),
+        TeachName("stair"),
+        PressTeach,
+        Wait(ms(300)),
+        WaitFinished,
+        CheckDialog(false),
+        CheckEditor("; mine\n\nTO STAIR\n  FD 20\nEND\n"),
+        EditorKeys("secondary-z"),
+        Wait(ms(300)),
+        CheckEditor("; mine"),
+        Say("Teach Kame: so does Copy to editor's, for definitions typed at the console"),
+        Console("TO STEP2"),
+        Console("FD 5"),
+        Console("END"),
+        WaitFinished,
+        CopyDefinitions,
+        Wait(ms(100)),
+        // TRI too, from earlier: Copy to editor keeps definitions across a
+        // Run, but only the newest of each name.
+        CheckEditor("; mine\n\nTO TRI :n\nREPEAT 3 [FD :n RT 120]\nEND\n\nTO STEP2\nFD 5\nEND\n"),
+        EditorKeys("secondary-z"),
+        Wait(ms(300)),
+        CheckEditor("; mine"),
         Quit,
     ]
 }
@@ -853,6 +989,58 @@ impl App {
                 Step::ConsoleKeys(keys) => self.press_in_console(keys, window, cx),
                 Step::UndoConsole => self.undo_console(cx),
                 Step::OpenTeach => self.open_teach(window, cx),
+                Step::TeachAll(ticked) => {
+                    if let Some(dialog) = self.teach_dialog.clone() {
+                        dialog.update(cx, |dialog, cx| dialog.tick_all(ticked, cx));
+                    }
+                }
+                Step::CheckTeachRows(expected) => {
+                    let rows = self
+                        .teach_dialog
+                        .as_ref()
+                        .map_or(String::new(), |d| d.read(cx).describe());
+                    self.check(rows == expected, format!("the dialog's rows are {rows:?}"));
+                }
+                Step::CheckTeachProblem(expected) => {
+                    let problem = self
+                        .teach_dialog
+                        .as_ref()
+                        .and_then(|d| d.read(cx).name_problem(cx))
+                        .unwrap_or_default();
+                    self.check(
+                        problem == expected,
+                        format!("the name's problem is {problem:?}"),
+                    );
+                }
+                Step::CheckTeachPicture => {
+                    let drawn = self
+                        .teach_dialog
+                        .as_ref()
+                        .is_some_and(|d| d.read(cx).has_drawing());
+                    self.check(drawn, format!("the dialog's picture is drawn: {drawn}"));
+                }
+                Step::CheckDialog(open) => {
+                    let found = window.has_active_dialog(cx);
+                    self.check(found == open, format!("a dialog is open: {found}"));
+                }
+                Step::CheckUndoLabel(expected) => {
+                    let found = self
+                        .to_undo()
+                        .map(pendown::console::label)
+                        .unwrap_or_default();
+                    self.check(found == expected, format!("Undo names {found:?}"));
+                }
+                Step::CheckCanTeach(expected) => {
+                    let found = self.can_teach();
+                    self.check(found == expected, format!("Teach Kame is enabled: {found}"));
+                }
+                Step::Keys(keys) => self.press(keys, window, cx),
+                Step::CopyDefinitions => self.copy_definitions(window, cx),
+                Step::EditorKeys(keys) => self.press_in_editor(keys, window, cx),
+                Step::CheckBackground(expected) => {
+                    let found = self.canvas.borrow().drawing.background();
+                    self.check(found == expected, format!("the background is {found:?}"));
+                }
                 Step::TeachName(name) => {
                     if let Some(dialog) = self.teach_dialog.clone() {
                         let input = dialog.read(cx).name.clone();

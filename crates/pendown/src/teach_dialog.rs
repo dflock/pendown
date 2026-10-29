@@ -82,11 +82,16 @@ impl TeachKame {
                     Some(Ending::Stopped) => Some("Stopped".to_string()),
                     _ => None,
                 };
-                Row {
-                    uses: uses(&e.text, &console_only)
+                // A definition doesn't use the procedure it defines.
+                let uses = match fixed {
+                    Some(_) => Vec::new(),
+                    None => uses(&e.text, &console_only)
                         .into_iter()
                         .map(String::from)
                         .collect(),
+                };
+                Row {
+                    uses,
                     ticked: fixed.is_none() && e.ending == Some(Ending::Ran),
                     text: e.text,
                     fixed,
@@ -142,7 +147,7 @@ impl TeachKame {
         cx.notify();
     }
 
-    fn tick_all(&mut self, ticked: bool, cx: &mut Context<Self>) {
+    pub(crate) fn tick_all(&mut self, ticked: bool, cx: &mut Context<Self>) {
         for row in &mut self.rows {
             if row.fixed.is_none() {
                 row.ticked = ticked;
@@ -182,6 +187,45 @@ impl TeachKame {
             .ok();
         })
         .detach();
+    }
+
+    /// For the scripted session: each row as `x` for ticked, `-` for not,
+    /// or `#` for one that can't be, then its text and any notes in
+    /// brackets, separated by ` | `.
+    pub(crate) fn describe(&self) -> String {
+        self.rows
+            .iter()
+            .map(|r| {
+                let mark = match (r.fixed, r.ticked) {
+                    (Some(_), _) => '#',
+                    (None, true) => 'x',
+                    (None, false) => '-',
+                };
+                let notes: Vec<String> = r
+                    .note
+                    .iter()
+                    .cloned()
+                    .chain(r.uses.iter().map(|n| format!("uses {n}")))
+                    .collect();
+                let notes = if notes.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({})", notes.join(", "))
+                };
+                format!("{mark} {}{notes}", r.text.replace('\n', " "))
+            })
+            .collect::<Vec<_>>()
+            .join(" | ")
+    }
+
+    /// For the scripted session: the picture has been drawn.
+    pub(crate) fn has_drawing(&self) -> bool {
+        matches!(self.picture, Some(Picture::Drawing(..)))
+    }
+
+    /// For the scripted session: why the name can't be used, if it can't.
+    pub(crate) fn name_problem(&self, cx: &App) -> Option<String> {
+        self.checked_name(cx).err().flatten()
     }
 
     /// The name, in capitals, or why it can't be used.

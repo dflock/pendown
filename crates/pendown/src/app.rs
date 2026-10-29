@@ -463,7 +463,7 @@ impl App {
     }
 
     /// The console entry Undo would take back, if it can now.
-    fn to_undo(&self) -> Option<&str> {
+    pub(crate) fn to_undo(&self) -> Option<&str> {
         if self.running() {
             return None;
         }
@@ -656,6 +656,23 @@ impl App {
     ) {
         let focus = self.console_input.read(cx).focus_handle(cx);
         window.focus(&focus, cx);
+        self.press(keys, window, cx);
+    }
+
+    /// For the scripted session: presses `keys` in the editor.
+    pub(crate) fn press_in_editor(
+        &mut self,
+        keys: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let focus = self.editor.read(cx).focus_handle(cx);
+        window.focus(&focus, cx);
+        self.press(keys, window, cx);
+    }
+
+    /// For the scripted session: presses `keys` wherever the focus is.
+    pub(crate) fn press(&mut self, keys: &str, window: &mut Window, cx: &mut Context<Self>) {
         let keystroke = Keystroke::parse(keys).expect("a keystroke");
         // After this update, since the key's actions update the window.
         window.defer(cx, move |window, cx| {
@@ -712,39 +729,45 @@ impl App {
     }
 
     /// Appends the definitions typed at the console to the editor's program.
-    fn copy_definitions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let definitions = std::mem::take(&mut self.console_definitions);
+    pub(crate) fn copy_definitions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let definitions = self.newest_definitions();
+        self.console_definitions.clear();
         self.append_to_program(&definitions, window, cx);
         self.print("Copied the console's definitions to the editor.");
     }
 
+    /// The definitions typed at the console, keeping only the newest of each
+    /// name: one can be typed again after a Run, which keeps the old one for
+    /// Copy to editor.
+    fn newest_definitions(&self) -> Vec<String> {
+        let mut newest: Vec<String> = Vec::new();
+        for definition in self.console_definitions.iter().rev() {
+            let names = teach::defined(definition);
+            if newest
+                .iter()
+                .all(|d| teach::defined(d).iter().all(|n| !names.contains(n)))
+            {
+                newest.insert(0, definition.clone());
+            }
+        }
+        newest
+    }
+
     /// Adds definitions to the end of the editor's program, each after a
-    /// blank line, as one step for the editor's Undo.
+    /// blank line, as one edit that the editor's Undo takes back out.
     fn append_to_program(
         &mut self,
         definitions: &[String],
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let mut text = self.editor.read(cx).value().to_string();
-        for definition in definitions {
-            if !text.is_empty() {
-                if !text.ends_with('\n') {
-                    text.push('\n');
-                }
-                text.push('\n');
-            }
-            text.push_str(definition.trim_end());
-            text.push('\n');
-        }
-        self.editor
-            .update(cx, |state, cx| state.set_value(text, window, cx));
-        self.check_program(cx);
+        let code: Vec<&str> = definitions.iter().map(|d| d.trim_end()).collect();
+        self.copy_to_editor(&code.join("\n\n"), window, cx);
     }
 
     /// Whether Teach Kame has something to offer: an entry since the last
     /// Run that isn't a definition, with nothing running.
-    fn can_teach(&self) -> bool {
+    pub(crate) fn can_teach(&self) -> bool {
         !self.running() && self.console_entry.teachable().any(|e| !defines(&e.text))
     }
 
@@ -759,7 +782,7 @@ impl App {
         let console = if self.definitions_cleared {
             Vec::new()
         } else {
-            self.console_definitions.clone()
+            self.newest_definitions()
         };
         let at_console = teach::defined(&console.join("\n"));
         // The picture uses the program's procedures, and the console's that

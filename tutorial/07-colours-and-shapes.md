@@ -59,6 +59,31 @@ CIRCLE 20
 
 > **Try this:** draw a snowman: three white circles, one above the other, getting smaller. Use `PU`, `FD` and `PD` to move between them.
 
+## Help Kame fix the bug
+
+Kame wanted an orange square, and a sky blue one turned across it.
+
+```picture
+PU LT 90 FD 71 RT 90 BK 15 PD
+SETPC "orange
+REPEAT 4 [FD 100 RT 90]
+RT 45
+SETPC "skyblue
+REPEAT 4 [FD 100 RT 90]
+```
+
+```logo
+REPEAT 4 [FD 100 RT 90]
+SETPC "orange
+RT 45
+REPEAT 4 [FD 100 RT 90]
+SETPC "skyblue
+```
+
+The first square is white, the second is orange, and there's no sky blue at all. [SETPENCOLOR] changes the colour of what Kame draws next. When does each `SETPC` happen?
+
+One way to fix it: put each `SETPC` before the square it's for.
+
 ## What next?
 
 That's the tutorial. You know enough to draw almost anything. The Help tab has every command Kame knows, each with examples you can run: press its **Run**, and Kame draws it right here.

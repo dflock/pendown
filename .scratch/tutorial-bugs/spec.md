@@ -23,7 +23,7 @@ The UI design is on a canvas of mockups: https://claude.ai/artifact/LR591Fduhev9
     - a square that won't close: `REPEAT 4 [FD 100 RT 80]`, and the idea that a shape that closes turns 360 degrees altogether;
     - a star that won't close: `REPEAT 5 [FD 200 RT 140]` instead of 144, turning twice round altogether;
     - a flower with a gap: `REPEAT 12 [BOX RT 20]`, which turns 240 degrees, not 360.
-- **One bug in each later lesson,** under "Help Kame fix the bug": inputs (`BOX :size` that always draws 100), recursion (a `TREE` that leans, because it forgets to turn back before it ends), colours (`SETPC` after the line it was meant for).
+- **One bug in each later lesson,** under "Help Kame fix the bug": inputs (`BOX :size` that always draws 100), recursion (a `TREE` that comes out in a tangle, because it forgets to turn back before it ends), colours (`SETPC` after the line it was meant for).
 - The lesson bar, "Lesson N of 7", and Previous and Next follow.
 
 ## Decisions

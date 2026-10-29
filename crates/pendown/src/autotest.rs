@@ -17,6 +17,7 @@ use pendown::{
     run::DEFAULT_CHANNEL,
     speed::level_speed,
 };
+use pendown_logo::SourceId;
 
 use crate::app::App;
 
@@ -191,6 +192,10 @@ fn script() -> Vec<Step> {
     use Step::*;
     let ms = Duration::from_millis;
     vec![
+        Say("A console entry before any run"),
+        Console("FD 1"),
+        WaitFinished,
+        CheckDrawn(1),
         Say("The welcome program"),
         Run(crate::app::WELCOME, level_speed(10)),
         WaitFinished,
@@ -532,8 +537,14 @@ impl App {
         }
     }
 
+    /// The editor text the highlight is on. Console entries aren't in the
+    /// editor, so their spans don't index `run_text`.
     fn highlighted(&self) -> String {
-        self.animator.as_ref().and_then(|a| a.highlight).map_or(String::new(), |s| self.run_text[s.range()].to_string())
+        self.animator
+            .as_ref()
+            .and_then(|a| a.highlight)
+            .filter(|s| s.source == SourceId::Editor)
+            .map_or(String::new(), |s| self.run_text[s.range()].to_string())
     }
 
     /// Takes the session's next steps, until one has to wait. Returns

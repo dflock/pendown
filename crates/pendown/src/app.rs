@@ -13,8 +13,8 @@ use gpui_kit::component::{
     h_flex,
     highlighter::{Diagnostic, DiagnosticSeverity},
     input::{
-        EditorState, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position, RangeDecoration,
-        RangeDecorationCollection, RangeDecorationStyle, TextareaState,
+        EditorState, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position,
+        RangeDecoration, RangeDecorationCollection, RangeDecorationStyle, TextareaState,
     },
     resizable::{h_resizable, resizable_panel},
     slider::{SliderEvent, SliderState},
@@ -35,7 +35,10 @@ use pendown_logo::{RunError, SourceId};
 use crate::{
     autotest::Autotest,
     canvas::{Canvas, Overlay, TURTLE_SIZE},
-    files::{After, ExportPicture, NewFile, OpenFile, Picture, RunProgram, SaveFile, SaveFileAs, ShowHelp, ToggleMetrics},
+    files::{
+        After, ExportPicture, NewFile, OpenFile, Picture, RunProgram, SaveFile, SaveFileAs,
+        ShowHelp, ToggleMetrics,
+    },
     help_panel::HelpPanel,
     highlighter::LogoHighlighter,
     panes::{ConsolePane, EditorPane, ToolbarPane, ToolbarState},
@@ -116,7 +119,8 @@ impl Samples {
     pub fn percentile(&self, p: usize) -> Option<Duration> {
         let mut v = self.0.clone();
         v.sort();
-        v.get((v.len() * p / 100).min(v.len().saturating_sub(1))).copied()
+        v.get((v.len() * p / 100).min(v.len().saturating_sub(1)))
+            .copied()
     }
 
     pub fn summary(&self) -> String {
@@ -203,27 +207,44 @@ pub struct App {
 impl App {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> App {
         let editor = cx.new(|cx| {
-            EditorState::new(window, cx).language("logo").line_number(true).soft_wrap(false).default_value(WELCOME)
+            EditorState::new(window, cx)
+                .language("logo")
+                .line_number(true)
+                .soft_wrap(false)
+                .default_value(WELCOME)
         });
         let highlight = editor.update(cx, |state, cx| {
             state.set_highlighter_factory(
-                Rc::new(|language| (language == "logo").then(|| Box::new(LogoHighlighter::default()) as Box<dyn InputHighlighter>)),
+                Rc::new(|language| {
+                    (language == "logo")
+                        .then(|| Box::new(LogoHighlighter::default()) as Box<dyn InputHighlighter>)
+                }),
                 cx,
             );
             state.create_range_decorations_collection(vec![], cx)
         });
         let console_output = cx.new(|cx| TextareaState::new(window, cx));
-        let console_input = cx.new(|cx| InputState::new(window, cx).placeholder("Type an instruction and press Enter"));
+        let console_input = cx.new(|cx| {
+            InputState::new(window, cx).placeholder("Type an instruction and press Enter")
+        });
         let speed = level_speed(5);
         let speed_slider = cx.new(|_| {
-            SliderState::new().min(1.0).max(INSTANT_LEVEL as f32).step(1.0).default_value(speed_level(speed) as f32)
+            SliderState::new()
+                .min(1.0)
+                .max(INSTANT_LEVEL as f32)
+                .step(1.0)
+                .default_value(speed_level(speed) as f32)
         });
         let subscriptions = vec![
-            cx.subscribe_in(&speed_slider, window, |this, _, event: &SliderEvent, window, cx| {
-                if let SliderEvent::Change(value) = event {
-                    this.set_speed(level_speed(value.end().round() as u8), window, cx);
-                }
-            }),
+            cx.subscribe_in(
+                &speed_slider,
+                window,
+                |this, _, event: &SliderEvent, window, cx| {
+                    if let SliderEvent::Change(value) = event {
+                        this.set_speed(level_speed(value.end().round() as u8), window, cx);
+                    }
+                },
+            ),
             // Parse errors show while typing (ADRs 0001 and 0005).
             cx.subscribe(&editor, |this, _, event: &InputEvent, cx| {
                 if let InputEvent::Change = event
@@ -232,17 +253,32 @@ impl App {
                     this.check_program(cx);
                 }
             }),
-            cx.subscribe_in(&console_input, window, |this, _, event: &InputEvent, window, cx| {
-                if let InputEvent::PressEnter { .. } = event {
-                    this.submit_console(window, cx);
-                }
-            }),
+            cx.subscribe_in(
+                &console_input,
+                window,
+                |this, _, event: &InputEvent, window, cx| {
+                    if let InputEvent::PressEnter { .. } = event {
+                        this.submit_console(window, cx);
+                    }
+                },
+            ),
         ];
         let metrics = Rc::new(WindowMetrics::default());
         let editor_pane = cx.new(|_| EditorPane::new(editor.clone(), metrics.clone()));
-        let console_pane = cx.new(|_| ConsolePane::new(console_output.clone(), console_input.clone(), metrics.clone()));
+        let console_pane = cx.new(|_| {
+            ConsolePane::new(
+                console_output.clone(),
+                console_input.clone(),
+                metrics.clone(),
+            )
+        });
         let app = cx.entity().downgrade();
-        let toolbar = ToolbarState { running: false, paused: false, speed, help: false };
+        let toolbar = ToolbarState {
+            running: false,
+            paused: false,
+            speed,
+            help: false,
+        };
         let toolbar_pane = cx.new(|_| ToolbarPane::new(app.clone(), speed_slider.clone(), toolbar));
         let watched = cx.new(|_| Watched::default());
         let counters_pane = cx.new(|_| CountersPane::new(watched.clone()));
@@ -253,7 +289,8 @@ impl App {
         // follows.
         subscriptions.push(cx.observe(&editor, |this, _, cx| this.follow_cursor(cx)));
         window.on_window_should_close(cx, move |window, cx| {
-            app.update(cx, |this, cx| this.should_close(window, cx)).unwrap_or(true)
+            app.update(cx, |this, cx| this.should_close(window, cx))
+                .unwrap_or(true)
         });
         if std::env::var_os("PENDOWN_AUTOTEST").is_some() {
             cx.spawn_in(window, async move |this, cx| {
@@ -329,7 +366,8 @@ impl App {
         }
         let level = speed_level(speed);
         if self.speed_slider.read(cx).value().end().round() as u8 != level {
-            self.speed_slider.update(cx, |s, cx| s.set_value(level as f32, window, cx));
+            self.speed_slider
+                .update(cx, |s, cx| s.set_value(level as f32, window, cx));
         }
         cx.notify();
     }
@@ -349,7 +387,9 @@ impl App {
         self.canvas.borrow_mut().drawing.reset();
         self.console.clear();
         self.console_dirty = true;
-        if !self.console_definitions.is_empty() && !std::mem::replace(&mut self.definitions_cleared, true) {
+        if !self.console_definitions.is_empty()
+            && !std::mem::replace(&mut self.definitions_cleared, true)
+        {
             self.print("Run cleared the procedures you defined in the console. \"Copy to editor\" keeps them.");
         }
         self.set_diagnostics(Vec::new(), cx);
@@ -417,14 +457,20 @@ impl App {
                     }
                 }
             });
-            self.overlay = Some(MetricsOverlay { since: self.snapshot(), lines: vec!["Measuring…".into()], _refresh: refresh });
+            self.overlay = Some(MetricsOverlay {
+                since: self.snapshot(),
+                lines: vec!["Measuring…".into()],
+                _refresh: refresh,
+            });
         }
         cx.notify();
     }
 
     /// Brings the overlay's numbers up to date, every `OVERLAY_EVERY`.
     fn update_overlay(&mut self) {
-        let Some(since) = self.overlay.as_ref().map(|o| o.since) else { return };
+        let Some(since) = self.overlay.as_ref().map(|o| o.since) else {
+            return;
+        };
         if since.at.elapsed() < OVERLAY_EVERY {
             return;
         }
@@ -440,9 +486,14 @@ impl App {
     /// costs the UI thread a few milliseconds.
     fn schedule_frame(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.wake = None;
-        let Some(animator) = self.animator.as_ref().filter(|a| a.wants_frames()) else { return };
+        let Some(animator) = self.animator.as_ref().filter(|a| a.wants_frames()) else {
+            return;
+        };
         let px_per_step = self.canvas.borrow().drawing.scale();
-        let mut gap = animator.next_change(px_per_step, TURTLE_SIZE as f64 / 2. * window.scale_factor() as f64);
+        let mut gap = animator.next_change(
+            px_per_step,
+            TURTLE_SIZE as f64 / 2. * window.scale_factor() as f64,
+        );
         if gap < FRAME_SOON {
             window.request_animation_frame();
             // gpui can drop an animation frame, as when it throttles a window
@@ -497,8 +548,15 @@ impl App {
     }
 
     /// For the scripted session: as if the user typed `line` and pressed Enter.
-    pub(crate) fn type_into_console(&mut self, line: &str, window: &mut Window, cx: &mut Context<Self>) {
-        self.console_input.update(cx, |input, cx| input.set_value(line.to_string(), window, cx));
+    pub(crate) fn type_into_console(
+        &mut self,
+        line: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.console_input.update(cx, |input, cx| {
+            input.set_value(line.to_string(), window, cx)
+        });
         self.submit_console(window, cx);
     }
 
@@ -507,8 +565,13 @@ impl App {
             return;
         }
         let line = self.console_input.read(cx).value().to_string();
-        self.console_input.update(cx, |input, cx| input.set_value("", window, cx));
-        let prompt = if self.console_entry.continuing() { "…" } else { ">" };
+        self.console_input
+            .update(cx, |input, cx| input.set_value("", window, cx));
+        let prompt = if self.console_entry.continuing() {
+            "…"
+        } else {
+            ">"
+        };
         self.print(format!("{prompt} {line}"));
         match self.console_entry.submit(&line) {
             Submit::More => {}
@@ -519,11 +582,16 @@ impl App {
 
     /// Up and Down in the console's input line go through its history.
     fn recall(&mut self, older: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let text = if older { self.console_entry.older() } else { self.console_entry.newer() };
+        let text = if older {
+            self.console_entry.older()
+        } else {
+            self.console_entry.newer()
+        };
         if let Some(text) = text.map(str::to_string) {
             // A multi-line entry comes back on one line, which runs the same.
             let text = text.replace('\n', " ");
-            self.console_input.update(cx, |input, cx| input.set_value(text, window, cx));
+            self.console_input
+                .update(cx, |input, cx| input.set_value(text, window, cx));
         }
     }
 
@@ -538,7 +606,8 @@ impl App {
             text.push_str(&definition);
             text.push('\n');
         }
-        self.editor.update(cx, |state, cx| state.set_value(text, window, cx));
+        self.editor
+            .update(cx, |state, cx| state.set_value(text, window, cx));
         self.check_program(cx);
         self.print("Copied the console's definitions to the editor.");
     }
@@ -548,11 +617,18 @@ impl App {
         if !std::mem::take(&mut self.console_dirty) {
             return;
         }
-        let text = self.console.iter().map(|l| l.as_ref()).collect::<Vec<_>>().join("\n");
+        let text = self
+            .console
+            .iter()
+            .map(|l| l.as_ref())
+            .collect::<Vec<_>>()
+            .join("\n");
         let lines = self.console.len();
         self.console_output.update(cx, |output, cx| {
             output.set_value(text, window, cx);
-            if let (Some(rows), Some(line_height)) = (output.visible_row_range(), output.line_height()) {
+            if let (Some(rows), Some(line_height)) =
+                (output.visible_row_range(), output.line_height())
+            {
                 let top = lines.saturating_sub(rows.len()) as f32;
                 output.set_scroll_offset(point(px(0.), -line_height * top), cx);
             }
@@ -587,7 +663,8 @@ impl App {
             .into_iter()
             .filter_map(|e| {
                 let span = e.span?;
-                let range = position(&text, span.start as usize)..position(&text, span.end as usize);
+                let range =
+                    position(&text, span.start as usize)..position(&text, span.end as usize);
                 Some(Diagnostic::new(range, e.message).with_severity(DiagnosticSeverity::Error))
             })
             .collect();
@@ -602,7 +679,10 @@ impl App {
         let mut diagnostics = Vec::new();
         let example = self.example.is_some();
         let reference = pendown_logo::reference::reference();
-        self.error_help = errors.iter().filter_map(|e| reference.find_index(e.command.as_deref()?)).next();
+        self.error_help = errors
+            .iter()
+            .filter_map(|e| reference.find_index(e.command.as_deref()?))
+            .next();
         for e in &errors {
             let where_ = match e.span {
                 // An example's spans are in its own text, not the editor's.
@@ -620,7 +700,10 @@ impl App {
                 && !example
             {
                 let range = self.position(span.start as usize)..self.position(span.end as usize);
-                diagnostics.push(Diagnostic::new(range, e.message.clone()).with_severity(DiagnosticSeverity::Error));
+                diagnostics.push(
+                    Diagnostic::new(range, e.message.clone())
+                        .with_severity(DiagnosticSeverity::Error),
+                );
             }
         }
         if !diagnostics.is_empty() {
@@ -636,16 +719,31 @@ impl App {
             return;
         }
         // Console entries aren't in the editor, so they aren't highlighted there.
-        let Some(span) = self.animator.as_ref().and_then(|a| a.highlight).filter(|s| s.source == SourceId::Editor) else {
+        let Some(span) = self
+            .animator
+            .as_ref()
+            .and_then(|a| a.highlight)
+            .filter(|s| s.source == SourceId::Editor)
+        else {
             self.highlight.set(vec![], cx);
             return;
         };
         let color = cx.theme().warning.opacity(0.35);
-        self.highlight.set(vec![RangeDecoration::new(span.range()).with_style(RangeDecorationStyle::Fill).with_color(color)], cx);
+        self.highlight.set(
+            vec![
+                RangeDecoration::new(span.range())
+                    .with_style(RangeDecorationStyle::Fill)
+                    .with_color(color),
+            ],
+            cx,
+        );
         let line = span.line as usize;
         let lines = self.run_text.matches('\n').count() + 1;
         self.editor.update(cx, |state, cx| {
-            let (Some(rows), Some(line_height)) = (state.visible_row_range(), state.line_height()) else { return };
+            let (Some(rows), Some(line_height)) = (state.visible_row_range(), state.line_height())
+            else {
+                return;
+            };
             // Only scroll where there's more text to see, and never past the
             // end: the editor springs back from there, animating for a third
             // of a second each time (issue 08).
@@ -663,17 +761,27 @@ impl App {
     /// and notice when the run has ended.
     fn tick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let now = Instant::now();
-        let Some(animator) = &mut self.animator else { return };
+        let Some(animator) = &mut self.animator else {
+            return;
+        };
         if !animator.wants_frames() {
             self.last_frame = None;
         } else {
-            let dt = self.last_frame.map_or(Duration::from_millis(16), |t| now - t);
+            let dt = self
+                .last_frame
+                .map_or(Duration::from_millis(16), |t| now - t);
             if self.last_frame.is_some() {
                 self.frame_intervals.push(dt);
             }
             self.last_frame = Some(now);
-            let per_segment = self.canvas.borrow().drawing.per_segment.max(Duration::from_nanos(200));
-            let max_marks = (INSTANT_DRAWING.as_nanos() / per_segment.as_nanos()).clamp(500, 100_000) as usize;
+            let per_segment = self
+                .canvas
+                .borrow()
+                .drawing
+                .per_segment
+                .max(Duration::from_nanos(200));
+            let max_marks =
+                (INSTANT_DRAWING.as_nanos() / per_segment.as_nanos()).clamp(500, 100_000) as usize;
             let frame = animator.frame(dt, max_marks);
             self.events += frame.events;
             if frame.watch_changed {
@@ -729,7 +837,9 @@ impl App {
     }
 
     fn status(&self) -> String {
-        let Some(animator) = &self.animator else { return String::new() };
+        let Some(animator) = &self.animator else {
+            return String::new();
+        };
         let state = if animator.stopped {
             "Stopped"
         } else if animator.finished() {
@@ -742,22 +852,42 @@ impl App {
             }
         };
         let run = self.run.as_ref().expect("a run goes with an animator");
-        let elapsed = self.finished_at.or(self.stop_at).unwrap_or_else(Instant::now) - run.started;
-        let example = if self.example.is_some() { "Example: " } else { "" };
-        format!("{example}{state} · {:.1} s · {} lines drawn", elapsed.as_secs_f64(), self.canvas.borrow().drawing.segments())
+        let elapsed = self
+            .finished_at
+            .or(self.stop_at)
+            .unwrap_or_else(Instant::now)
+            - run.started;
+        let example = if self.example.is_some() {
+            "Example: "
+        } else {
+            ""
+        };
+        format!(
+            "{example}{state} · {:.1} s · {} lines drawn",
+            elapsed.as_secs_f64(),
+            self.canvas.borrow().drawing.segments()
+        )
     }
 
     /// Step, or Step instruction.
     pub(crate) fn step(&mut self, instruction: bool, cx: &mut Context<Self>) {
         if let Some(a) = &mut self.animator {
-            if instruction { a.step_instruction() } else { a.step_line() }
+            if instruction {
+                a.step_instruction()
+            } else {
+                a.step_line()
+            }
         }
         cx.notify();
     }
 
     pub(crate) fn toggle_pause(&mut self, cx: &mut Context<Self>) {
         if let Some(a) = &mut self.animator {
-            if a.mode() == Mode::Paused { a.resume() } else { a.pause() }
+            if a.mode() == Mode::Paused {
+                a.resume()
+            } else {
+                a.pause()
+            }
         }
         cx.notify();
     }
@@ -774,7 +904,11 @@ impl Render for App {
 }
 
 impl App {
-    fn render_window(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+    fn render_window(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
         if !std::mem::replace(&mut self.checked, true) {
             self.check_program(cx);
         }
@@ -786,21 +920,38 @@ impl App {
 
         let theme = cx.theme().clone();
         let running = self.running();
-        self.editor_pane.update(cx, |pane, cx| pane.set_readonly(running, cx));
-        self.console_pane.update(cx, |pane, cx| pane.set_disabled(running, cx));
-        let paused = self.animator.as_ref().is_some_and(|a| a.mode() == Mode::Paused && !a.finished());
+        self.editor_pane
+            .update(cx, |pane, cx| pane.set_readonly(running, cx));
+        self.console_pane
+            .update(cx, |pane, cx| pane.set_disabled(running, cx));
+        let paused = self
+            .animator
+            .as_ref()
+            .is_some_and(|a| a.mode() == Mode::Paused && !a.finished());
         let canvas = self.canvas.clone();
         let overlay = match &self.animator {
             Some(a) => {
                 // A fifth of a pixel, as the buffer is drawn.
                 let tolerance = 0.2 / self.canvas.borrow().drawing.scale().max(1e-6);
-                Overlay { partial: a.partial(tolerance), turtle: a.shown.then_some((a.pos, a.heading)) }
+                Overlay {
+                    partial: a.partial(tolerance),
+                    turtle: a.shown.then_some((a.pos, a.heading)),
+                }
             }
-            None => Overlay { partial: None, turtle: Some((pendown_logo::Point { x: 0.0, y: 0.0 }, 0.0)) },
+            None => Overlay {
+                partial: None,
+                turtle: Some((pendown_logo::Point { x: 0.0, y: 0.0 }, 0.0)),
+            },
         };
 
-        let toolbar = ToolbarState { running, paused, speed: self.speed, help: self.help_open };
-        self.toolbar_pane.update(cx, |pane, cx| pane.set(toolbar, cx));
+        let toolbar = ToolbarState {
+            running,
+            paused,
+            speed: self.speed,
+            help: self.help_open,
+        };
+        self.toolbar_pane
+            .update(cx, |pane, cx| pane.set(toolbar, cx));
 
         let canvas_area = div()
             .relative()
@@ -808,7 +959,11 @@ impl App {
             .child(
                 gpui_kit::canvas(
                     move |bounds, _, _| bounds,
-                    move |_, bounds, window, cx| canvas.borrow_mut().paint(bounds, window, overlay.clone(), cx),
+                    move |_, bounds, window, cx| {
+                        canvas
+                            .borrow_mut()
+                            .paint(bounds, window, overlay.clone(), cx)
+                    },
                 )
                 .size_full(),
             )
@@ -831,13 +986,27 @@ impl App {
 
         v_flex()
             .size_full()
-            .on_action(cx.listener(|this, _: &NewFile, window, cx| this.then(After::NewFile, window, cx)))
-            .on_action(cx.listener(|this, _: &OpenFile, window, cx| this.then(After::OpenFile, window, cx)))
-            .on_action(cx.listener(|this, _: &SaveFile, window, cx| this.save(After::Nothing, window, cx)))
-            .on_action(cx.listener(|this, _: &SaveFileAs, window, cx| this.save_as(After::Nothing, window, cx)))
-            .on_action(cx.listener(|this, _: &ExportPicture, window, cx| this.export(Picture::Png, window, cx)))
+            .on_action(
+                cx.listener(|this, _: &NewFile, window, cx| this.then(After::NewFile, window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &OpenFile, window, cx| {
+                    this.then(After::OpenFile, window, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &SaveFile, window, cx| this.save(After::Nothing, window, cx)),
+            )
+            .on_action(cx.listener(|this, _: &SaveFileAs, window, cx| {
+                this.save_as(After::Nothing, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &ExportPicture, window, cx| {
+                this.export(Picture::Png, window, cx)
+            }))
             .on_action(cx.listener(|this, _: &RunProgram, _, cx| this.start(DEFAULT_CHANNEL, cx)))
-            .on_action(cx.listener(|this, _: &ToggleMetrics, window, cx| this.toggle_metrics(window, cx)))
+            .on_action(
+                cx.listener(|this, _: &ToggleMetrics, window, cx| this.toggle_metrics(window, cx)),
+            )
             .on_action(cx.listener(|this, _: &ShowHelp, window, cx| this.show_help(window, cx)))
             .bg(theme.background)
             .text_color(theme.foreground)
@@ -848,42 +1017,56 @@ impl App {
                     .gap_2()
                     .border_b_1()
                     .border_color(theme.border)
-                    .child(self.toolbar_pane.clone().cached(StyleRefinement::default().h_full().flex_1())),
+                    .child(
+                        self.toolbar_pane
+                            .clone()
+                            .cached(StyleRefinement::default().h_full().flex_1()),
+                    ),
             )
-            .child(
-                div().flex_1().min_h_0().child({
-                    let editor = resizable_panel()
-                        .size(px(460.))
-                        .child(self.editor_pane.clone().cached(StyleRefinement::default().size_full()));
-                    let canvas = resizable_panel().child(canvas_area);
-                    // The side panel, when it's open (phase 5). Each layout
-                    // has its own id, so each remembers its sizes.
-                    if self.help_open {
-                        h_resizable("main-help").child(editor).child(canvas).child(
-                            resizable_panel()
-                                .size(px(380.))
-                                .child(self.help_panel.clone().cached(StyleRefinement::default().size_full())),
-                        )
-                    } else {
-                        h_resizable("main").child(editor).child(canvas)
-                    }
-                }),
-            )
-            .child(
-                div().h(px(CONSOLE_HEIGHT)).border_t_1().border_color(theme.border).child(
-                    h_resizable("console-area")
-                        .child(resizable_panel().child(self.render_console(running, cx)))
-                        .child(
-                            resizable_panel()
-                                .size(px(220.))
-                                .child(self.counters_pane.clone().cached(StyleRefinement::default().size_full())),
-                        )
-                        .child(
-                            resizable_panel()
-                                .size(px(340.))
-                                .child(self.variables_pane.clone().cached(StyleRefinement::default().size_full())),
+            .child(div().flex_1().min_h_0().child({
+                let editor = resizable_panel().size(px(460.)).child(
+                    self.editor_pane
+                        .clone()
+                        .cached(StyleRefinement::default().size_full()),
+                );
+                let canvas = resizable_panel().child(canvas_area);
+                // The side panel, when it's open (phase 5). Each layout
+                // has its own id, so each remembers its sizes.
+                if self.help_open {
+                    h_resizable("main-help").child(editor).child(canvas).child(
+                        resizable_panel().size(px(380.)).child(
+                            self.help_panel
+                                .clone()
+                                .cached(StyleRefinement::default().size_full()),
                         ),
-                ),
+                    )
+                } else {
+                    h_resizable("main").child(editor).child(canvas)
+                }
+            }))
+            .child(
+                div()
+                    .h(px(CONSOLE_HEIGHT))
+                    .border_t_1()
+                    .border_color(theme.border)
+                    .child(
+                        h_resizable("console-area")
+                            .child(resizable_panel().child(self.render_console(running, cx)))
+                            .child(
+                                resizable_panel().size(px(220.)).child(
+                                    self.counters_pane
+                                        .clone()
+                                        .cached(StyleRefinement::default().size_full()),
+                                ),
+                            )
+                            .child(
+                                resizable_panel().size(px(340.)).child(
+                                    self.variables_pane
+                                        .clone()
+                                        .cached(StyleRefinement::default().size_full()),
+                                ),
+                            ),
+                    ),
             )
             // The status bar: how the run is going.
             .child(
@@ -900,7 +1083,11 @@ impl App {
     }
 
     /// The console's title, buttons, output and input.
-    fn render_console(&mut self, running: bool, cx: &mut Context<Self>) -> impl IntoElement + use<> {
+    fn render_console(
+        &mut self,
+        running: bool,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
         let theme = cx.theme().clone();
         v_flex()
             .size_full()
@@ -909,7 +1096,12 @@ impl App {
                     .px_2()
                     .py_1()
                     .gap_2()
-                    .child(div().text_sm().text_color(theme.muted_foreground).child("Console"))
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(theme.muted_foreground)
+                            .child("Console"),
+                    )
                     .child(div().flex_1())
                     .when_some(self.error_help, |row, i| {
                         let title = &pendown_logo::reference::reference().commands[i].title;
@@ -919,7 +1111,9 @@ impl App {
                                 .ghost()
                                 .icon(IconName::BookOpen)
                                 .label(format!("Help on {title}"))
-                                .on_click(cx.listener(move |this, _, window, cx| this.open_help(i, window, cx))),
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.open_help(i, window, cx)
+                                })),
                         )
                     })
                     .when(!self.console_definitions.is_empty(), |row| {
@@ -929,16 +1123,21 @@ impl App {
                                 .ghost()
                                 .label("Copy to editor")
                                 .disabled(running)
-                                .on_click(cx.listener(|this, _, window, cx| this.copy_definitions(window, cx))),
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.copy_definitions(window, cx)
+                                })),
                         )
                     })
-                    .child(Button::new("clear-console").xsmall().ghost().label("Clear").on_click(cx.listener(
-                        |this, _, _, cx| {
-                            this.console.clear();
-                            this.console_dirty = true;
-                            cx.notify();
-                        },
-                    ))),
+                    .child(
+                        Button::new("clear-console")
+                            .xsmall()
+                            .label("Clear")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.console.clear();
+                                this.console_dirty = true;
+                                cx.notify();
+                            })),
+                    ),
             )
             .child(
                 div()
@@ -952,7 +1151,11 @@ impl App {
                         this.recall(false, window, cx);
                         cx.stop_propagation();
                     }))
-                    .child(self.console_pane.clone().cached(StyleRefinement::default().size_full())),
+                    .child(
+                        self.console_pane
+                            .clone()
+                            .cached(StyleRefinement::default().size_full()),
+                    ),
             )
     }
 }

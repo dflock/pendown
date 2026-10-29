@@ -105,6 +105,8 @@ enum Step {
     Console(&'static str),
     /// How many lines, arcs and shapes are drawn.
     CheckDrawn(usize),
+    /// Where the turtle sprite is, and its heading.
+    CheckTurtle(f64, f64, f64),
     /// Save the program as this file in the autotest folder, as Save As
     /// would once the dialog has a name.
     SaveTo(&'static str),
@@ -196,6 +198,14 @@ fn script() -> Vec<Step> {
         Console("FD 1"),
         WaitFinished,
         CheckDrawn(1),
+        Say("A console turn turns where the last entry left the turtle"),
+        Console("CS"),
+        WaitFinished,
+        Console("FD 100"),
+        WaitFinished,
+        Console("RT 45"),
+        WaitFinished,
+        CheckTurtle(0.0, 100.0, 45.0),
         Say("The welcome program"),
         Run(crate::app::WELCOME, level_speed(10)),
         WaitFinished,
@@ -784,6 +794,11 @@ impl App {
                 Step::CheckDrawn(expected) => {
                     let drawn = self.canvas.borrow().drawing.segments();
                     self.check(drawn == expected, format!("{drawn} lines and shapes drawn"));
+                }
+                Step::CheckTurtle(x, y, heading) => {
+                    let (fx, fy, found) = self.animator.as_ref().map_or((0.0, 0.0, 0.0), |a| (a.pos.x, a.pos.y, a.heading));
+                    let ok = (fx - x).abs() < 0.01 && (fy - y).abs() < 0.01 && (found - heading).abs() < 0.01;
+                    self.check(ok, format!("the turtle is at {fx:.1}, {fy:.1}, heading {found:.1}"));
                 }
                 Step::CheckConsole(expected) => {
                     let found = self.console.iter().any(|l| l.as_ref() == expected);

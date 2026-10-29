@@ -364,7 +364,14 @@ impl App {
         // The console works on what the user's program left.
         self.back_to_my_drawing(cx);
         self.defining = defines(&entry).then(|| entry.clone());
+        // A new animator puts the turtle in the centre, and a turn doesn't
+        // say where the turtle is: so carry on from where the last one left
+        // it.
+        let left = self.animator.as_ref().map(|a| (a.pos, a.heading, a.shown));
         self.start_job(Job::Console(entry), DEFAULT_CHANNEL, cx);
+        if let (Some((pos, heading, shown)), Some(animator)) = (left, &mut self.animator) {
+            (animator.pos, animator.heading, animator.shown) = (pos, heading, shown);
+        }
     }
 
     fn start_job(&mut self, job: Job, channel: Channel, cx: &mut Context<Self>) {

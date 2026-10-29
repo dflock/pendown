@@ -1,0 +1,14 @@
+to triangle :size
+  repeat 3 [fd :size rt 120]
+end
+
+to box :size
+  repeat 4 [fd :size rt 90]
+end
+
+to house
+  box 100
+  triangle 100
+end
+
+house

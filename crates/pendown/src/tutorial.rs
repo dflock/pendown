@@ -9,13 +9,14 @@ use std::sync::OnceLock;
 use crate::markup::{self, Block};
 
 /// The lessons' files, in order.
-const SOURCES: [&str; 6] = [
+const SOURCES: [&str; 7] = [
     include_str!("../../../tutorial/01-moving-and-turning.md"),
     include_str!("../../../tutorial/02-repeat.md"),
     include_str!("../../../tutorial/03-procedures.md"),
-    include_str!("../../../tutorial/04-inputs-and-variables.md"),
-    include_str!("../../../tutorial/05-recursion.md"),
-    include_str!("../../../tutorial/06-colours-and-shapes.md"),
+    include_str!("../../../tutorial/04-help-kame-fix-the-bug.md"),
+    include_str!("../../../tutorial/05-inputs-and-variables.md"),
+    include_str!("../../../tutorial/06-recursion.md"),
+    include_str!("../../../tutorial/07-colours-and-shapes.md"),
 ];
 
 /// The language that marks a code block as a picture: only what its

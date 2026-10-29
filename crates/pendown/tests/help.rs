@@ -49,5 +49,5 @@ fn every_link_in_the_tutorial_resolves() {
             n + 1
         );
     }
-    assert_eq!(pendown::tutorial::lessons().len(), 6);
+    assert_eq!(pendown::tutorial::lessons().len(), 7);
 }

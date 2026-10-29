@@ -106,6 +106,21 @@ impl ConsoleInput {
         Submit::Run(text)
     }
 
+    /// Changes the newest entry's text, as a driven entry grows: `FD 10`
+    /// becomes `FD 20`. The history follows, so Up brings back the whole.
+    pub fn amend_last(&mut self, text: &str) {
+        let Some(entry) = self.entries.last_mut() else {
+            return;
+        };
+        if self.history.last() == Some(&entry.text) {
+            self.history.pop();
+        }
+        entry.text = text.to_string();
+        if self.history.last().map(String::as_str) != Some(text) {
+            self.history.push(text.to_string());
+        }
+    }
+
     /// Records how the newest entry ended.
     pub fn finish(&mut self, ending: Ending) {
         if let Some(entry) = self.entries.last_mut() {
@@ -262,6 +277,18 @@ mod tests {
         assert_eq!(c.to_undo(), None);
         assert_eq!(c.teachable().count(), 0);
         assert_eq!(c.older(), Some("FD 10"));
+    }
+
+    #[test]
+    fn a_driven_entry_grows() {
+        let mut c = ConsoleInput::default();
+        c.submit("RT 90");
+        c.submit("FD 10");
+        c.amend_last("FD 20");
+        c.amend_last("FD 30");
+        assert_eq!(texts(c.teachable()), ["RT 90", "FD 30"]);
+        assert_eq!(c.older(), Some("FD 30"));
+        assert_eq!(c.older(), Some("RT 90"), "the history has only the whole");
     }
 
     #[test]

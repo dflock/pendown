@@ -140,6 +140,14 @@ enum Step {
     ShowPanel,
     /// Turn Show thinking on or off.
     SetThinking(bool),
+    /// Turn Drive on or off.
+    Drive(bool),
+    /// Press keys while driving: up, down, left, right, space, undo, escape.
+    DriveKeys(&'static [&'static str]),
+    /// Wait until every press has played.
+    WaitDriven,
+    /// Driving is on, or not.
+    CheckDriving(bool),
     /// Scroll the help page this far down, in logical pixels.
     ScrollHelp(f32),
     /// Type in the Colours page's R, G, B, A or hex field, counting from 0.
@@ -830,6 +838,55 @@ fn script() -> Vec<Step> {
         SetSpeed(Speed::Instant),
         WaitFinished,
         SetThinking(false),
+        Say("Drive Kame: the keys make console entries, and the same key joins up"),
+        Run("", Speed::Instant),
+        WaitFinished,
+        Drive(true),
+        CheckDriving(true),
+        DriveKeys(&["up", "up", "up", "up", "up", "up", "up", "up", "up", "up"]),
+        WaitDriven,
+        CheckConsole("> FD 100"),
+        CheckTurtle(0.0, 100.0, 0.0),
+        // Each press draws its own line: ten for FD 100, which look as one.
+        CheckDrawn(10),
+        DriveKeys(&["right", "right", "right", "right", "right", "right"]),
+        WaitDriven,
+        CheckConsole("> RT 90"),
+        CheckTurtle(0.0, 100.0, 90.0),
+        DriveKeys(&["up", "up", "up", "up", "up", "up", "up", "up", "up", "up"]),
+        WaitDriven,
+        CheckTurtle(100.0, 100.0, 90.0),
+        DriveKeys(&["right", "right", "right"]),
+        WaitDriven,
+        CheckUndoLabel("RT 45"),
+        Wait(ms(100)),
+        Screenshot("driving"),
+        Say("Drive Kame: Backspace takes back the whole entry, and Space lifts the pen"),
+        DriveKeys(&["undo"]),
+        WaitDriven,
+        CheckTurtle(100.0, 100.0, 90.0),
+        CheckUndoLabel("FD 100"),
+        DriveKeys(&["space", "up", "space"]),
+        WaitDriven,
+        CheckDrawn(20),
+        CheckTurtle(110.0, 100.0, 90.0),
+        CheckConsole("> PU"),
+        CheckConsole("> PD"),
+        Say("Drive Kame: Teach Kame what you drove"),
+        OpenTeach,
+        Wait(ms(300)),
+        TeachName("corner"),
+        PressTeach,
+        Wait(ms(300)),
+        WaitDriven,
+        CheckEditor("TO CORNER\n  FD 100\n  RT 90\n  FD 100\n  PU\n  FD 10\n  PD\nEND\n"),
+        Say("Drive Kame: Esc and Run stop driving"),
+        DriveKeys(&["escape"]),
+        CheckDriving(false),
+        Drive(true),
+        Run("FD 1", Speed::Instant),
+        WaitFinished,
+        CheckDriving(false),
         Quit,
     ]
 }
@@ -946,6 +1003,11 @@ impl App {
             if let Some((step, since)) = auto.waiting.clone() {
                 let done = match step {
                     Step::Wait(d) => since.elapsed() >= d,
+                    Step::WaitDriven => {
+                        (self.animator.as_ref().is_none_or(|a| a.finished())
+                            && self.driving.as_ref().is_none_or(|d| d.queue.is_empty()))
+                            || since.elapsed() > Duration::from_secs(20)
+                    }
                     Step::WaitFinished => {
                         self.animator.as_ref().is_none_or(|a| a.finished())
                             || since.elapsed() > Duration::from_secs(60)
@@ -1001,6 +1063,7 @@ impl App {
                 }
                 Step::Wait(_)
                 | Step::WaitFinished
+                | Step::WaitDriven
                 | Step::WaitPaused
                 | Step::CheckStopsWithin(_) => {
                     self.autotest.as_mut().unwrap().waiting = Some((step, Instant::now()));
@@ -1138,6 +1201,35 @@ impl App {
                         p.page_scroll.set_offset(point(px(0.), px(-y)));
                         cx.notify();
                     });
+                }
+                Step::Drive(on) => {
+                    if self.driving.is_some() != on {
+                        self.toggle_driving(window, cx);
+                    }
+                }
+                Step::DriveKeys(keys) => {
+                    use crate::driving::Input;
+                    use pendown::drive::Key;
+                    for key in keys {
+                        let input = match *key {
+                            "up" => Input::Key(Key::Forward),
+                            "down" => Input::Key(Key::Back),
+                            "left" => Input::Key(Key::Left),
+                            "right" => Input::Key(Key::Right),
+                            "space" => Input::Pen,
+                            "undo" => Input::Undo,
+                            "escape" => {
+                                self.stop_driving(cx);
+                                continue;
+                            }
+                            other => panic!("no driving key {other}"),
+                        };
+                        self.drive(input, cx);
+                    }
+                }
+                Step::CheckDriving(expected) => {
+                    let found = self.driving.is_some();
+                    self.check(found == expected, format!("driving: {found}"));
                 }
                 Step::SetThinking(on) => {
                     if self.show_thinking != on {

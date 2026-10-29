@@ -20,7 +20,8 @@ gpui_kit::assets::icon_assets!(
         Square,
         PencilLine,
         MessageSquarePlus,
-        Lightbulb
+        Lightbulb,
+        Gamepad2
     ]
 );
 

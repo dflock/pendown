@@ -128,6 +128,8 @@ pub struct ToolbarState {
     pub help: bool,
     /// Show Kame thinking is on.
     pub thinking: bool,
+    /// Drive Kame is on.
+    pub driving: bool,
 }
 
 /// The toolbar's buttons, slider and speed. The run's status, which changes
@@ -152,6 +154,26 @@ impl ToolbarPane {
             self.state = state;
             cx.notify();
         }
+    }
+
+    /// A button with only an icon, named by its tooltip, that calls `f` on
+    /// the window's `App`.
+    fn icon_button(
+        &self,
+        id: &'static str,
+        icon: IconName,
+        tooltip: &'static str,
+        f: impl Fn(&mut App, &mut Window, &mut Context<App>) + 'static,
+    ) -> Button {
+        let app = self.app.clone();
+        Button::new(id)
+            .flex_none()
+            .small()
+            .icon(icon)
+            .tooltip(tooltip)
+            .on_click(move |_, window, cx| {
+                app.update(cx, |this, cx| f(this, window, cx)).ok();
+            })
     }
 
     /// A button that calls `f` on the window's `App`.
@@ -190,7 +212,7 @@ impl ToolbarPane {
             .small()
             .ghost()
             .icon(IconName::ImageDown)
-            .label("Export")
+            .tooltip("Export")
             .dropdown_caret(true)
             .dropdown_menu(move |menu, _, _| {
                 menu.item(item("PNG picture", Picture::Png))
@@ -207,25 +229,26 @@ impl Render for ToolbarPane {
             speed,
             help,
             thinking,
+            driving,
         } = self.state;
         h_flex()
             .gap_2()
             .size_full()
             .overflow_hidden()
             .child(
-                self.button("new", IconName::FilePlus, "New", |this, window, cx| {
+                self.icon_button("new", IconName::FilePlus, "New", |this, window, cx| {
                     this.then(After::NewFile, window, cx)
                 })
                 .ghost(),
             )
             .child(
-                self.button("open", IconName::FolderOpen, "Open", |this, window, cx| {
+                self.icon_button("open", IconName::FolderOpen, "Open", |this, window, cx| {
                     this.then(After::OpenFile, window, cx)
                 })
                 .ghost(),
             )
             .child(
-                self.button("save", IconName::Save, "Save", |this, window, cx| {
+                self.icon_button("save", IconName::Save, "Save", |this, window, cx| {
                     this.save(After::Nothing, window, cx)
                 })
                 .ghost(),
@@ -295,6 +318,14 @@ impl Render for ToolbarPane {
                     .child(describe(speed)),
             )
             .child(div().flex_none().w(px(6.)))
+            // The arrow keys move and turn Kame, while nothing else runs.
+            .child(
+                self.button("drive", IconName::Gamepad2, "Drive", |this, window, cx| {
+                    this.toggle_driving(window, cx)
+                })
+                .selected(driving)
+                .disabled(running && !driving),
+            )
             // Arcs on turns and rulers on moves, over the canvas.
             .child(
                 self.button(

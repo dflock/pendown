@@ -49,6 +49,10 @@ pub struct Overlay {
     pub turtle: Option<(Point, f64)>,
     /// What Kame is thinking about, with Show thinking on.
     pub thinking: Thinking,
+    /// While driving: a line out in front of Kame, and what the entry
+    /// means, under Kame.
+    pub heading_line: bool,
+    pub caption: Option<String>,
 }
 
 /// The arc's radius, and how far the ruler is from the line, in logical
@@ -203,7 +207,30 @@ impl Canvas {
         if let Some(thought) = overlay.thinking.current {
             paint_thought(thought, 1.0, colour, px_per_step, &to_window, window, cx);
         }
+        if overlay.heading_line
+            && let Some((pos, heading)) = overlay.turtle
+        {
+            // Dashes out in front of Kame, to the edge of the canvas.
+            let start = to_window(pos);
+            let reach = (bounds.size.width.as_f32()).max(bounds.size.height.as_f32());
+            let mut along = TURTLE_SIZE / 2.0 + 4.0;
+            while along < reach {
+                let mut dash = PathBuilder::stroke(px(1.0));
+                dash.move_to(towards(start, heading, along));
+                dash.line_to(towards(start, heading, along + 5.0));
+                if let Ok(path) = dash.build() {
+                    window.paint_path(path, colour.opacity(0.6));
+                }
+                along += 10.0;
+            }
+        }
 
+        if let (Some(caption), Some((pos, _))) = (&overlay.caption, overlay.turtle) {
+            // Below Kame, clear of the arc and its number.
+            let under = to_window(pos);
+            let at = point(under.x, under.y + px(ARC_RADIUS + 44.0));
+            paint_chip(caption, at, colour, window, cx);
+        }
         if let Some((pos, heading)) = overlay.turtle {
             let centre = to_window(pos);
             let (turtle, turn) = turtle_placement(
@@ -406,15 +433,30 @@ fn round(n: f64, done: bool) -> String {
     }
 }
 
-/// `text` centred on `at`, in the editor's font.
-fn paint_label(
+/// `text` on a dark chip with an edge of `colour`, centred on `at`.
+fn paint_chip(
     text: &str,
     at: gpui_kit::Point<Pixels>,
     colour: Hsla,
     window: &mut Window,
     cx: &mut App,
 ) {
-    let size = px(13.0);
+    let width = shape(text, colour, window, cx).width();
+    let bounds = Bounds::new(
+        point(at.x - width / 2.0 - px(8.0), at.y - px(11.0)),
+        size(width + px(16.0), px(22.0)),
+    );
+    window.paint_quad(
+        fill(bounds, rgb(0x18181b).opacity(0.85))
+            .corner_radii(px(5.0))
+            .border_widths(px(1.0))
+            .border_color(colour.opacity(0.5)),
+    );
+    paint_label(text, at, colour, window, cx);
+}
+
+/// `text` laid out in the editor's font, bold.
+fn shape(text: &str, colour: Hsla, window: &mut Window, cx: &mut App) -> ShapedLine {
     let mut font = font(cx.theme().mono_font_family.clone());
     font.weight = FontWeight::BOLD;
     let run = TextRun {
@@ -425,9 +467,20 @@ fn paint_label(
         underline: None,
         strikethrough: None,
     };
-    let shaped = window
+    window
         .text_system()
-        .shape_line(text.to_string().into(), size, &[run], None);
+        .shape_line(text.to_string().into(), px(13.0), &[run], None)
+}
+
+/// `text` centred on `at`, in the editor's font.
+fn paint_label(
+    text: &str,
+    at: gpui_kit::Point<Pixels>,
+    colour: Hsla,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let shaped = shape(text, colour, window, cx);
     let line_height = px(16.0);
     let origin = point(at.x - shaped.width() / 2.0, at.y - line_height / 2.0);
     shaped

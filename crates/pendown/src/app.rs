@@ -179,7 +179,7 @@ pub struct App {
     checked: bool,
     /// Console output, one line each.
     pub(crate) console: Vec<SharedString>,
-    console_dirty: bool,
+    pub(crate) console_dirty: bool,
     console_output: Entity<TextareaState>,
     console_input: Entity<InputState>,
     /// The editor and console, drawn as cached views (issue 08).
@@ -201,7 +201,7 @@ pub struct App {
     /// The help page for the last error's command, for the console's Help
     /// button (issue 07).
     pub(crate) error_help: Option<usize>,
-    console_entry: ConsoleInput,
+    pub(crate) console_entry: ConsoleInput,
     /// What each console entry not undone yet found, oldest first: one for
     /// each in `console_entry`'s record.
     console_before: Vec<Before>,
@@ -209,6 +209,12 @@ pub struct App {
     console_job: bool,
     /// Show Kame thinking: arcs on turns and rulers on moves.
     pub(crate) show_thinking: bool,
+    /// Drive Kame, while it's on, and the steps it uses, which last the
+    /// session.
+    pub(crate) driving: Option<crate::driving::Driving>,
+    pub(crate) drive_steps: pendown::drive::Steps,
+    /// The canvas takes the keys while driving.
+    pub(crate) canvas_focus: FocusHandle,
     /// Teach Kame's dialog, while it's open.
     pub(crate) teach_dialog: Option<Entity<TeachKame>>,
     /// Definitions typed at the console since the last Run, which "Copy to
@@ -309,6 +315,7 @@ impl App {
             speed,
             help: false,
             thinking: false,
+            driving: false,
         };
         let toolbar_pane = cx.new(|_| ToolbarPane::new(app.clone(), speed_slider.clone(), toolbar));
         let watched = cx.new(|_| Watched::default());
@@ -375,6 +382,9 @@ impl App {
             console_job: false,
             teach_dialog: None,
             show_thinking: false,
+            driving: None,
+            drive_steps: pendown::drive::Steps::default(),
+            canvas_focus: cx.focus_handle(),
             console_definitions: Vec::new(),
             defining: None,
             definitions_cleared: false,
@@ -420,6 +430,7 @@ impl App {
     /// Run (ADR 0006): stop any running program, clear the drawing, and
     /// start the editor's program from a clean slate.
     pub(crate) fn start(&mut self, channel: Channel, cx: &mut Context<Self>) {
+        self.stop_driving(cx);
         self.stop(cx);
         // Run replaces an example's picture, as it would the user's.
         self.forget_example(cx);
@@ -443,7 +454,7 @@ impl App {
     }
 
     /// Runs a console entry against whatever the last run left (ADR 0006).
-    fn run_console(&mut self, entry: String, cx: &mut Context<Self>) {
+    pub(crate) fn run_console(&mut self, entry: String, cx: &mut Context<Self>) {
         self.stop(cx);
         // The console works on what the user's program left.
         self.back_to_my_drawing(cx);
@@ -466,7 +477,7 @@ impl App {
     }
 
     /// Puts the new animator's Kame where `kame` says, if it says.
-    fn put_kame(&mut self, kame: Option<(Point, f64, bool)>) {
+    pub(crate) fn put_kame(&mut self, kame: Option<(Point, f64, bool)>) {
         if let (Some((pos, heading, shown)), Some(animator)) = (kame, &mut self.animator) {
             (animator.pos, animator.heading, animator.shown) = (pos, heading, shown);
         }
@@ -489,6 +500,7 @@ impl App {
         let Some(text) = self.console_entry.undo().map(|e| e.text.clone()) else {
             return;
         };
+        self.driven_undo(&text);
         let before = self
             .console_before
             .pop()
@@ -514,8 +526,14 @@ impl App {
         cx.notify();
     }
 
-    fn start_job(&mut self, job: Job, channel: Channel, cx: &mut Context<Self>) {
-        let (animator, run) = self.session.start(job, self.speed, channel);
+    pub(crate) fn start_job(&mut self, job: Job, channel: Channel, cx: &mut Context<Self>) {
+        // Driving plays at a speed of its own, whatever the slider says.
+        let speed = if self.driving.is_some() {
+            Speed::Animated(pendown::drive::DRIVE_SPEED)
+        } else {
+            self.speed
+        };
+        let (animator, run) = self.session.start(job, speed, channel);
         self.play(animator, run, cx);
     }
 
@@ -710,6 +728,8 @@ impl App {
         let line = self.console_input.read(cx).value().to_string();
         self.console_input
             .update(cx, |input, cx| input.set_value("", window, cx));
+        // Typing ends a driven entry: the next key press starts a new one.
+        self.end_driven_entry();
         let prompt = if self.console_entry.continuing() {
             "…"
         } else {
@@ -1093,6 +1113,8 @@ impl App {
                 }
                 _ => {}
             }
+            // A press made while this one played.
+            self.drive_next(cx);
         }
     }
 
@@ -1131,6 +1153,7 @@ impl App {
 
     /// Step, or Step instruction.
     pub(crate) fn step(&mut self, instruction: bool, cx: &mut Context<Self>) {
+        self.stop_driving(cx);
         if let Some(a) = &mut self.animator {
             if instruction {
                 a.step_instruction()
@@ -1142,6 +1165,7 @@ impl App {
     }
 
     pub(crate) fn toggle_pause(&mut self, cx: &mut Context<Self>) {
+        self.stop_driving(cx);
         if let Some(a) = &mut self.animator {
             if a.mode() == Mode::Paused {
                 a.resume()
@@ -1191,6 +1215,18 @@ impl App {
             .as_ref()
             .is_some_and(|a| a.mode() == Mode::Paused && !a.finished());
         let canvas = self.canvas.clone();
+        // Driving thinks about the whole entry, across its presses.
+        let drive_thinking = {
+            let now = self
+                .animator
+                .as_ref()
+                .map(|a| a.thinking())
+                .unwrap_or_default();
+            self.drive_thinking(now)
+        };
+        if self.drive_fading() {
+            window.request_animation_frame();
+        }
         let overlay = match &self.animator {
             Some(a) => {
                 // A fifth of a pixel, as the buffer is drawn.
@@ -1198,17 +1234,23 @@ impl App {
                 Overlay {
                     partial: a.partial(tolerance),
                     turtle: a.shown.then_some((a.pos, a.heading)),
-                    thinking: if self.show_thinking {
+                    thinking: if self.driving.is_some() {
+                        drive_thinking
+                    } else if self.show_thinking {
                         a.thinking()
                     } else {
                         Thinking::default()
                     },
+                    heading_line: self.driving.is_some(),
+                    caption: self.drive_caption(),
                 }
             }
             None => Overlay {
                 partial: None,
                 turtle: Some((pendown_logo::Point { x: 0.0, y: 0.0 }, 0.0)),
                 thinking: Thinking::default(),
+                heading_line: self.driving.is_some(),
+                caption: None,
             },
         };
 
@@ -1218,6 +1260,7 @@ impl App {
             speed: self.speed,
             help: self.help_open,
             thinking: self.show_thinking,
+            driving: self.driving.is_some(),
         };
         self.toolbar_pane
             .update(cx, |pane, cx| pane.set(toolbar, cx));
@@ -1251,7 +1294,23 @@ impl App {
                         .children(metrics.lines.iter().map(|line| div().child(line.clone()))),
                 )
             })
-            .children(self.example_banner(cx));
+            .children(self.example_banner(cx))
+            .children(self.drive_strip(cx))
+            // The canvas takes the arrow keys while driving.
+            .track_focus(&self.canvas_focus)
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                if this.drive_key(event, window, cx) {
+                    cx.stop_propagation();
+                }
+            }))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, window, cx| {
+                    if this.driving.is_some() {
+                        window.focus(&this.canvas_focus, cx);
+                    }
+                }),
+            );
 
         v_flex()
             .size_full()

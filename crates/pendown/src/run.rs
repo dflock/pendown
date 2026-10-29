@@ -119,9 +119,11 @@ impl Session {
                         Job::Undo => it.undo_console(),
                         Job::Define(text) => it.define_console(text),
                     };
-                    // Dropping the sender tells the animator the job is over.
-                    it.set_output(Box::new(Discard), Arc::default());
+                    // The result first: dropping the sender tells the
+                    // animator the job is over, and the window reads the
+                    // result as soon as it sees that.
                     *command.result.lock().unwrap() = Some(result);
+                    it.set_output(Box::new(Discard), Arc::default());
                     *command.exited.lock().unwrap() = Some(Instant::now());
                 }
             })

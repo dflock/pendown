@@ -19,16 +19,39 @@ fn start(src: &str, speed: Speed) -> (Animator, Run) {
 }
 
 /// Plays one frame. If nothing was ready, gives the interpreter a moment,
-/// so the tests don't depend on how fast it starts.
+/// so the tests don't depend on how fast it starts. A frame that produced
+/// anything is kept, even with no new events: the last frame of a shape
+/// gives its mark, and the interpreter may not have finished yet when the
+/// machine is busy, so throwing that frame away would lose the mark.
 fn frame(animator: &mut Animator, dt: Duration) -> pendown::animator::Frame {
     for _ in 0..200 {
         let out = animator.frame(dt, usize::MAX);
-        if out.events > 0 || !animator.wants_frames() || animator.in_progress() {
+        let produced = !out.marks.is_empty()
+            || !out.printed.is_empty()
+            || out.cleaned
+            || out.background.is_some()
+            || out.speed.is_some()
+            || out.highlight_changed
+            || out.watch_changed;
+        if out.events > 0 || produced || !animator.wants_frames() || animator.in_progress() {
             return out;
         }
         thread::sleep(Duration::from_micros(500));
     }
     animator.frame(dt, usize::MAX)
+}
+
+/// Plays tiny frames until a move or turn is under way: its event can come
+/// a frame or two after its highlight when the machine is busy, so a test
+/// that measures it starts here.
+fn until_started(animator: &mut Animator) {
+    for _ in 0..1000 {
+        if animator.in_progress() && animator.highlight.is_some() {
+            return;
+        }
+        frame(animator, Duration::from_millis(1));
+    }
+    panic!("nothing started");
 }
 
 fn highlighted<'a>(src: &'a str, animator: &Animator) -> &'a str {
@@ -99,6 +122,13 @@ fn highlight_is_on_the_move_while_the_turtle_moves() {
 fn speed_changes_mid_move() {
     let (mut animator, _run) = start("WINDOW FD 1000", Speed::Animated(100.0));
     let dt = Duration::from_millis(100);
+    // Until the line is being drawn, past WINDOW's moment on show.
+    for _ in 0..1000 {
+        if animator.partial(0.1).is_some() {
+            break;
+        }
+        frame(&mut animator, Duration::from_millis(1));
+    }
     let mut ys = Vec::new();
     for i in 0..10 {
         if i == 5 {
@@ -600,8 +630,7 @@ fn next_change_is_when_the_picture_moves_a_pixel() {
     // At 20 steps a second and 0.5 pixels a step, the line grows a pixel
     // every 100 ms, the most the window waits.
     let (mut animator, _run) = start("FD 300", Speed::Animated(20.0));
-    frame(&mut animator, FRAME);
-    assert!(animator.in_progress());
+    until_started(&mut animator);
     assert_eq!(animator.next_change(0.5, 18.0), MAX_FRAME_GAP);
     // At 2 pixels a step, every 25 ms.
     assert!((ms(animator.next_change(2.0, 18.0)) - 25.0).abs() < 0.01);
@@ -609,7 +638,7 @@ fn next_change_is_when_the_picture_moves_a_pixel() {
     // A turn moves the turtle's tip: 18 pixels long, turning 60 degrees a
     // second, it moves about 19 pixels a second.
     let (mut animator, _run) = start("RT 90", Speed::Animated(20.0));
-    frame(&mut animator, FRAME);
+    until_started(&mut animator);
     let gap = ms(animator.next_change(1.0, 18.0));
     assert!(
         (gap - 1000.0 / (18.0 * 60.0f64.to_radians())).abs() < 0.01,

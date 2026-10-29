@@ -50,6 +50,16 @@ cargo run --release -p pendown
 
 Run the tests with `cargo test`. Debug builds work too, but drawing is much faster in release.
 
+On Linux, to add Pendown to your desktop's app menu, with Kame as its icon:
+
+```sh
+cargo install --path crates/pendown
+install -Dm644 crates/pendown/linux/pendown.desktop ~/.local/share/applications/pendown.desktop
+install -Dm644 crates/pendown/linux/pendown.png ~/.local/share/icons/hicolor/128x128/apps/pendown.png
+```
+
+On X11 the window shows Kame either way. Wayland needs the desktop file to find it.
+
 `PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, stepping, stopping, the console, files, errors, filled shapes, how often the window redraws, the counters and variables panels, and the help panel and tutorial. `PENDOWN_AUTOTEST_FROM="Phase 5"` starts it at the first section with that in its title. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
 
 Type a program in the editor and press **Run**. Use the speed slider to choose how fast the turtle draws. Try the console too: after a run, it knows every procedure your program defined, so you can type `FLOWER 80` and watch.

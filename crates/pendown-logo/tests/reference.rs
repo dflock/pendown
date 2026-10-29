@@ -71,7 +71,7 @@ fn chapters_and_sections() {
 }
 
 #[test]
-fn search_finds_names_and_aliases_by_prefix() {
+fn search_finds_names_and_aliases_anywhere_in_them() {
     let r = reference();
     let titles = |q, obsolete| {
         r.search(q, obsolete)
@@ -90,8 +90,23 @@ fn search_finds_names_and_aliases_by_prefix() {
         "obsolete commands only when asked"
     );
     assert!(titles("setp", true).contains(&"SETPENPATTERN"));
-    // An exact name comes first.
-    assert_eq!(titles("pos", false)[0], "POS");
+    // An exact name comes first, then names starting with it, then names
+    // with it anywhere.
+    let pos = titles("pos", false);
+    assert_eq!(pos[0], "POS");
+    let at = |name| pos.iter().position(|t| *t == name).unwrap();
+    assert!(at("SETPOS") > 0, "{pos:?}");
+    assert!(
+        pos.iter().take_while(|t| t.starts_with("POS")).count() <= at("SETPOS"),
+        "{pos:?}"
+    );
+    let colour = titles("color", false);
+    assert!(
+        colour.contains(&"PENCOLOR")
+            && colour.contains(&"SETPENCOLOR")
+            && colour.contains(&"FILLCOLOR"),
+        "{colour:?}"
+    );
     assert!(titles("", false).is_empty());
 }
 

@@ -372,9 +372,10 @@ impl Reference {
             .or_else(|| self.commands.iter().position(|c| c.key == name))
     }
 
-    /// Commands with a name starting with `query`, an exact match first,
-    /// then shorter names, then alphabetically. Only implemented ones, and
-    /// obsolete ones if asked for.
+    /// Commands with a name containing `query`: an exact match first, then
+    /// names starting with it, then names with it anywhere, each shorter
+    /// names first, then alphabetically. Only implemented ones, and obsolete
+    /// ones if asked for.
     pub fn search(&self, query: &str, obsolete: bool) -> Vec<usize> {
         let query = query.trim().to_lowercase();
         if query.is_empty() {
@@ -389,14 +390,21 @@ impl Reference {
                 .names
                 .iter()
                 .chain(&command.operators)
-                .filter(|n| n.to_lowercase().starts_with(&query))
-                .min_by_key(|n| n.len());
-            if let Some(name) = best {
-                let rank = if name.eq_ignore_ascii_case(&query) {
-                    0
-                } else {
-                    1
-                };
+                .filter_map(|n| {
+                    let lower = n.to_lowercase();
+                    let rank = if lower == query {
+                        0
+                    } else if lower.starts_with(&query) {
+                        1
+                    } else if lower.contains(&query) {
+                        2
+                    } else {
+                        return None;
+                    };
+                    Some((rank, n.len(), n.as_str()))
+                })
+                .min();
+            if let Some((rank, _, name)) = best {
                 hits.push((rank, i, name));
             }
         }

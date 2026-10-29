@@ -1072,7 +1072,7 @@ impl HelpPanel {
                 div()
                     .mt_2()
                     .text_color(theme.muted_foreground)
-                    .child(format!("Nothing is called {}.", query.to_uppercase()))
+                    .child(format!("No name has {} in it.", query.to_uppercase()))
                     .into_any_element(),
             );
         }

@@ -13,6 +13,11 @@ pendown-cli.workspace = true
 pendown-logo.workspace = true
 pendown-render.workspace = true
 
+[build-dependencies]
+# pendown.exe's icon and version details on Windows. The version gpui
+# already uses there.
+embed-resource = "3"
+
 [dev-dependencies]
 # Renders exported SVGs back into pixels, to compare with the PNG. The
 # version gpui already uses, so it adds nothing to build.

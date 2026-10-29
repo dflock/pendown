@@ -1,5 +1,9 @@
 //! Pendown: a Logo playground where you can watch the turtle think.
 
+// On Windows, a release build opens no console window beside the app. Debug
+// builds keep it, for what Pendown prints while it's being worked on.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod app;
 mod autotest;
 mod canvas;

@@ -14,7 +14,15 @@ const END: &str = "; END GENERATED\n";
 /// query string: the string takes one backslash off, so a regex's `\?` is
 /// written `\\?`.
 fn escape(name: &str) -> String {
-    name.chars().flat_map(|c| if ".?*+()[]{}|^$\\#".contains(c) { vec!['\\', '\\', c] } else { vec![c] }).collect()
+    name.chars()
+        .flat_map(|c| {
+            if ".?*+()[]{}|^$\\#".contains(c) {
+                vec!['\\', '\\', c]
+            } else {
+                vec![c]
+            }
+        })
+        .collect()
 }
 
 fn generated() -> String {
@@ -25,7 +33,11 @@ fn generated() -> String {
             .iter()
             .filter(|c| c.implemented && c.kind == kind)
             .flat_map(|c| c.names.iter())
-            .filter(|n| n.chars().next().is_some_and(|c| c.is_alphabetic() || c == '.'))
+            .filter(|n| {
+                n.chars()
+                    .next()
+                    .is_some_and(|c| c.is_alphabetic() || c == '.')
+            })
             .map(|n| escape(&n.to_lowercase()))
             .collect();
         names.sort();
@@ -46,13 +58,18 @@ fn generated() -> String {
 
 #[test]
 fn the_highlights_list_the_built_in_commands() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tree-sitter-logo/queries/highlights.scm");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tree-sitter-logo/queries/highlights.scm");
     let text = std::fs::read_to_string(&path).unwrap();
     let start = text.find(BEGIN).expect("the generated part's start") + BEGIN.len();
     let end = text.find(END).expect("the generated part's end");
     let expected = generated();
     if std::env::var_os("UPDATE_HIGHLIGHTS").is_some() {
-        std::fs::write(&path, format!("{}{expected}{}", &text[..start], &text[end..])).unwrap();
+        std::fs::write(
+            &path,
+            format!("{}{expected}{}", &text[..start], &text[end..]),
+        )
+        .unwrap();
         return;
     }
     assert!(
@@ -71,6 +88,10 @@ fn the_zed_extension_has_the_same_queries() {
         if std::env::var_os("UPDATE_HIGHLIGHTS").is_some() {
             std::fs::write(&path, &queries).unwrap();
         }
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), queries, "zed/languages/logo/{name}.scm: run with UPDATE_HIGHLIGHTS=1");
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            queries,
+            "zed/languages/logo/{name}.scm: run with UPDATE_HIGHLIGHTS=1"
+        );
     }
 }

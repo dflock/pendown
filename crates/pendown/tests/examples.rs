@@ -32,12 +32,20 @@ fn programs() -> Vec<(String, String, bool)> {
     let mut out = Vec::new();
     for command in reference().commands.iter().filter(|c| c.implemented) {
         for (i, example) in command.examples.iter().enumerate() {
-            out.push((pendown::help::example_name(&command.key, i), example.code.clone(), example.fails));
+            out.push((
+                pendown::help::example_name(&command.key, i),
+                example.code.clone(),
+                example.fails,
+            ));
         }
     }
     for (l, lesson) in pendown::tutorial::lessons().iter().enumerate() {
         for (p, program) in lesson.programs().enumerate() {
-            out.push((format!("tutorial-{}-{}", l + 1, p + 1), program.to_string(), false));
+            out.push((
+                format!("tutorial-{}-{}", l + 1, p + 1),
+                program.to_string(),
+                false,
+            ));
         }
     }
     out
@@ -66,16 +74,25 @@ fn check(name: &str, code: &str, fails: bool) -> Option<String> {
     }
     let printed = std::fs::read_to_string(&txt).unwrap_or_default();
     if output.printed != printed {
-        return Some(format!("{name}: printed {:?}, not {printed:?}", output.printed));
+        return Some(format!(
+            "{name}: printed {:?}, not {printed:?}",
+            output.printed
+        ));
     }
     match std::fs::read_to_string(&saved) {
         Ok(expected) if expected == svg => None,
         Ok(_) => {
             let failed = saved.with_extension("actual.svg");
             std::fs::write(&failed, &svg).unwrap();
-            Some(format!("{name}: the picture changed; the new one is in {}", failed.display()))
+            Some(format!(
+                "{name}: the picture changed; the new one is in {}",
+                failed.display()
+            ))
         }
-        Err(e) => Some(format!("{}: {e}. Run with UPDATE_PICTURES=1 to make it", saved.display())),
+        Err(e) => Some(format!(
+            "{}: {e}. Run with UPDATE_PICTURES=1 to make it",
+            saved.display()
+        )),
     }
 }
 
@@ -83,7 +100,10 @@ fn check(name: &str, code: &str, fails: bool) -> Option<String> {
 fn every_example_runs_and_draws_its_picture() {
     std::fs::create_dir_all(dir()).unwrap();
     let programs = programs();
-    let problems: Vec<_> = programs.iter().filter_map(|(name, code, fails)| check(name, code, *fails)).collect();
+    let problems: Vec<_> = programs
+        .iter()
+        .filter_map(|(name, code, fails)| check(name, code, *fails))
+        .collect();
     assert!(problems.is_empty(), "{problems:#?}");
     // No pictures are left from examples that have gone.
     let stale: Vec<_> = std::fs::read_dir(dir())
@@ -91,7 +111,10 @@ fn every_example_runs_and_draws_its_picture() {
         .map(|e| e.unwrap().path())
         .filter(|p| {
             let stem = p.file_name().unwrap().to_string_lossy();
-            let stem = stem.trim_end_matches(".actual.svg").trim_end_matches(".svg").trim_end_matches(".txt");
+            let stem = stem
+                .trim_end_matches(".actual.svg")
+                .trim_end_matches(".svg")
+                .trim_end_matches(".txt");
             !programs.iter().any(|(n, ..)| n == stem)
         })
         .collect();
@@ -104,14 +127,30 @@ fn every_svg_looks_like_its_png() {
     // The PNG never draws a line thinner than a pixel, so for the same
     // picture, neither does the SVG.
     let thinnest = 1.0 / SIZE as f64;
-    let options = pendown_cli::Options { width: SIZE, height: SIZE, limit: 1_000_000, seed: Some(1), fit: false, svg: Some(thinnest) };
+    let options = pendown_cli::Options {
+        width: SIZE,
+        height: SIZE,
+        limit: 1_000_000,
+        seed: Some(1),
+        fit: false,
+        svg: Some(thinnest),
+    };
     // And some that the examples don't cover: shapes at headings where
     // turning the wrong way would show, arcs both ways and past a whole
     // turn, rounded corners, fills, and translucent pens.
     let extra = [
-        ("turned-shapes", "SETPENSIZE 4 SETPC \"orange RT 30 ELLIPSE 80 200\nPU FD 250 PD SETFILLCOLOR [0 128 255 160] RT 20 (RECTANGLE 120 260 30)"),
-        ("arcs", "SETPENSIZE 3 ARC 270 150\nPU HOME PD LT 70 ARC -200 120\nPU SETPOS [-250 -250] PD ARC 500 80"),
-        ("translucent", "SETPC [255 0 0 120] SETPENSIZE 20 REPEAT 5 [FD 300 RT 144]"),
+        (
+            "turned-shapes",
+            "SETPENSIZE 4 SETPC \"orange RT 30 ELLIPSE 80 200\nPU FD 250 PD SETFILLCOLOR [0 128 255 160] RT 20 (RECTANGLE 120 260 30)",
+        ),
+        (
+            "arcs",
+            "SETPENSIZE 3 ARC 270 150\nPU HOME PD LT 70 ARC -200 120\nPU SETPOS [-250 -250] PD ARC 500 80",
+        ),
+        (
+            "translucent",
+            "SETPC [255 0 0 120] SETPENSIZE 20 REPEAT 5 [FD 300 RT 144]",
+        ),
     ];
     let mut problems = Vec::new();
     let programs = programs().into_iter().map(|(n, c, _)| (n, c));
@@ -128,12 +167,17 @@ fn every_svg_looks_like_its_png() {
         let mut pixmap = resvg::tiny_skia::Pixmap::new(SIZE, SIZE).unwrap();
         // The SVG is the turtle area, a step to a pixel.
         let scale = SIZE as f32 / pendown_render::TURTLE_AREA as f32;
-        resvg::render(&tree, resvg::tiny_skia::Transform::from_scale(scale, scale), &mut pixmap.as_mut());
+        resvg::render(
+            &tree,
+            resvg::tiny_skia::Transform::from_scale(scale, scale),
+            &mut pixmap.as_mut(),
+        );
         // Compared at a quarter of the size: the two renderers smooth edges
         // differently, which averages out, while anything drawn in the
         // wrong place still shows. The background is opaque, so resvg's
         // premultiplied pixels are straight.
-        let small = |image: image::RgbaImage| image::imageops::thumbnail(&image, SIZE / 4, SIZE / 4);
+        let small =
+            |image: image::RgbaImage| image::imageops::thumbnail(&image, SIZE / 4, SIZE / 4);
         let png = small(image::load_from_memory(&output.png).unwrap().to_rgba8());
         let resvg = small(image::RgbaImage::from_raw(SIZE, SIZE, pixmap.data().to_vec()).unwrap());
         let different = png
@@ -146,8 +190,13 @@ fn every_svg_looks_like_its_png() {
             std::fs::create_dir_all(&dir).unwrap();
             std::fs::write(dir.join(format!("{name}.svg")), &svg).unwrap();
             std::fs::write(dir.join(format!("{name}.png")), &output.png).unwrap();
-            pixmap.save_png(dir.join(format!("{name}.resvg.png"))).unwrap();
-            problems.push(format!("{name}: {different} pixels differ; see {}", dir.display()));
+            pixmap
+                .save_png(dir.join(format!("{name}.resvg.png")))
+                .unwrap();
+            problems.push(format!(
+                "{name}: {different} pixels differ; see {}",
+                dir.display()
+            ));
         }
     }
     assert!(problems.is_empty(), "{problems:#?}");

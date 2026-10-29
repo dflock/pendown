@@ -20,7 +20,12 @@ pub fn chain(error: &Error) -> Vec<String> {
             if i == 0 {
                 // "in DOWN", then the other calls from the same place.
                 lines.push(line);
-                line = format!("called from {} (line {}), {} times", call.procedure, call.span.line + 1, thousands(same - 1));
+                line = format!(
+                    "called from {} (line {}), {} times",
+                    call.procedure,
+                    call.span.line + 1,
+                    thousands(same - 1)
+                );
             } else {
                 line.push_str(&format!(", {} times", thousands(same)));
             }
@@ -51,11 +56,24 @@ mod tests {
     use super::*;
 
     fn call(procedure: &str, line: u32) -> CallSite {
-        CallSite { procedure: procedure.into(), span: Span { source: SourceId::Editor, start: 0, end: 1, line } }
+        CallSite {
+            procedure: procedure.into(),
+            span: Span {
+                source: SourceId::Editor,
+                start: 0,
+                end: 1,
+                line,
+            },
+        }
     }
 
     fn error(calls: Vec<CallSite>) -> Error {
-        Error { message: "oops".into(), span: None, calls, command: None }
+        Error {
+            message: "oops".into(),
+            span: None,
+            calls,
+            command: None,
+        }
     }
 
     #[test]
@@ -69,13 +87,32 @@ mod tests {
         let mut calls = vec![call("DOWN", 1); 10_000];
         calls.push(call("DOWN", 4));
         let e = error(calls);
-        assert_eq!(chain(&e), ["in DOWN (line 2)", "called from DOWN (line 2), 9,999 times", "called from DOWN (line 5)"]);
+        assert_eq!(
+            chain(&e),
+            [
+                "in DOWN (line 2)",
+                "called from DOWN (line 2), 9,999 times",
+                "called from DOWN (line 5)"
+            ]
+        );
     }
 
     #[test]
     fn repeats_further_up_are_counted() {
-        let e = error(vec![call("FD", 0), call("B", 3), call("B", 3), call("A", 9)]);
-        assert_eq!(chain(&e), ["in FD (line 1)", "called from B (line 4), 2 times", "called from A (line 10)"]);
+        let e = error(vec![
+            call("FD", 0),
+            call("B", 3),
+            call("B", 3),
+            call("A", 9),
+        ]);
+        assert_eq!(
+            chain(&e),
+            [
+                "in FD (line 1)",
+                "called from B (line 4), 2 times",
+                "called from A (line 10)"
+            ]
+        );
     }
 
     #[test]

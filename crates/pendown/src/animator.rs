@@ -13,8 +13,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use pendown_logo::{Control, Event, Pen, Point, Span, SyncPoint, Watch};
 use pendown_logo::arc_point;
+use pendown_logo::{Control, Event, Pen, Point, Span, SyncPoint, Watch};
 use pendown_render::{Mark, Segment};
 
 use crate::metrics::AnimatorMetrics;
@@ -59,17 +59,33 @@ pub enum Mode {
     StepInstruction,
 }
 
-
 enum Current {
-    Move { from: Point, to: Point, pen: Pen, done: f64 },
+    Move {
+        from: Point,
+        to: Point,
+        pen: Pen,
+        done: f64,
+    },
     /// An arc, which moves the turtle, or a shape, which doesn't: `done` of
     /// its `length` in steps so far.
-    Mark { mark: Mark, length: f64, done: f64 },
-    Turn { from: f64, by: f64, done: f64 },
+    Mark {
+        mark: Mark,
+        length: f64,
+        done: f64,
+    },
+    Turn {
+        from: f64,
+        by: f64,
+        done: f64,
+    },
     /// Keeps the highlight on an instruction that drew nothing.
-    Dwell { left: f64 },
+    Dwell {
+        left: f64,
+    },
     /// `WAIT`: seconds left, counted in real time at every speed.
-    Wait { left: f64 },
+    Wait {
+        left: f64,
+    },
 }
 
 /// What a frame produced.
@@ -156,7 +172,10 @@ impl Animator {
             stopped: false,
             metrics: AnimatorMetrics::default(),
         };
-        animator.control.speed.store(crate::speed::speed_level(speed), Ordering::Relaxed);
+        animator
+            .control
+            .speed
+            .store(crate::speed::speed_level(speed), Ordering::Relaxed);
         animator.update_lockstep();
         animator
     }
@@ -176,7 +195,11 @@ impl Animator {
 
     /// Whether the window needs another frame.
     pub fn wants_frames(&self) -> bool {
-        !self.finished() && matches!(self.mode, Mode::Running | Mode::StepLine | Mode::StepInstruction)
+        !self.finished()
+            && matches!(
+                self.mode,
+                Mode::Running | Mode::StepLine | Mode::StepInstruction
+            )
     }
 
     /// How long until the picture changes by about a device pixel, so the
@@ -186,18 +209,29 @@ impl Animator {
     /// the turtle reaches from its position, which says how far its head
     /// moves as it turns.
     pub fn next_change(&self, px_per_step: f64, turtle_px: f64) -> Duration {
-        let Speed::Animated(steps) = self.speed else { return Duration::ZERO };
+        let Speed::Animated(steps) = self.speed else {
+            return Duration::ZERO;
+        };
         let secs = |s: f64| Duration::from_secs_f64(s.max(0.0));
         // The time for `remaining` steps (or degrees, at `rate`) to play,
         // and for one pixel's change at `px_per_unit`.
         let gap = |remaining: f64, rate: f64, px_per_unit: f64| {
             let to_end = remaining / rate;
-            let pixel = if px_per_unit > 0.0 { 1.0 / (rate * px_per_unit) } else { to_end };
+            let pixel = if px_per_unit > 0.0 {
+                1.0 / (rate * px_per_unit)
+            } else {
+                to_end
+            };
             secs(to_end.min(pixel))
         };
         let gap = match &self.current {
             None => Duration::ZERO,
-            Some(Current::Move { from, to, pen, done }) => {
+            Some(Current::Move {
+                from,
+                to,
+                pen,
+                done,
+            }) => {
                 let length = ((to.x - from.x).powi(2) + (to.y - from.y).powi(2)).sqrt();
                 let seen = pen.down || self.shown;
                 gap(length - done, steps, if seen { px_per_step } else { 0.0 })
@@ -207,7 +241,11 @@ impl Animator {
                 gap(length - done, steps, if seen { px_per_step } else { 0.0 })
             }
             Some(Current::Turn { by, done, .. }) => {
-                let tip = if self.shown { turtle_px * std::f64::consts::PI / 180.0 } else { 0.0 };
+                let tip = if self.shown {
+                    turtle_px * std::f64::consts::PI / 180.0
+                } else {
+                    0.0
+                };
                 gap(by.abs() - done, steps * DEGREES_PER_STEP, tip)
             }
             Some(Current::Dwell { left } | Current::Wait { left }) => secs(*left),
@@ -224,7 +262,9 @@ impl Animator {
     /// polyline within `tolerance` turtle steps of the curve, with its pen.
     pub fn partial(&self, tolerance: f64) -> Option<(Vec<Point>, Pen)> {
         match &self.current {
-            Some(Current::Move { from, pen, .. }) if pen.down => Some((vec![*from, self.pos], *pen)),
+            Some(Current::Move { from, pen, .. }) if pen.down => {
+                Some((vec![*from, self.pos], *pen))
+            }
             Some(Current::Mark { mark, length, done }) if mark.pen().down => {
                 let fraction = if *length > 0.0 { done / length } else { 1.0 };
                 Some((mark.partial(fraction, tolerance), mark.pen()))
@@ -255,7 +295,9 @@ impl Animator {
     /// Changes the speed, and tells the interpreter the level, for `SPEED`.
     pub fn set_speed(&mut self, speed: Speed) {
         self.speed = speed;
-        self.control.speed.store(crate::speed::speed_level(speed), Ordering::Relaxed);
+        self.control
+            .speed
+            .store(crate::speed::speed_level(speed), Ordering::Relaxed);
         self.update_lockstep();
     }
 
@@ -347,7 +389,9 @@ impl Animator {
             } else {
                 replied.then_some(sync_wait_end)
             };
-            let Some(event) = self.next_event(wait_until) else { break };
+            let Some(event) = self.next_event(wait_until) else {
+                break;
+            };
             out.events += 1;
             match event {
                 Event::Instruction { span, starts_line } => {
@@ -355,7 +399,8 @@ impl Animator {
                         // Show the instruction that did nothing for a moment,
                         // then come back to this one.
                         self.idle_instruction = false;
-                        self.queue.push_front(Event::Instruction { span, starts_line });
+                        self.queue
+                            .push_front(Event::Instruction { span, starts_line });
                         out.events -= 1;
                         self.current = Some(Current::Dwell { left: self.dwell() });
                         continue;
@@ -377,22 +422,73 @@ impl Animator {
                 }
                 Event::Move { from, to, pen } => {
                     self.idle_instruction = false;
-                    self.current = Some(Current::Move { from, to, pen, done: 0.0 });
+                    self.current = Some(Current::Move {
+                        from,
+                        to,
+                        pen,
+                        done: 0.0,
+                    });
                 }
                 Event::Turn { from, by } => {
                     self.idle_instruction = false;
-                    self.current = Some(Current::Turn { from, by, done: 0.0 });
+                    self.current = Some(Current::Turn {
+                        from,
+                        by,
+                        done: 0.0,
+                    });
                 }
-                Event::Arc { center, radius, start_heading, angle, pen } => {
+                Event::Arc {
+                    center,
+                    radius,
+                    start_heading,
+                    angle,
+                    pen,
+                } => {
                     self.idle_instruction = false;
-                    let mark = Mark::Arc { center, radius, start_heading, angle, pen };
-                    self.current = Some(Current::Mark { mark, length: mark.length(), done: 0.0 });
+                    let mark = Mark::Arc {
+                        center,
+                        radius,
+                        start_heading,
+                        angle,
+                        pen,
+                    };
+                    self.current = Some(Current::Mark {
+                        mark,
+                        length: mark.length(),
+                        done: 0.0,
+                    });
                 }
-                Event::Ellipse { center, radii, heading, pen, fill } => {
-                    self.start_shape(Mark::Ellipse { center, radii, heading, pen, fill });
+                Event::Ellipse {
+                    center,
+                    radii,
+                    heading,
+                    pen,
+                    fill,
+                } => {
+                    self.start_shape(Mark::Ellipse {
+                        center,
+                        radii,
+                        heading,
+                        pen,
+                        fill,
+                    });
                 }
-                Event::Rect { center, size, corner, heading, pen, fill } => {
-                    self.start_shape(Mark::Rect { center, size, corner, heading, pen, fill });
+                Event::Rect {
+                    center,
+                    size,
+                    corner,
+                    heading,
+                    pen,
+                    fill,
+                } => {
+                    self.start_shape(Mark::Rect {
+                        center,
+                        size,
+                        corner,
+                        heading,
+                        pen,
+                        fill,
+                    });
                 }
                 Event::Watch(watch) => {
                     // It belongs to the next instruction, so it waits for
@@ -418,7 +514,9 @@ impl Animator {
                 Event::SetBackground { color } => out.background = Some(color),
                 Event::Wait(duration) => {
                     self.idle_instruction = false;
-                    self.current = Some(Current::Wait { left: duration.as_secs_f64() });
+                    self.current = Some(Current::Wait {
+                        left: duration.as_secs_f64(),
+                    });
                 }
                 Event::SetSpeed(level) => {
                     let speed = crate::speed::level_speed(level);
@@ -452,7 +550,11 @@ impl Animator {
     fn start_shape(&mut self, mark: Mark) {
         if mark.visible() {
             self.idle_instruction = false;
-            self.current = Some(Current::Mark { mark, length: mark.length(), done: 0.0 });
+            self.current = Some(Current::Mark {
+                mark,
+                length: mark.length(),
+                done: 0.0,
+            });
         }
     }
 
@@ -488,7 +590,12 @@ impl Animator {
             }
         };
         match current {
-            Current::Move { from, to, pen, done } => {
+            Current::Move {
+                from,
+                to,
+                pen,
+                done,
+            } => {
                 let length = ((to.x - from.x).powi(2) + (to.y - from.y).powi(2)).sqrt();
                 let done = done + progress(length - done, rate);
                 if done >= length {
@@ -499,15 +606,34 @@ impl Animator {
                     return true;
                 }
                 let t = done / length;
-                self.pos = Point { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
-                self.current = Some(Current::Move { from, to, pen, done });
+                self.pos = Point {
+                    x: from.x + (to.x - from.x) * t,
+                    y: from.y + (to.y - from.y) * t,
+                };
+                self.current = Some(Current::Move {
+                    from,
+                    to,
+                    pen,
+                    done,
+                });
                 false
             }
             Current::Mark { mark, length, done } => {
                 let done = done + progress(length - done, rate);
-                let t = if length > 0.0 { (done / length).min(1.0) } else { 1.0 };
+                let t = if length > 0.0 {
+                    (done / length).min(1.0)
+                } else {
+                    1.0
+                };
                 // An arc carries the turtle with it; a shape leaves it put.
-                if let Mark::Arc { center, radius, start_heading, angle, .. } = mark {
+                if let Mark::Arc {
+                    center,
+                    radius,
+                    start_heading,
+                    angle,
+                    ..
+                } = mark
+                {
                     (self.pos, self.heading) = arc_point(center, radius, start_heading, angle, t);
                 }
                 if done >= length {
@@ -533,7 +659,9 @@ impl Animator {
                     *budget -= left;
                     return true;
                 }
-                self.current = Some(Current::Wait { left: left - *budget });
+                self.current = Some(Current::Wait {
+                    left: left - *budget,
+                });
                 *budget = 0.0;
                 false
             }

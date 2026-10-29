@@ -10,14 +10,20 @@ pub const INSTANT_LEVEL: u8 = 11;
 /// level 10.
 pub fn level_speed(level: u8) -> Speed {
     let level = level.clamp(1, INSTANT_LEVEL);
-    if level == INSTANT_LEVEL { Speed::Instant } else { Speed::Animated(5.0 * 2f64.powi(level as i32 - 1)) }
+    if level == INSTANT_LEVEL {
+        Speed::Instant
+    } else {
+        Speed::Animated(5.0 * 2f64.powi(level as i32 - 1))
+    }
 }
 
 /// The nearest level to a speed.
 pub fn speed_level(speed: Speed) -> u8 {
     match speed {
         Speed::Instant => INSTANT_LEVEL,
-        Speed::Animated(steps) => ((steps / 5.0).log2() + 1.0).round().clamp(1.0, (INSTANT_LEVEL - 1) as f64) as u8,
+        Speed::Animated(steps) => ((steps / 5.0).log2() + 1.0)
+            .round()
+            .clamp(1.0, (INSTANT_LEVEL - 1) as f64) as u8,
     }
 }
 

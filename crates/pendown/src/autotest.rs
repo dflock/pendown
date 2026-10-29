@@ -228,7 +228,9 @@ fn script() -> Vec<Step> {
         Screenshot("console"),
         Run(crate::app::WELCOME, Speed::Instant),
         WaitFinished,
-        CheckConsole("Run cleared the procedures you defined in the console. \"Copy to editor\" keeps them."),
+        CheckConsole(
+            "Run cleared the procedures you defined in the console. \"Copy to editor\" keeps them.",
+        ),
         Console("TRI 10"),
         WaitFinished,
         CheckConsole("In the console: I don't know how to TRI"),
@@ -267,7 +269,17 @@ fn script() -> Vec<Step> {
         CheckMoving,
         Screenshot("highlight-mid-move"),
         WaitFinished,
-        CheckTrace(&["REPEAT 4 [FD 300 RT 90]", "FD 300", "RT 90", "FD 300", "RT 90", "FD 300", "RT 90", "FD 300", "RT 90"]),
+        CheckTrace(&[
+            "REPEAT 4 [FD 300 RT 90]",
+            "FD 300",
+            "RT 90",
+            "FD 300",
+            "RT 90",
+            "FD 300",
+            "RT 90",
+            "FD 300",
+            "RT 90",
+        ]),
         Say("A speed change applies in the middle of a move"),
         Track,
         Run("FD 600", Speed::Animated(50.0)),
@@ -328,7 +340,10 @@ fn script() -> Vec<Step> {
         WaitFinished,
         CheckConsole("Line 2: Not enough inputs to RT"),
         Say("Phase 2: filled shapes, FOR and a template, animated"),
-        Run("FOR [i 3 1] [SETFC ITEM :i [red orange gold] CIRCLE :i * 50]\nPRINT MAP [? * 2] [1 2 3]", Speed::Animated(2560.0)),
+        Run(
+            "FOR [i 3 1] [SETFC ITEM :i [red orange gold] CIRCLE :i * 50]\nPRINT MAP [? * 2] [1 2 3]",
+            Speed::Animated(2560.0),
+        ),
         WaitFinished,
         CheckDrawn(3),
         CheckConsole("2 4 6"),
@@ -393,7 +408,10 @@ fn script() -> Vec<Step> {
         Wait(ms(100)),
         CheckPanelsDrawn,
         Say("Phase 4: the colours, with a square of each"),
-        Run("SETPC \"orange\nSETBG [20 40 80]\nSETFC \"#40c0ff80\nCIRCLE 100", Speed::Animated(200.0)),
+        Run(
+            "SETPC \"orange\nSETBG [20 40 80]\nSETFC \"#40c0ff80\nCIRCLE 100",
+            Speed::Animated(200.0),
+        ),
         WaitFinished,
         CheckColours("PENCOLOR=orange FILLCOLOR=#40c0ff80 BACKGROUND=[20 40 80]"),
         Screenshot("colours"),
@@ -443,7 +461,9 @@ fn script() -> Vec<Step> {
         CheckErrorHelp("FORWARD"),
         Run("EDIT \"square", Speed::Instant),
         WaitFinished,
-        CheckConsole("Line 1: EDIT isn't in Pendown: it opens an external text editor, and Pendown has its own."),
+        CheckConsole(
+            "Line 1: EDIT isn't in Pendown: it opens an external text editor, and Pendown has its own.",
+        ),
         CheckErrorHelp("EDIT"),
         Wait(ms(100)),
         Screenshot("error-help"),
@@ -486,14 +506,22 @@ pub struct Autotest {
 impl Autotest {
     pub fn from_env() -> Option<Autotest> {
         let value = std::env::var("PENDOWN_AUTOTEST").ok()?;
-        let dir = if value == "1" { PathBuf::from("target/autotest") } else { PathBuf::from(value) };
+        let dir = if value == "1" {
+            PathBuf::from("target/autotest")
+        } else {
+            PathBuf::from(value)
+        };
         std::fs::create_dir_all(&dir).ok();
         let steps = script();
         // PENDOWN_AUTOTEST_FROM="Phase 5" starts at the first section whose
         // title has that in it.
         let next = std::env::var("PENDOWN_AUTOTEST_FROM")
             .ok()
-            .and_then(|from| steps.iter().position(|s| matches!(s, Step::Say(text) if text.contains(from.as_str()))))
+            .and_then(|from| {
+                steps
+                    .iter()
+                    .position(|s| matches!(s, Step::Say(text) if text.contains(from.as_str())))
+            })
             .unwrap_or(0);
         Some(Autotest {
             steps,
@@ -524,7 +552,10 @@ impl App {
     fn check(&mut self, ok: bool, what: String) {
         self.say(format!("  {} {what}", if ok { "ok  " } else { "FAIL" }));
         if !ok {
-            self.autotest.as_mut().expect("running the autotest").failures += 1;
+            self.autotest
+                .as_mut()
+                .expect("running the autotest")
+                .failures += 1;
         }
     }
 
@@ -569,9 +600,14 @@ impl App {
             if let Some((step, since)) = auto.waiting.clone() {
                 let done = match step {
                     Step::Wait(d) => since.elapsed() >= d,
-                    Step::WaitFinished => self.animator.as_ref().is_none_or(|a| a.finished()) || since.elapsed() > Duration::from_secs(60),
+                    Step::WaitFinished => {
+                        self.animator.as_ref().is_none_or(|a| a.finished())
+                            || since.elapsed() > Duration::from_secs(60)
+                    }
                     Step::WaitPaused => {
-                        self.animator.as_ref().is_none_or(|a| a.mode() == Mode::Paused || a.finished())
+                        self.animator
+                            .as_ref()
+                            .is_none_or(|a| a.mode() == Mode::Paused || a.finished())
                             || since.elapsed() > Duration::from_secs(10)
                     }
                     Step::CheckStopsWithin(limit) => {
@@ -579,7 +615,13 @@ impl App {
                         match (exited, self.stop_at) {
                             (Some(exited), Some(stop)) => {
                                 let took = exited.saturating_duration_since(stop);
-                                self.check(took <= limit, format!("the interpreter stopped {:.3} ms after Stop", took.as_secs_f64() * 1e3));
+                                self.check(
+                                    took <= limit,
+                                    format!(
+                                        "the interpreter stopped {:.3} ms after Stop",
+                                        took.as_secs_f64() * 1e3
+                                    ),
+                                );
                                 true
                             }
                             _ if since.elapsed() > Duration::from_secs(2) => {
@@ -597,47 +639,80 @@ impl App {
                 self.autotest.as_mut().unwrap().waiting = None;
                 continue;
             }
-            let Some(step) = auto.steps.get(auto.next).cloned() else { return took };
+            let Some(step) = auto.steps.get(auto.next).cloned() else {
+                return took;
+            };
             auto.next += 1;
             took = true;
             match step.clone() {
                 Step::Say(text) => self.say(format!("\n{text}")),
                 Step::Run(program, speed) => {
                     self.set_speed(speed, window, cx);
-                    self.editor.update(cx, |state, cx| state.set_value(program.to_string(), window, cx));
+                    self.editor.update(cx, |state, cx| {
+                        state.set_value(program.to_string(), window, cx)
+                    });
                     self.start(DEFAULT_CHANNEL, cx);
                 }
-                Step::Wait(_) | Step::WaitFinished | Step::WaitPaused | Step::CheckStopsWithin(_) => {
+                Step::Wait(_)
+                | Step::WaitFinished
+                | Step::WaitPaused
+                | Step::CheckStopsWithin(_) => {
                     self.autotest.as_mut().unwrap().waiting = Some((step, Instant::now()));
                 }
                 Step::SetSpeed(speed) => self.set_speed(speed, window, cx),
                 Step::Pause => self.animator.as_mut().map_or((), |a| a.pause()),
                 Step::Resume => self.animator.as_mut().map_or((), |a| a.resume()),
                 Step::StepLine => self.animator.as_mut().map_or((), |a| a.step_line()),
-                Step::StepInstruction => self.animator.as_mut().map_or((), |a| a.step_instruction()),
+                Step::StepInstruction => {
+                    self.animator.as_mut().map_or((), |a| a.step_instruction())
+                }
                 Step::Stop => self.stop(cx),
                 Step::Screenshot(name) => self.screenshot(name),
                 Step::Track => self.autotest.as_mut().unwrap().track = Some(Vec::new()),
                 Step::CheckSpeeds(at, before, after) => {
-                    let track = self.autotest.as_mut().unwrap().track.take().unwrap_or_default();
+                    let track = self
+                        .autotest
+                        .as_mut()
+                        .unwrap()
+                        .track
+                        .take()
+                        .unwrap_or_default();
                     self.check_speeds(&track, at, before, after);
                 }
                 Step::Trace => self.autotest.as_mut().unwrap().trace = Some(Vec::new()),
                 Step::CheckTrace(expected) => {
-                    let trace = self.autotest.as_mut().unwrap().trace.take().unwrap_or_default();
-                    self.check(trace == expected, format!("the highlight went through {trace:?}"));
+                    let trace = self
+                        .autotest
+                        .as_mut()
+                        .unwrap()
+                        .trace
+                        .take()
+                        .unwrap_or_default();
+                    self.check(
+                        trace == expected,
+                        format!("the highlight went through {trace:?}"),
+                    );
                 }
                 Step::CheckHighlight(expected) => {
                     let text = self.highlighted();
                     self.check(text == expected, format!("the highlight is on {text:?}"));
                 }
                 Step::CheckMoving => {
-                    let moving = self.animator.as_ref().is_some_and(|a| a.partial(1.0).is_some());
+                    let moving = self
+                        .animator
+                        .as_ref()
+                        .is_some_and(|a| a.partial(1.0).is_some());
                     self.check(moving, "the turtle is part-way through the move".into());
                 }
                 Step::CheckNothingAhead => {
-                    let (ahead, text) = (self.animator.as_ref().map_or(0, |a| a.lines_ahead()), self.highlighted());
-                    self.check(ahead == 0, format!("paused at {text:?} with {ahead} lines run ahead"));
+                    let (ahead, text) = (
+                        self.animator.as_ref().map_or(0, |a| a.lines_ahead()),
+                        self.highlighted(),
+                    );
+                    self.check(
+                        ahead == 0,
+                        format!("paused at {text:?} with {ahead} lines run ahead"),
+                    );
                 }
                 Step::CheckFinishedWithin(limit) => {
                     let took = match (&self.run, self.finished_at) {
@@ -645,8 +720,14 @@ impl App {
                         _ => None,
                     };
                     let ok = took.is_some_and(|t| t <= limit);
-                    let what = took.map_or("didn't finish".into(), |t| format!("finished in {:.2} s", t.as_secs_f64()));
-                    let detail = format!("{what}, {} lines drawn, {} events", self.canvas.borrow().drawing.segments(), self.events);
+                    let what = took.map_or("didn't finish".into(), |t| {
+                        format!("finished in {:.2} s", t.as_secs_f64())
+                    });
+                    let detail = format!(
+                        "{what}, {} lines drawn, {} events",
+                        self.canvas.borrow().drawing.segments(),
+                        self.events
+                    );
                     self.check(ok, detail);
                 }
                 Step::CheckFramesAtMost(limit) => {
@@ -673,7 +754,8 @@ impl App {
                     let text = self.editor.read(cx).value().to_string();
                     let offset = text.find(marker).map_or(0, |i| i + 1);
                     let at = crate::app::position(&text, offset);
-                    self.editor.update(cx, |state, cx| state.set_cursor_position(at, window, cx));
+                    self.editor
+                        .update(cx, |state, cx| state.set_cursor_position(at, window, cx));
                     if matches!(step, Step::F1At(_)) {
                         self.show_help(window, cx);
                     }
@@ -681,10 +763,16 @@ impl App {
                 Step::CheckHelpPage(expected) => {
                     let page = self.help_panel.read(cx).page;
                     let title = match page {
-                        crate::help_panel::Page::Command(i) => pendown_logo::reference::reference().commands[i].title.clone(),
+                        crate::help_panel::Page::Command(i) => pendown_logo::reference::reference()
+                            .commands[i]
+                            .title
+                            .clone(),
                         crate::help_panel::Page::Contents => "Contents".to_string(),
                     };
-                    self.check(self.help_open && title == expected, format!("the help panel shows {title}"));
+                    self.check(
+                        self.help_open && title == expected,
+                        format!("the help panel shows {title}"),
+                    );
                 }
                 Step::SearchHelp(query) => {
                     let search = self.help_panel.read(cx).search.clone();
@@ -694,17 +782,29 @@ impl App {
                 Step::CheckFirstResult(expected) => {
                     let query = self.help_panel.read(cx).query(cx);
                     let r = pendown_logo::reference::reference();
-                    let first = r.search(&query, false).first().map(|&i| r.commands[i].title.clone()).unwrap_or_default();
-                    self.check(first == expected, format!("the first result for {query:?} is {first}"));
+                    let first = r
+                        .search(&query, false)
+                        .first()
+                        .map(|&i| r.commands[i].title.clone())
+                        .unwrap_or_default();
+                    self.check(
+                        first == expected,
+                        format!("the first result for {query:?} is {first}"),
+                    );
                 }
                 Step::OpenHelp(name) => {
-                    self.help_panel.update(cx, |p, cx| p.open_name(name, window, cx));
+                    self.help_panel
+                        .update(cx, |p, cx| p.open_name(name, window, cx));
                 }
                 Step::HelpContents => {
-                    self.help_panel.update(cx, |p, cx| p.go(crate::help_panel::Page::Contents, window, cx));
+                    self.help_panel.update(cx, |p, cx| {
+                        p.go(crate::help_panel::Page::Contents, window, cx)
+                    });
                 }
                 Step::RunExample(name, n) => {
-                    let i = pendown_logo::reference::reference().find_index(name).expect("a help page");
+                    let i = pendown_logo::reference::reference()
+                        .find_index(name)
+                        .expect("a help page");
                     self.run_example(i, n, cx);
                 }
                 Step::CheckExampleHighlight(expected) => {
@@ -712,8 +812,13 @@ impl App {
                     let text = running
                         .as_ref()
                         .and_then(|r| r.highlight.clone())
-                        .map_or(String::new(), |range| self.run_text.get(range).unwrap_or_default().to_string());
-                    self.check(text == expected, format!("the example's highlight is on {text:?}"));
+                        .map_or(String::new(), |range| {
+                            self.run_text.get(range).unwrap_or_default().to_string()
+                        });
+                    self.check(
+                        text == expected,
+                        format!("the example's highlight is on {text:?}"),
+                    );
                 }
                 Step::BackToMyDrawing => self.back_to_my_drawing(cx),
                 Step::CopyExample(name, n) => {
@@ -724,12 +829,20 @@ impl App {
                 Step::CheckEditorEnds(expected) => {
                     let text = self.editor.read(cx).value().to_string();
                     let tail = &text[text.len().saturating_sub(expected.len() + 20)..];
-                    self.check(text.ends_with(expected), format!("the editor ends with {tail:?}"));
+                    self.check(
+                        text.ends_with(expected),
+                        format!("the editor ends with {tail:?}"),
+                    );
                 }
                 Step::CheckErrorHelp(expected) => {
                     let r = pendown_logo::reference::reference();
-                    let title = self.error_help.map_or(String::new(), |i| r.commands[i].title.clone());
-                    self.check(title == expected, format!("the console offers help on {title:?}"));
+                    let title = self
+                        .error_help
+                        .map_or(String::new(), |i| r.commands[i].title.clone());
+                    self.check(
+                        title == expected,
+                        format!("the console offers help on {title:?}"),
+                    );
                     if let Some(i) = self.error_help {
                         self.open_help(i, window, cx);
                     }
@@ -744,8 +857,12 @@ impl App {
                         cx.notify();
                     });
                 }
-                Step::LoadLesson(lesson, program) => self.proceed(crate::files::After::Load { lesson, program }, window, cx),
-                Step::RunLesson(lesson, program) => self.run_source(crate::help_panel::Source::Lesson { lesson, program }, cx),
+                Step::LoadLesson(lesson, program) => {
+                    self.proceed(crate::files::After::Load { lesson, program }, window, cx)
+                }
+                Step::RunLesson(lesson, program) => {
+                    self.run_source(crate::help_panel::Source::Lesson { lesson, program }, cx)
+                }
                 Step::CloseHelp => {
                     if self.help_open {
                         self.toggle_help(cx);
@@ -754,7 +871,9 @@ impl App {
                 Step::Type(text) => {
                     // Like typing: an edit the user could undo, which sends
                     // a change event. `set_value` sends none.
-                    self.editor.update(cx, |state, cx| state.replace_all(text.to_string(), window, cx));
+                    self.editor.update(cx, |state, cx| {
+                        state.replace_all(text.to_string(), window, cx)
+                    });
                 }
                 Step::CheckTitle(expected) => {
                     self.update_title(window, cx);
@@ -763,7 +882,11 @@ impl App {
                 }
                 Step::CheckDiagnostics(expected) => {
                     let found: Vec<String> = self.editor.update(cx, |state, _| {
-                        state.diagnostics_mut().map_or(Vec::new(), |set| set.iter().map(|d| d.diagnostic.message.to_string()).collect())
+                        state.diagnostics_mut().map_or(Vec::new(), |set| {
+                            set.iter()
+                                .map(|d| d.diagnostic.message.to_string())
+                                .collect()
+                        })
                     });
                     self.check(found == expected, format!("the editor shows {found:?}"));
                 }
@@ -779,7 +902,9 @@ impl App {
                     };
                     let image = image::open(&path).map(|i| i.to_rgba8());
                     let found = image.as_ref().map(|i| i.dimensions());
-                    let drawn = image.as_ref().map_or(0, |i| i.pixels().filter(|p| p.0 != [0, 0, 0, 255]).count());
+                    let drawn = image
+                        .as_ref()
+                        .map_or(0, |i| i.pixels().filter(|p| p.0 != [0, 0, 0, 255]).count());
                     let ok = found.as_ref().is_ok_and(|s| *s == size) && drawn > 0;
                     self.check(ok, format!("exported a {found:?} PNG with {drawn} drawn pixels, the canvas is {size:?}"));
                 }
@@ -787,18 +912,38 @@ impl App {
                     let path = self.autotest.as_ref().unwrap().dir.join(name);
                     let svg = std::fs::read_to_string(&path).unwrap_or_default();
                     // The background, then a line for each mark.
-                    let marks = svg.lines().filter(|l| l.starts_with('<') && !l.starts_with("</") && !l.starts_with("<svg") && !l.starts_with("<g")).count() - 1;
+                    let marks = svg
+                        .lines()
+                        .filter(|l| {
+                            l.starts_with('<')
+                                && !l.starts_with("</")
+                                && !l.starts_with("<svg")
+                                && !l.starts_with("<g")
+                        })
+                        .count()
+                        - 1;
                     let drawn = self.canvas.borrow().drawing.segments();
-                    self.check(svg.starts_with("<svg ") && marks == drawn, format!("exported an SVG with {marks} marks, and {drawn} were drawn"));
+                    self.check(
+                        svg.starts_with("<svg ") && marks == drawn,
+                        format!("exported an SVG with {marks} marks, and {drawn} were drawn"),
+                    );
                 }
                 Step::CheckDrawn(expected) => {
                     let drawn = self.canvas.borrow().drawing.segments();
                     self.check(drawn == expected, format!("{drawn} lines and shapes drawn"));
                 }
                 Step::CheckTurtle(x, y, heading) => {
-                    let (fx, fy, found) = self.animator.as_ref().map_or((0.0, 0.0, 0.0), |a| (a.pos.x, a.pos.y, a.heading));
-                    let ok = (fx - x).abs() < 0.01 && (fy - y).abs() < 0.01 && (found - heading).abs() < 0.01;
-                    self.check(ok, format!("the turtle is at {fx:.1}, {fy:.1}, heading {found:.1}"));
+                    let (fx, fy, found) = self
+                        .animator
+                        .as_ref()
+                        .map_or((0.0, 0.0, 0.0), |a| (a.pos.x, a.pos.y, a.heading));
+                    let ok = (fx - x).abs() < 0.01
+                        && (fy - y).abs() < 0.01
+                        && (found - heading).abs() < 0.01;
+                    self.check(
+                        ok,
+                        format!("the turtle is at {fx:.1}, {fy:.1}, heading {found:.1}"),
+                    );
                 }
                 Step::CheckConsole(expected) => {
                     let found = self.console.iter().any(|l| l.as_ref() == expected);
@@ -806,12 +951,17 @@ impl App {
                 }
                 Step::MeasureRenders => {
                     pendown_logo::metrics::set_enabled(true);
-                    let start = (self.snapshot(), self.autotest.as_ref().unwrap().highlights, self.console.len());
+                    let start = (
+                        self.snapshot(),
+                        self.autotest.as_ref().unwrap().highlights,
+                        self.console.len(),
+                    );
                     self.autotest.as_mut().unwrap().measuring = Some(start);
                 }
                 Step::CheckRenders(per_second) => {
                     let auto = self.autotest.as_mut().unwrap();
-                    let (start, highlights, lines) = auto.measuring.take().expect("MeasureRenders came first");
+                    let (start, highlights, lines) =
+                        auto.measuring.take().expect("MeasureRenders came first");
                     let highlights = auto.highlights - highlights;
                     let printed = self.console.len().saturating_sub(lines) as u64;
                     let i = self.snapshot().since(&start);
@@ -820,7 +970,10 @@ impl App {
                     // end the measurement.
                     self.check(
                         rate <= per_second && i.renders <= i.frames + 2,
-                        format!("{} renders at {rate:.0}/s, for {} animation frames", i.renders, i.frames),
+                        format!(
+                            "{} renders at {rate:.0}/s, for {} animation frames",
+                            i.renders, i.frames
+                        ),
                     );
                     self.check(
                         i.editor_renders <= highlights + 2 && i.console_renders <= printed + 2,
@@ -836,31 +989,50 @@ impl App {
                 }
                 Step::CheckPanelsDrawn => {
                     let watch = self.watched.read(cx).watch.clone();
-                    let same = |drawn: &Option<std::sync::Arc<pendown_logo::Watch>>| match (drawn, &watch) {
-                        (Some(a), Some(b)) => std::sync::Arc::ptr_eq(a, b),
-                        (None, None) => true,
-                        _ => false,
-                    };
+                    let same =
+                        |drawn: &Option<std::sync::Arc<pendown_logo::Watch>>| match (drawn, &watch)
+                        {
+                            (Some(a), Some(b)) => std::sync::Arc::ptr_eq(a, b),
+                            (None, None) => true,
+                            _ => false,
+                        };
                     let counters = same(&self.counters_pane.read(cx).drawn);
                     let variables = same(&self.variables_pane.read(cx).drawn);
-                    self.check(counters && variables, format!("the counters drew the latest: {counters}, the variables: {variables}"));
+                    self.check(
+                        counters && variables,
+                        format!(
+                            "the counters drew the latest: {counters}, the variables: {variables}"
+                        ),
+                    );
                 }
                 Step::CheckColours(expected) => {
                     let watch = self.watched.read(cx).watch.clone();
                     let shown = watch.map_or(String::new(), |w| {
-                        w.colours.iter().map(|c| format!("{}={}", c.name, c.value)).collect::<Vec<_>>().join(" ")
+                        w.colours
+                            .iter()
+                            .map(|c| format!("{}={}", c.name, c.value))
+                            .collect::<Vec<_>>()
+                            .join(" ")
                     });
                     self.check(shown == expected, format!("the colours are {shown:?}"));
                 }
                 Step::CheckPanelsStart(expected) => {
                     let shown = self.panels(cx);
-                    self.check(shown.starts_with(expected), format!("the panels show {shown:?}"));
+                    self.check(
+                        shown.starts_with(expected),
+                        format!("the panels show {shown:?}"),
+                    );
                 }
                 Step::ToggleMetrics => self.toggle_metrics(window, cx),
                 Step::CheckOverlay(shown) => {
                     let lines = self.overlay.as_ref().map(|o| o.lines.clone());
                     let ok = match &lines {
-                        Some(lines) => shown && lines.first().is_some_and(|l| l.contains(" renders/s, UI CPU ")),
+                        Some(lines) => {
+                            shown
+                                && lines
+                                    .first()
+                                    .is_some_and(|l| l.contains(" renders/s, UI CPU "))
+                        }
                         None => !shown,
                     };
                     self.check(ok, format!("the overlay shows {lines:?}"));
@@ -872,7 +1044,10 @@ impl App {
                     let _ = writeln!(log, "\n{failures} checks failed");
                     let path = auto.dir.join("autotest.log");
                     std::fs::write(&path, log).ok();
-                    println!("\n{failures} checks failed; the log is in {}", path.display());
+                    println!(
+                        "\n{failures} checks failed; the log is in {}",
+                        path.display()
+                    );
                     std::process::exit(if failures == 0 { 0 } else { 1 });
                 }
             }
@@ -882,18 +1057,28 @@ impl App {
     /// What the counters and variables panels show, in short: each counter,
     /// with `*` on the one `REPCOUNT` outputs, the globals, then each scope.
     fn panels(&self, cx: &gpui_kit::App) -> String {
-        let Some(watch) = self.watched.read(cx).watch.clone() else { return String::new() };
+        let Some(watch) = self.watched.read(cx).watch.clone() else {
+            return String::new();
+        };
         let mut parts: Vec<String> = watch
             .counters
             .iter()
             .map(|c| {
                 let of = c.of.map_or(String::new(), |of| format!(" of {of}"));
-                format!("{} {}{of}{}", c.name, c.count, if c.repcount { "*" } else { "" })
+                format!(
+                    "{} {}{of}{}",
+                    c.name,
+                    c.count,
+                    if c.repcount { "*" } else { "" }
+                )
             })
             .collect();
         for scope in &watch.scopes {
-            let vars: Vec<String> =
-                scope.variables.iter().map(|v| format!("{}={}", v.name, v.value.as_deref().unwrap_or("-"))).collect();
+            let vars: Vec<String> = scope
+                .variables
+                .iter()
+                .map(|v| format!("{}={}", v.name, v.value.as_deref().unwrap_or("-")))
+                .collect();
             if !scope.name.is_empty() {
                 parts.push(format!("{}: {}", scope.name, vars.join(" ")));
             } else if !vars.is_empty() {
@@ -911,7 +1096,10 @@ impl App {
         // Average speeds over 0.4 s either side of the change, leaving out
         // the frames around it.
         let speed = |from: Duration, to: Duration| {
-            let window: Vec<_> = track.iter().filter(|(t, _)| (from..to).contains(&(*t - start))).collect();
+            let window: Vec<_> = track
+                .iter()
+                .filter(|(t, _)| (from..to).contains(&(*t - start)))
+                .collect();
             match (window.first(), window.last()) {
                 (Some(a), Some(b)) if b.0 > a.0 => (b.1 - a.1) / (b.0 - a.0).as_secs_f64(),
                 _ => 0.0,
@@ -923,7 +1111,9 @@ impl App {
         let close = |measured: f64, expected: f64| (measured - expected).abs() <= expected * 0.1;
         self.check(
             close(measured_before, before) && close(measured_after, after),
-            format!("the turtle moved at {measured_before:.0} steps/s, then {measured_after:.0} steps/s"),
+            format!(
+                "the turtle moved at {measured_before:.0} steps/s, then {measured_after:.0} steps/s"
+            ),
         );
     }
 
@@ -934,9 +1124,20 @@ impl App {
         let title = self.title.replace('\'', "");
         let status = std::process::Command::new("sh")
             .arg("-c")
-            .arg(format!("xwd -silent -name '{title}' | convert xwd:- '{}'", path.display()))
+            .arg(format!(
+                "xwd -silent -name '{title}' | convert xwd:- '{}'",
+                path.display()
+            ))
             .status();
         let ok = status.is_ok_and(|s| s.success());
-        self.say(format!("  screenshot {}{}", path.display(), if ok { "" } else { " (failed: needs xwd and ImageMagick)" }));
+        self.say(format!(
+            "  screenshot {}{}",
+            path.display(),
+            if ok {
+                ""
+            } else {
+                " (failed: needs xwd and ImageMagick)"
+            }
+        ));
     }
 }

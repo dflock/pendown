@@ -4,7 +4,9 @@
 
 use std::ops::Range;
 
-use gpui_kit::component::input::{EditorState, FoldRange, HighlightStyleResolver, InputEdit, InputHighlighter, Rope};
+use gpui_kit::component::input::{
+    EditorState, FoldRange, HighlightStyleResolver, InputEdit, InputHighlighter, Rope,
+};
 use gpui_kit::*;
 use pendown_logo::syntax::{Kind, highlight};
 
@@ -28,11 +30,18 @@ fn style_name(kind: Kind) -> Option<&'static str> {
 
 /// Each token in `text` with a colour, and its theme name.
 fn runs(text: &str) -> Vec<(Range<usize>, &'static str)> {
-    highlight(text).into_iter().filter_map(|(r, k)| Some((r, style_name(k)?))).collect()
+    highlight(text)
+        .into_iter()
+        .filter_map(|(r, k)| Some((r, style_name(k)?)))
+        .collect()
 }
 
 /// The styles of all of `range`, from `runs`: between tokens, the default.
-fn styles(runs: &[(Range<usize>, &str)], range: &Range<usize>, resolver: &dyn HighlightStyleResolver) -> Vec<(Range<usize>, HighlightStyle)> {
+fn styles(
+    runs: &[(Range<usize>, &str)],
+    range: &Range<usize>,
+    resolver: &dyn HighlightStyleResolver,
+) -> Vec<(Range<usize>, HighlightStyle)> {
     let mut out = Vec::new();
     let mut at = range.start;
     let first = runs.partition_point(|(r, _)| r.end <= range.start);
@@ -61,14 +70,20 @@ pub fn program_styles(
     running: Option<(Range<usize>, HighlightStyle)>,
 ) -> Vec<(Range<usize>, HighlightStyle)> {
     let coloured = styles(&runs(code), &(0..code.len()), resolver);
-    let Some((run, over)) = running.filter(|(r, _)| r.end <= code.len()) else { return coloured };
+    let Some((run, over)) = running.filter(|(r, _)| r.end <= code.len()) else {
+        return coloured;
+    };
     // gpui wants runs that don't overlap, so a token the instruction starts
     // or ends in is split there.
     let mut out = Vec::new();
     for (r, style) in coloured {
         let start = r.start.max(run.start).min(r.end);
         let end = r.end.min(run.end).max(start);
-        for (piece, style) in [(r.start..start, style), (start..end, style.highlight(over)), (end..r.end, style)] {
+        for (piece, style) in [
+            (r.start..start, style),
+            (start..end, style.highlight(over)),
+            (end..r.end, style),
+        ] {
             if !piece.is_empty() {
                 out.push((piece, style));
             }
@@ -89,11 +104,22 @@ impl InputHighlighter for LogoHighlighter {
         "logo".into()
     }
 
-    fn update(&mut self, _: Option<InputEdit>, text: &Rope, _: bool, _: &mut Window, _: &mut Context<EditorState>) {
+    fn update(
+        &mut self,
+        _: Option<InputEdit>,
+        text: &Rope,
+        _: bool,
+        _: &mut Window,
+        _: &mut Context<EditorState>,
+    ) {
         self.runs = runs(&text.to_string());
     }
 
-    fn styles(&self, range: &Range<usize>, resolver: &dyn HighlightStyleResolver) -> Vec<(Range<usize>, HighlightStyle)> {
+    fn styles(
+        &self,
+        range: &Range<usize>,
+        resolver: &dyn HighlightStyleResolver,
+    ) -> Vec<(Range<usize>, HighlightStyle)> {
         styles(&self.runs, range, resolver)
     }
 
@@ -116,7 +142,15 @@ mod tests {
 
     impl HighlightStyleResolver for ByName {
         fn style(&self, name: &str) -> Option<HighlightStyle> {
-            Some(HighlightStyle { color: Some(Hsla { h: name.len() as f32 / 100., s: 1., l: 0.5, a: 1. }), ..Default::default() })
+            Some(HighlightStyle {
+                color: Some(Hsla {
+                    h: name.len() as f32 / 100.,
+                    s: 1.,
+                    l: 0.5,
+                    a: 1.,
+                }),
+                ..Default::default()
+            })
         }
     }
 
@@ -136,20 +170,35 @@ mod tests {
 
     #[test]
     fn the_running_instruction_is_split_out_and_keeps_its_colours() {
-        let bold = HighlightStyle { font_weight: Some(FontWeight::BOLD), ..Default::default() };
+        let bold = HighlightStyle {
+            font_weight: Some(FontWeight::BOLD),
+            ..Default::default()
+        };
         // `RT 90` running, in `REPEAT 4 [FD 10 RT 90]`, and part of a token.
-        for (run, expected) in [(16..21, vec![16..18, 18..19, 19..21]), (1..3, vec![Range { start: 1, end: 3 }])] {
-            let styles = program_styles("REPEAT 4 [FD 10 RT 90]", &ByName, Some((run.clone(), bold)));
+        for (run, expected) in [
+            (16..21, vec![16..18, 18..19, 19..21]),
+            (1..3, vec![Range { start: 1, end: 3 }]),
+        ] {
+            let styles =
+                program_styles("REPEAT 4 [FD 10 RT 90]", &ByName, Some((run.clone(), bold)));
             let mut at = 0;
             for (r, _) in &styles {
                 assert_eq!(r.start, at, "runs cover the program in order: {styles:?}");
                 at = r.end;
             }
             assert_eq!(at, 22);
-            let bolded: Vec<_> = styles.iter().filter(|(_, s)| s.font_weight.is_some()).map(|(r, _)| r.clone()).collect();
+            let bolded: Vec<_> = styles
+                .iter()
+                .filter(|(_, s)| s.font_weight.is_some())
+                .map(|(r, _)| r.clone())
+                .collect();
             assert_eq!(bolded, expected);
             // A token keeps its colour where the instruction starts.
-            assert!(styles.iter().any(|(r, s)| r.start == run.start && s.color.is_some()));
+            assert!(
+                styles
+                    .iter()
+                    .any(|(r, s)| r.start == run.start && s.color.is_some())
+            );
         }
     }
 }

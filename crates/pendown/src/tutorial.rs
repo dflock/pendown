@@ -29,7 +29,13 @@ pub struct Lesson {
 impl Lesson {
     /// The programs in it, in order.
     pub fn programs(&self) -> impl Iterator<Item = &str> {
-        self.blocks.iter().filter_map(|b| if let Block::Code { code, .. } = b { Some(code.as_str()) } else { None })
+        self.blocks.iter().filter_map(|b| {
+            if let Block::Code { code, .. } = b {
+                Some(code.as_str())
+            } else {
+                None
+            }
+        })
     }
 }
 

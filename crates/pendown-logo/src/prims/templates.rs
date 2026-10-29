@@ -23,9 +23,16 @@ use crate::{
 type Out = Result<Option<Value>, Flow>;
 
 enum Template {
-    Named { target: Target, name: Rc<str>, arity: Arity },
+    Named {
+        target: Target,
+        name: Rc<str>,
+        arity: Arity,
+    },
     Slots(Rc<Block>),
-    Lambda { inputs: Vec<Sym>, body: Rc<Block> },
+    Lambda {
+        inputs: Vec<Sym>,
+        body: Rc<Block>,
+    },
     Text(Rc<Proc>),
 }
 
@@ -40,7 +47,12 @@ impl Data {
     fn rest(&self, after: usize) -> Value {
         let rest = &self.members[after + 1..];
         if self.word {
-            Value::Word(rest.iter().map(Value::print_form).collect::<String>().into())
+            Value::Word(
+                rest.iter()
+                    .map(Value::print_form)
+                    .collect::<String>()
+                    .into(),
+            )
         } else {
             Value::List(Rc::new(List::new(rest.to_vec())))
         }
@@ -48,7 +60,10 @@ impl Data {
 }
 
 fn data(a: &Args, i: usize) -> Result<Data, Flow> {
-    Ok(Data { members: members(a, i)?, word: !matches!(a.vals[i], Value::List(_)) })
+    Ok(Data {
+        members: members(a, i)?,
+        word: !matches!(a.vals[i], Value::List(_)),
+    })
 }
 
 fn prepare(it: &mut Interpreter, a: &Args, i: usize) -> Result<Template, Flow> {
@@ -64,7 +79,12 @@ fn prepare(it: &mut Interpreter, a: &Args, i: usize) -> Result<Template, Flow> {
                 }
                 let rest = &list.items[1..];
                 if !rest.is_empty() && rest.iter().all(|v| matches!(v, Value::List(_))) {
-                    Ok(Template::Text(it.make_proc("template", inputs, rest, a.call.span)?))
+                    Ok(Template::Text(it.make_proc(
+                        "template",
+                        inputs,
+                        rest,
+                        a.call.span,
+                    )?))
                 } else {
                     let body = it.parse_block(&rest_of(list, 1), a.call.span)?;
                     Ok(Template::Lambda { inputs, body })
@@ -76,14 +96,24 @@ fn prepare(it: &mut Interpreter, a: &Args, i: usize) -> Result<Template, Flow> {
         _ => {
             let name = a.word(i)?;
             match it.procedure_named(&name) {
-                Some((target, arity)) => Ok(Template::Named { target, name, arity }),
+                Some((target, arity)) => Ok(Template::Named {
+                    target,
+                    name,
+                    arity,
+                }),
                 None => Err(a.error(format!("I don't know how to {}", name.to_uppercase()))),
             }
         }
     }
 }
 
-fn check_inputs(a: &Args, n: usize, min: usize, max: Option<usize>, name: &str) -> Result<(), Flow> {
+fn check_inputs(
+    a: &Args,
+    n: usize,
+    min: usize,
+    max: Option<usize>,
+    name: &str,
+) -> Result<(), Flow> {
     if n < min {
         return Err(a.error(format!("Not enough inputs to {}", name.to_uppercase())));
     }
@@ -95,25 +125,54 @@ fn check_inputs(a: &Args, n: usize, min: usize, max: Option<usize>, name: &str) 
 
 /// Runs a template with `values` in its slots. `data` and `index` are for
 /// `?REST`: the data inputs, and which member is in the slots.
-fn apply(it: &mut Interpreter, t: &Template, values: Vec<Value>, data: &Rc<Vec<Data>>, index: usize, a: &Args) -> Out {
+fn apply(
+    it: &mut Interpreter,
+    t: &Template,
+    values: Vec<Value>,
+    data: &Rc<Vec<Data>>,
+    index: usize,
+    a: &Args,
+) -> Out {
     match t {
-        Template::Named { target, name, arity } => {
+        Template::Named {
+            target,
+            name,
+            arity,
+        } => {
             check_inputs(a, values.len(), arity.min, arity.max, name)?;
             it.call_with(*target, name.clone(), values, a.call.span)
         }
         Template::Slots(block) => {
-            it.slots.push(Slots { values, data: data.clone(), index });
+            it.slots.push(Slots {
+                values,
+                data: data.clone(),
+                index,
+            });
             let result = it.run_block_maybe(block);
             it.slots.pop();
             result
         }
         Template::Lambda { inputs, body } => {
-            check_inputs(a, values.len(), inputs.len(), Some(inputs.len()), "the template")?;
+            check_inputs(
+                a,
+                values.len(),
+                inputs.len(),
+                Some(inputs.len()),
+                "the template",
+            )?;
             let body = body.clone();
-            it.with_locals(inputs, values, &a.call.name, a.call.span, |it| it.run_block_maybe(&body))
+            it.with_locals(inputs, values, &a.call.name, a.call.span, |it| {
+                it.run_block_maybe(&body)
+            })
         }
         Template::Text(proc) => {
-            check_inputs(a, values.len(), proc.inputs.len(), Some(proc.inputs.len()), "the template")?;
+            check_inputs(
+                a,
+                values.len(),
+                proc.inputs.len(),
+                Some(proc.inputs.len()),
+                "the template",
+            )?;
             it.call_proc(proc.clone(), values, a.call.span)
         }
     }
@@ -132,7 +191,10 @@ fn for_each_member(
     let data: Vec<Data> = data_inputs.map(|i| data(a, i)).collect::<Result<_, _>>()?;
     let len = data[0].members.len();
     if data.iter().any(|d| d.members.len() != len) {
-        return Err(a.error(format!("{}'s data inputs must be the same length", a.call.name.to_uppercase())));
+        return Err(a.error(format!(
+            "{}'s data inputs must be the same length",
+            a.call.name.to_uppercase()
+        )));
     }
     let data = Rc::new(data);
     it.counting(&a.call.name, Some(len as i64), true, |it| {
@@ -152,13 +214,25 @@ fn for_each_member(
 
 /// What a template output, which it must have.
 fn output_of(a: &Args, v: Option<Value>, template: usize) -> Result<Value, Flow> {
-    v.ok_or_else(|| a.error(format!("{} didn't output to {}", a.vals[template].show(), a.call.name.to_uppercase())))
+    v.ok_or_else(|| {
+        a.error(format!(
+            "{} didn't output to {}",
+            a.vals[template].show(),
+            a.call.name.to_uppercase()
+        ))
+    })
 }
 
 /// `TRUE` or `FALSE` from a template, for `FILTER` and `FIND`.
 fn truth(a: &Args, v: Option<Value>) -> Result<bool, Flow> {
     let v = output_of(a, v, 0)?;
-    v.as_bool().ok_or_else(|| a.error(format!("{} doesn't like {} from the template", a.call.name.to_uppercase(), v.show())))
+    v.as_bool().ok_or_else(|| {
+        a.error(format!(
+            "{} doesn't like {} from the template",
+            a.call.name.to_uppercase(),
+            v.show()
+        ))
+    })
 }
 
 fn no_data() -> Rc<Vec<Data>> {
@@ -168,7 +242,9 @@ fn no_data() -> Rc<Vec<Data>> {
 /// `APPLY template inputlist`.
 pub(super) fn apply_(it: &mut Interpreter, a: &Args) -> Out {
     let t = prepare(it, a, 0)?;
-    let Value::List(inputs) = &a.vals[1] else { return Err(a.doesnt_like(1)) };
+    let Value::List(inputs) = &a.vals[1] else {
+        return Err(a.doesnt_like(1));
+    };
     apply(it, &t, inputs.items.clone(), &no_data(), 0, a)
 }
 
@@ -201,7 +277,9 @@ pub(super) fn map(it: &mut Interpreter, a: &Args) -> Out {
     let mut word = String::new();
     for v in &out {
         match v {
-            Value::List(_) | Value::Array(_) => return Err(a.error(format!("MAP can't put {} in a word", v.show()))),
+            Value::List(_) | Value::Array(_) => {
+                return Err(a.error(format!("MAP can't put {} in a word", v.show())));
+            }
             v => word.push_str(&v.print_form()),
         }
     }
@@ -234,7 +312,12 @@ pub(super) fn filter(it: &mut Interpreter, a: &Args) -> Out {
     if matches!(a.vals[1], Value::List(_)) {
         return Ok(Some(Value::List(Rc::new(List::new(kept)))));
     }
-    Ok(Some(Value::Word(kept.iter().map(Value::print_form).collect::<String>().into())))
+    Ok(Some(Value::Word(
+        kept.iter()
+            .map(Value::print_form)
+            .collect::<String>()
+            .into(),
+    )))
 }
 
 /// `FIND tftemplate data`: the first member for which the template outputs
@@ -248,7 +331,9 @@ pub(super) fn find(it: &mut Interpreter, a: &Args) -> Out {
         }
         Ok(true)
     })?;
-    Ok(Some(found.unwrap_or_else(|| Value::List(Rc::new(List::new(Vec::new()))))))
+    Ok(Some(found.unwrap_or_else(|| {
+        Value::List(Rc::new(List::new(Vec::new())))
+    })))
 }
 
 /// `REDUCE template data`: from the right, so `REDUCE "DIFFERENCE [10 3 2]`
@@ -256,7 +341,9 @@ pub(super) fn find(it: &mut Interpreter, a: &Args) -> Out {
 pub(super) fn reduce(it: &mut Interpreter, a: &Args) -> Out {
     let t = prepare(it, a, 0)?;
     let m = members(a, 1)?;
-    let Some((last, rest)) = m.split_last() else { return Err(a.doesnt_like(1)) };
+    let Some((last, rest)) = m.split_last() else {
+        return Err(a.doesnt_like(1));
+    };
     let mut acc = last.clone();
     for v in rest.iter().rev() {
         let result = apply(it, &t, vec![v.clone(), acc], &no_data(), 0, a)?;
@@ -268,8 +355,14 @@ pub(super) fn reduce(it: &mut Interpreter, a: &Args) -> Out {
 /// `?`, `?2` or `(? 2)`: what's in a slot of the template running.
 pub(super) fn slot(it: &mut Interpreter, a: &Args) -> Out {
     let n = if a.vals.is_empty() { 1 } else { a.int(0)? };
-    let Some(slots) = it.slots.last() else { return Err(a.error("? can only be used inside a template".into())) };
-    match usize::try_from(n).ok().and_then(|n| n.checked_sub(1)).and_then(|i| slots.values.get(i)) {
+    let Some(slots) = it.slots.last() else {
+        return Err(a.error("? can only be used inside a template".into()));
+    };
+    match usize::try_from(n)
+        .ok()
+        .and_then(|n| n.checked_sub(1))
+        .and_then(|i| slots.values.get(i))
+    {
         Some(v) => Ok(Some(v.clone())),
         None => Err(a.error(format!("This template has no ?{n}"))),
     }
@@ -279,8 +372,14 @@ pub(super) fn slot(it: &mut Interpreter, a: &Args) -> Out {
 /// the slot.
 pub(super) fn slot_rest(it: &mut Interpreter, a: &Args) -> Out {
     let n = if a.vals.is_empty() { 1 } else { a.int(0)? };
-    let Some(slots) = it.slots.last() else { return Err(a.error("?REST can only be used inside a template".into())) };
-    match usize::try_from(n).ok().and_then(|n| n.checked_sub(1)).and_then(|i| slots.data.get(i)) {
+    let Some(slots) = it.slots.last() else {
+        return Err(a.error("?REST can only be used inside a template".into()));
+    };
+    match usize::try_from(n)
+        .ok()
+        .and_then(|n| n.checked_sub(1))
+        .and_then(|i| slots.data.get(i))
+    {
         Some(d) => Ok(Some(d.rest(slots.index))),
         None => Err(a.error(format!("This template has no ?REST {n}"))),
     }

@@ -11,7 +11,11 @@ fn forward_back_and_turns() {
     assert_eq!(r.turns(), [(0.0, 90.0), (90.0, -45.0)]);
     let moves = r.moves();
     assert_eq!(moves[0], ((0.0, 0.0), (0.0, 100.0), true));
-    assert_eq!(moves[1], ((0.0, 100.0), (50.0, 100.0), true), "exact at 90 degrees");
+    assert_eq!(
+        moves[1],
+        ((0.0, 100.0), (50.0, 100.0), true),
+        "exact at 90 degrees"
+    );
     let ((x, y), _, _) = moves[2];
     assert_eq!((x, y), (50.0, 100.0));
 }
@@ -19,9 +23,15 @@ fn forward_back_and_turns() {
 #[test]
 fn positions_are_exact_at_right_angles() {
     assert_eq!(output("REPEAT 4 [FD 100 RT 90] SHOW POS"), "[0 0]\n");
-    assert_eq!(output("RT 90 FD 100 SHOW POS PRINT XCOR PRINT YCOR"), "[100 0]\n100\n0\n");
+    assert_eq!(
+        output("RT 90 FD 100 SHOW POS PRINT XCOR PRINT YCOR"),
+        "[100 0]\n100\n0\n"
+    );
     // 120 degrees isn't exact, but POS hides the rounding.
-    assert_eq!(output("REPEAT 3 [FD 100 RT 120] SHOW POS PRINT HEADING"), "[0 0]\n0\n");
+    assert_eq!(
+        output("REPEAT 3 [FD 100 RT 120] SHOW POS PRINT HEADING"),
+        "[0 0]\n0\n"
+    );
 }
 
 #[test]
@@ -53,7 +63,10 @@ fn home_is_a_move_that_draws() {
     let r = run("FD 50 RT 30 HOME");
     assert_eq!(r.moves()[1], ((0.0, 50.0), (0.0, 0.0), true));
     assert_eq!(r.turns(), [(0.0, 30.0), (30.0, -30.0)]);
-    assert_eq!(output("FD 50 RT 30 HOME SHOW POS PRINT HEADING"), "[0 0]\n0\n");
+    assert_eq!(
+        output("FD 50 RT 30 HOME SHOW POS PRINT HEADING"),
+        "[0 0]\n0\n"
+    );
 }
 
 #[test]
@@ -84,12 +97,26 @@ fn clean_keeps_the_turtle_where_it_is() {
 fn clearscreen_goes_home_without_drawing() {
     let r = run("FD 50 RT 90 CS FD 10");
     let clean = r.events.iter().position(|e| *e == Event::Clean).unwrap();
-    let after: Vec<_> = r.events[clean..].iter().filter(|e| matches!(e, Event::Move { .. })).collect();
-    let Event::Move { from, to, pen } = after[0] else { unreachable!() };
-    assert_eq!(((from.x, from.y), (to.x, to.y), pen.down), ((0.0, 50.0), (0.0, 0.0), false), "home with the pen up");
-    let Event::Move { pen, .. } = after[1] else { unreachable!() };
+    let after: Vec<_> = r.events[clean..]
+        .iter()
+        .filter(|e| matches!(e, Event::Move { .. }))
+        .collect();
+    let Event::Move { from, to, pen } = after[0] else {
+        unreachable!()
+    };
+    assert_eq!(
+        ((from.x, from.y), (to.x, to.y), pen.down),
+        ((0.0, 50.0), (0.0, 0.0), false),
+        "home with the pen up"
+    );
+    let Event::Move { pen, .. } = after[1] else {
+        unreachable!()
+    };
     assert!(pen.down, "and the pen is down again after");
-    assert_eq!(output("FD 50 RT 90 CLEARSCREEN SHOW POS PRINT HEADING"), "[0 0]\n0\n");
+    assert_eq!(
+        output("FD 50 RT 90 CLEARSCREEN SHOW POS PRINT HEADING"),
+        "[0 0]\n0\n"
+    );
 }
 
 #[test]

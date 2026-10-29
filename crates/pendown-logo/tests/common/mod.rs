@@ -27,7 +27,16 @@ pub struct Run {
 
 impl Run {
     pub fn printed(&self) -> String {
-        self.events.iter().filter_map(|e| if let Event::Print(t) = e { Some(t.as_str()) } else { None }).collect()
+        self.events
+            .iter()
+            .filter_map(|e| {
+                if let Event::Print(t) = e {
+                    Some(t.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// The moves, as ((from), (to), pen down).
@@ -42,7 +51,16 @@ impl Run {
     }
 
     pub fn turns(&self) -> Vec<(f64, f64)> {
-        self.events.iter().filter_map(|e| if let Event::Turn { from, by } = e { Some((*from, *by)) } else { None }).collect()
+        self.events
+            .iter()
+            .filter_map(|e| {
+                if let Event::Turn { from, by } = e {
+                    Some((*from, *by))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     pub fn error(&self) -> &Error {
@@ -56,7 +74,10 @@ impl Run {
 pub fn run(src: &str) -> Run {
     let events = Shared::default();
     let mut it = Interpreter::new(Box::new(events.clone()), Arc::default());
-    it.limits = Limits { instruction_events: false, ..Limits::default() };
+    it.limits = Limits {
+        instruction_events: false,
+        ..Limits::default()
+    };
     let result = it.run_program(src);
     let events = events.0.borrow().clone();
     Run { result, events }

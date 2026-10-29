@@ -28,7 +28,10 @@ fn unfinished(text: &str) -> bool {
         if words.next().is_some_and(|w| w.eq_ignore_ascii_case("to")) {
             open = true;
         }
-        if line.split_whitespace().any(|w| w.eq_ignore_ascii_case("end")) {
+        if line
+            .split_whitespace()
+            .any(|w| w.eq_ignore_ascii_case("end"))
+        {
             open = false;
         }
     }
@@ -37,7 +40,11 @@ fn unfinished(text: &str) -> bool {
 
 /// Whether an entry defines procedures, which the next Run will clear.
 pub fn defines(text: &str) -> bool {
-    text.lines().any(|line| line.split_whitespace().next().is_some_and(|w| w.eq_ignore_ascii_case("to")))
+    text.lines().any(|line| {
+        line.split_whitespace()
+            .next()
+            .is_some_and(|w| w.eq_ignore_ascii_case("to"))
+    })
 }
 
 impl ConsoleInput {
@@ -90,7 +97,10 @@ mod tests {
     fn one_line_entries_run_straight_away() {
         let mut c = ConsoleInput::default();
         assert_eq!(c.submit("FD 50"), Submit::Run("FD 50".into()));
-        assert_eq!(c.submit("TO DOUBLE :n OUTPUT :n * 2 END"), Submit::Run("TO DOUBLE :n OUTPUT :n * 2 END".into()));
+        assert_eq!(
+            c.submit("TO DOUBLE :n OUTPUT :n * 2 END"),
+            Submit::Run("TO DOUBLE :n OUTPUT :n * 2 END".into())
+        );
     }
 
     #[test]
@@ -99,7 +109,10 @@ mod tests {
         assert_eq!(c.submit("to box :n"), Submit::More);
         assert!(c.continuing());
         assert_eq!(c.submit("  repeat 4 [fd :n rt 90]"), Submit::More);
-        assert_eq!(c.submit("end"), Submit::Run("to box :n\n  repeat 4 [fd :n rt 90]\nend".into()));
+        assert_eq!(
+            c.submit("end"),
+            Submit::Run("to box :n\n  repeat 4 [fd :n rt 90]\nend".into())
+        );
         assert!(!c.continuing());
     }
 

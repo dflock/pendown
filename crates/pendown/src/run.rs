@@ -26,7 +26,11 @@ pub struct Channel {
 }
 
 /// Batches of 256 events, with room for 4 batches (spikes 03 and 04).
-pub const DEFAULT_CHANNEL: Channel = Channel { batch: 256, capacity: 4, max_wait: Duration::from_millis(4) };
+pub const DEFAULT_CHANNEL: Channel = Channel {
+    batch: 256,
+    capacity: 4,
+    max_wait: Duration::from_millis(4),
+};
 
 /// What the interpreter runs.
 #[derive(Clone, Debug)]
@@ -97,8 +101,12 @@ impl Session {
                 it.limits.stack_bytes = Some(STACK);
                 // Jobs run one at a time, until the session is dropped.
                 for command in rx {
-                    let sink = BatchSender::new(command.events, command.channel.batch, command.channel.max_wait)
-                        .measured(command.control.clone());
+                    let sink = BatchSender::new(
+                        command.events,
+                        command.channel.batch,
+                        command.channel.max_wait,
+                    )
+                    .measured(command.control.clone());
                     it.set_output(Box::new(sink), command.control);
                     let result = match &command.job {
                         Job::Program(text) => it.run_program(text),
@@ -119,11 +127,25 @@ impl Session {
     pub fn start(&self, job: Job, speed: Speed, channel: Channel) -> (Animator, Run) {
         let control = Arc::new(Control::default());
         let (events, rx) = mpsc::sync_channel::<Vec<Event>>(channel.capacity);
-        let run = Run { control: control.clone(), started: Instant::now(), result: Arc::default(), exited: Arc::default() };
+        let run = Run {
+            control: control.clone(),
+            started: Instant::now(),
+            result: Arc::default(),
+            exited: Arc::default(),
+        };
         // The animator sets the lockstep flag and the speed before the job starts.
         let animator = Animator::new(rx, control.clone(), speed);
-        let command = Command { job, events, channel, control, result: run.result.clone(), exited: run.exited.clone() };
-        self.commands.send(command).expect("the interpreter thread is running");
+        let command = Command {
+            job,
+            events,
+            channel,
+            control,
+            result: run.result.clone(),
+            exited: run.exited.clone(),
+        };
+        self.commands
+            .send(command)
+            .expect("the interpreter thread is running");
         (animator, run)
     }
 }

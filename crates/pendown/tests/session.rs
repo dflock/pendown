@@ -16,7 +16,10 @@ fn play(animator: &mut Animator) -> usize {
         if animator.finished() {
             return marks;
         }
-        marks += animator.frame(Duration::from_millis(16), usize::MAX).marks.len();
+        marks += animator
+            .frame(Duration::from_millis(16), usize::MAX)
+            .marks
+            .len();
         thread::sleep(Duration::from_micros(200));
     }
     panic!("the job didn't finish");
@@ -34,26 +37,38 @@ fn finish(session: &Session, job: Job) -> (Run, usize) {
 #[test]
 fn the_console_uses_what_the_last_run_left() {
     let session = Session::new();
-    let (run, _) = finish(&session, Job::Program("TO BOX :n\n REPEAT 4 [FD :n RT 90]\nEND\nMAKE \"size 30".into()));
+    let (run, _) = finish(
+        &session,
+        Job::Program("TO BOX :n\n REPEAT 4 [FD :n RT 90]\nEND\nMAKE \"size 30".into()),
+    );
     assert_eq!(run.result(), Some(Ok(())));
     let (run, marks) = finish(&session, Job::Console("BOX :size".into()));
     assert_eq!((run.result(), marks), (Some(Ok(())), 4));
     // A TO at the console works too...
-    let (run, _) = finish(&session, Job::Console("TO TWICE :n OUTPUT :n * 2 END".into()));
+    let (run, _) = finish(
+        &session,
+        Job::Console("TO TWICE :n OUTPUT :n * 2 END".into()),
+    );
     assert_eq!(run.result(), Some(Ok(())));
     let (run, marks) = finish(&session, Job::Console("FD TWICE 10".into()));
     assert_eq!((run.result(), marks), (Some(Ok(())), 1));
     // ...until the next Run clears everything.
     finish(&session, Job::Program("PRINT 1".into()));
     let (run, _) = finish(&session, Job::Console("BOX 10".into()));
-    let Some(Err(RunError::Parse(errors))) = run.result() else { panic!("{:?}", run.result()) };
+    let Some(Err(RunError::Parse(errors))) = run.result() else {
+        panic!("{:?}", run.result())
+    };
     assert_eq!(errors[0].message, "I don't know how to BOX");
 }
 
 #[test]
 fn a_stopped_job_doesnt_stop_the_next() {
     let session = Session::new();
-    let (mut animator, run) = session.start(Job::Program("FOREVER [FD 1 RT 1]".into()), Speed::Animated(10.0), DEFAULT_CHANNEL);
+    let (mut animator, run) = session.start(
+        Job::Program("FOREVER [FD 1 RT 1]".into()),
+        Speed::Animated(10.0),
+        DEFAULT_CHANNEL,
+    );
     animator.frame(Duration::from_millis(16), usize::MAX);
     animator.stop();
     while run.result().is_none() {

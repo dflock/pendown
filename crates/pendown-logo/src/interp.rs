@@ -14,18 +14,18 @@ use std::{
 use smallvec::SmallVec;
 
 use crate::{
-    error::{CallSite, Error, RunError},
     colour::{PALETTE, Rgba},
+    error::{CallSite, Error, RunError},
     event::{Event, EventSink, Pen, Point, SyncPoint},
-    watch::{self, Scope, ScopeKind, Variable, Watch},
-    metrics::InterpreterMetrics,
     geometry::{Area, TurtleMode},
-    random::Random,
+    metrics::InterpreterMetrics,
     names::{Names, Sym},
     parse::{self, Arity, Block, Call, Cx, Expr, Instr, Target},
     prims::{self, Args, Imp, PRIMS},
+    random::Random,
     span::{SourceId, Span},
     value::{List, Style, Value},
+    watch::{self, Scope, ScopeKind, Variable, Watch},
 };
 
 /// The pen, fill and background colours' values, and the colours formatted
@@ -38,7 +38,11 @@ pub enum Flow {
     Output(Value, Span),
     Error(Box<Error>),
     /// `THROW tag`, on its way to a `CATCH` with the same tag (ADR 0021).
-    Throw { tag: Rc<str>, value: Option<Value>, span: Span },
+    Throw {
+        tag: Rc<str>,
+        value: Option<Value>,
+        span: Span,
+    },
     /// Stopped from outside (ADR 0007): `CATCH` must never handle this.
     Halt,
 }
@@ -110,7 +114,12 @@ pub struct Limits {
 
 impl Default for Limits {
     fn default() -> Limits {
-        Limits { max_depth: 10_000, stack_bytes: None, instruction_events: true, max_instructions: None }
+        Limits {
+            max_depth: 10_000,
+            stack_bytes: None,
+            instruction_events: true,
+            max_instructions: None,
+        }
     }
 }
 
@@ -147,7 +156,11 @@ impl Default for Turtle {
             pos: Point { x: 0.0, y: 0.0 },
             heading: 0.0,
             // UCBLogo's defaults: a white pen on a black background.
-            pen: Pen { down: true, color: PALETTE[7], size: 1.0 },
+            pen: Pen {
+                down: true,
+                color: PALETTE[7],
+                size: 1.0,
+            },
             pen_colour: Value::Num(7.0),
             fill: None,
             fill_colour: Value::word("none"),
@@ -190,7 +203,14 @@ struct Specials {
     logoversion: Sym,
 }
 
-pub const SPECIAL_VARIABLES: &[&str] = &["CASEIGNOREDP", "ERRACT", "FULLPRINTP", "PRINTDEPTHLIMIT", "PRINTWIDTHLIMIT", "LOGOVERSION"];
+pub const SPECIAL_VARIABLES: &[&str] = &[
+    "CASEIGNOREDP",
+    "ERRACT",
+    "FULLPRINTP",
+    "PRINTDEPTHLIMIT",
+    "PRINTWIDTHLIMIT",
+    "LOGOVERSION",
+];
 
 /// `LOGOVERSION`: Pendown's version, such as 0.1, as a number.
 fn logo_version() -> f64 {
@@ -273,7 +293,9 @@ fn stack_addr() -> usize {
 /// A `THROW` that no `CATCH` caught. `THROW "ERROR` is an error by design.
 fn uncaught(tag: &str, value: Option<Value>, span: Span) -> Error {
     let message = match value {
-        _ if !tag.eq_ignore_ascii_case("error") => format!("Can't find a CATCH for {}", tag.to_uppercase()),
+        _ if !tag.eq_ignore_ascii_case("error") => {
+            format!("Can't find a CATCH for {}", tag.to_uppercase())
+        }
         Some(v) => v.print_form(),
         None => "THROW \"ERROR".to_string(),
     };
@@ -281,14 +303,22 @@ fn uncaught(tag: &str, value: Option<Value>, span: Span) -> Error {
 }
 
 fn dont_say(v: &Value, span: Span) -> Flow {
-    Error::new(format!("You don't say what to do with {}", v.show()), Some(span)).into()
+    Error::new(
+        format!("You don't say what to do with {}", v.show()),
+        Some(span),
+    )
+    .into()
 }
 
 fn didnt_output(name: &str, to: &str, span: Span) -> Flow {
     let message = if to.is_empty() {
         format!("{} didn't output a value", name.to_uppercase())
     } else {
-        format!("{} didn't output to {}", name.to_uppercase(), to.to_uppercase())
+        format!(
+            "{} didn't output to {}",
+            name.to_uppercase(),
+            to.to_uppercase()
+        )
     };
     Error::new(message, Some(span)).into()
 }
@@ -351,7 +381,9 @@ impl Interpreter {
     /// `CASEIGNOREDP`: whether words compare without case. Anything but
     /// `FALSE` counts as true, since it starts true.
     pub(crate) fn ignore_case(&self) -> bool {
-        self.special(self.specials.caseignoredp).and_then(Value::as_bool) != Some(false)
+        self.special(self.specials.caseignoredp)
+            .and_then(Value::as_bool)
+            != Some(false)
     }
 
     /// `EQUALP`, with `CASEIGNOREDP`.
@@ -370,7 +402,10 @@ impl Interpreter {
         Style {
             depth: limit(self.specials.printdepthlimit),
             width: limit(self.specials.printwidthlimit),
-            full: self.special(self.specials.fullprintp).and_then(Value::as_bool) == Some(true),
+            full: self
+                .special(self.specials.fullprintp)
+                .and_then(Value::as_bool)
+                == Some(true),
             length: None,
         }
     }
@@ -388,7 +423,12 @@ impl Interpreter {
             Some(Value::List(list)) if !list.items.is_empty() => list.clone(),
             _ => return Ok(()),
         };
-        let span = error.span.unwrap_or(Span { source: SourceId::Editor, start: 0, end: 0, line: 0 });
+        let span = error.span.unwrap_or(Span {
+            source: SourceId::Editor,
+            start: 0,
+            end: 0,
+            line: 0,
+        });
         let saved = self.vars[sym].take();
         let result = self.run_list(&list, span, false);
         self.vars[sym] = saved;
@@ -397,7 +437,10 @@ impl Interpreter {
 
     /// The innermost procedure running, if any, for `ERROR`.
     pub(crate) fn current_procedure(&self) -> Option<Rc<str>> {
-        self.frames.iter().rev().find_map(|f| f.proc.as_ref().map(|p| p.name.clone()))
+        self.frames
+            .iter()
+            .rev()
+            .find_map(|f| f.proc.as_ref().map(|p| p.name.clone()))
     }
 
     /// Sends events somewhere else, and takes Stop and lockstep from a new
@@ -447,7 +490,10 @@ impl Interpreter {
     /// Sets the turtle area's size in turtle steps, centred on 0, 0. The
     /// default is 1000 × 1000 (ADR 0003).
     pub fn set_area(&mut self, width: f64, height: f64) {
-        self.area = Area { half_width: width / 2.0, half_height: height / 2.0 };
+        self.area = Area {
+            half_width: width / 2.0,
+            half_height: height / 2.0,
+        };
     }
 
     pub fn area(&self) -> Area {
@@ -464,15 +510,26 @@ impl Interpreter {
     /// top-level instructions as s-expressions, one per instruction.
     pub fn parse_to_sexp(&mut self, text: &str) -> Result<Vec<String>, Vec<Error>> {
         let program = self.parse(text, SourceId::Editor)?;
-        Ok(program.top.iter().map(|i| i.expr.sexp(&self.names)).collect())
+        Ok(program
+            .top
+            .iter()
+            .map(|i| i.expr.sexp(&self.names))
+            .collect())
     }
 
     fn parse(&mut self, text: &str, source: SourceId) -> Result<parse::Program, Vec<Error>> {
         let procs = &self.procs;
         let known = |sym: Sym| -> Option<Arity> {
-            procs.get(sym as usize)?.as_ref().map(|p| Arity::fixed(p.inputs.len()))
+            procs
+                .get(sym as usize)?
+                .as_ref()
+                .map(|p| Arity::fixed(p.inputs.len()))
         };
-        let mut cx = Cx { names: &mut self.names, known: &known, defining: Default::default() };
+        let mut cx = Cx {
+            names: &mut self.names,
+            known: &known,
+            defining: Default::default(),
+        };
         let program = parse::parse_program(text, source, &mut cx);
         self.grow();
         program
@@ -499,14 +556,22 @@ impl Interpreter {
     }
 
     fn publish_instructions(&self) {
-        self.control.metrics.instructions.set(self.stats.instructions - self.job_start);
+        self.control
+            .metrics
+            .instructions
+            .set(self.stats.instructions - self.job_start);
     }
 
     fn run_source_unflushed(&mut self, text: &str, source: SourceId) -> Result<(), RunError> {
         let program = self.parse(text, source).map_err(RunError::Parse)?;
         for def in program.procs {
             let name = self.names.spelling(def.sym).clone();
-            self.procs[def.sym as usize] = Some(Rc::new(Proc { name, inputs: def.inputs, body: def.body, title: def.title }));
+            self.procs[def.sym as usize] = Some(Rc::new(Proc {
+                name,
+                inputs: def.inputs,
+                body: def.body,
+                title: def.title,
+            }));
         }
         self.stack_base = stack_addr();
         for instr in &program.top {
@@ -526,14 +591,20 @@ impl Interpreter {
                     return Err(RunError::Runtime(*e));
                 }
                 // `THROW "TOPLEVEL` ends the program, as if it had finished.
-                Err(Flow::Throw { tag, .. }) if tag.eq_ignore_ascii_case("toplevel") => return Ok(()),
-                Err(Flow::Throw { tag, value, span }) => return Err(RunError::Runtime(uncaught(&tag, value, span))),
+                Err(Flow::Throw { tag, .. }) if tag.eq_ignore_ascii_case("toplevel") => {
+                    return Ok(());
+                }
+                Err(Flow::Throw { tag, value, span }) => {
+                    return Err(RunError::Runtime(uncaught(&tag, value, span)));
+                }
                 Err(Flow::Stop(span)) => {
-                    let e = Error::new("STOP can only be used inside a procedure", Some(span)).about("STOP");
+                    let e = Error::new("STOP can only be used inside a procedure", Some(span))
+                        .about("STOP");
                     return Err(RunError::Runtime(e));
                 }
                 Err(Flow::Output(_, span)) => {
-                    let e = Error::new("OUTPUT can only be used inside a procedure", Some(span)).about("OUTPUT");
+                    let e = Error::new("OUTPUT can only be used inside a procedure", Some(span))
+                        .about("OUTPUT");
                     return Err(RunError::Runtime(e));
                 }
             }
@@ -560,7 +631,9 @@ impl Interpreter {
     /// procedure shares its caller's frame, so its locals go there too.
     /// Returns false outside any procedure.
     pub(crate) fn make_local(&mut self, sym: Sym) -> bool {
-        let Some(frame) = self.frames.last_mut() else { return false };
+        let Some(frame) = self.frames.last_mut() else {
+            return false;
+        };
         let slot = &mut self.vars[sym as usize];
         if frame.saved.iter().any(|(s, _)| *s == sym) {
             *slot = None;
@@ -582,7 +655,11 @@ impl Interpreter {
     }
 
     pub(crate) fn bool(&self, b: bool) -> Value {
-        if b { self.true_word.clone() } else { self.false_word.clone() }
+        if b {
+            self.true_word.clone()
+        } else {
+            self.false_word.clone()
+        }
     }
 
     pub(crate) fn emit(&mut self, event: Event) -> Result<(), Flow> {
@@ -606,12 +683,20 @@ impl Interpreter {
     /// saved the values its own variables hid, so a frame's variables have
     /// the values saved by the next frame up that has the same name.
     pub fn watch(&self) -> Watch {
-        let style = Style { depth: Some(4), width: Some(20), full: true, length: Some(watch::VALUE_LIMIT) };
+        let style = Style {
+            depth: Some(4),
+            width: Some(20),
+            full: true,
+            length: Some(watch::VALUE_LIMIT),
+        };
         let show = |v: &Option<Value>| {
             v.as_ref().map(|v| {
                 let mut text = v.show_styled(style);
                 if text.len() > watch::VALUE_LIMIT {
-                    let end = (0..=watch::VALUE_LIMIT).rev().find(|&i| text.is_char_boundary(i)).unwrap_or(0);
+                    let end = (0..=watch::VALUE_LIMIT)
+                        .rev()
+                        .find(|&i| text.is_char_boundary(i))
+                        .unwrap_or(0);
                     text.truncate(end);
                     text.push_str("...");
                 }
@@ -645,14 +730,25 @@ impl Interpreter {
                         None => &self.vars[*sym as usize],
                     };
                     below.push((*sym, old));
-                    Variable { name: self.names.spelling(*sym).to_string(), value: show(value), hidden: above.is_some() }
+                    Variable {
+                        name: self.names.spelling(*sym).to_string(),
+                        value: show(value),
+                        hidden: above.is_some(),
+                    }
                 })
                 .collect();
             let (kind, name) = match (&frame.proc, &frame.label) {
                 (Some(proc), _) => (ScopeKind::Procedure, proc.name.to_string()),
-                (None, label) => (ScopeKind::Loop, label.as_deref().unwrap_or("").to_uppercase()),
+                (None, label) => (
+                    ScopeKind::Loop,
+                    label.as_deref().unwrap_or("").to_uppercase(),
+                ),
             };
-            scopes.push(Scope { kind, name, variables });
+            scopes.push(Scope {
+                kind,
+                name,
+                variables,
+            });
         }
 
         let mut globals: Vec<Variable> = (0..self.vars.len() as Sym)
@@ -666,33 +762,58 @@ impl Interpreter {
                 if self.is_default_special(sym, value) {
                     return None;
                 }
-                Some(Variable { name: self.names.spelling(sym).to_string(), value: show(&Some(value.clone())), hidden: hidden.is_some() })
+                Some(Variable {
+                    name: self.names.spelling(sym).to_string(),
+                    value: show(&Some(value.clone())),
+                    hidden: hidden.is_some(),
+                })
             })
             .collect();
         globals.sort_by_cached_key(|v| v.name.to_lowercase());
-        scopes.push(Scope { kind: ScopeKind::Globals, name: String::new(), variables: globals });
+        scopes.push(Scope {
+            kind: ScopeKind::Globals,
+            name: String::new(),
+            variables: globals,
+        });
         scopes.reverse();
-        let sources = [self.turtle.pen_colour.clone(), self.turtle.fill_colour.clone(), self.background.1.clone()];
+        let sources = [
+            self.turtle.pen_colour.clone(),
+            self.turtle.fill_colour.clone(),
+            self.background.1.clone(),
+        ];
         // A palette number can look different with the same value, after
         // SETPALETTE, so the colours themselves are compared too.
-        let rgbas = [Some(self.turtle.pen.color), self.turtle.fill, Some(self.background.0)];
+        let rgbas = [
+            Some(self.turtle.pen.color),
+            self.turtle.fill,
+            Some(self.background.0),
+        ];
         let mut shown = self.colours_shown.borrow_mut();
         let colours = match shown.as_ref() {
             Some((old, colours))
-                if old.iter().zip(&sources).all(|(a, b)| a.same(b)) && colours.iter().zip(&rgbas).all(|(c, rgba)| c.rgba == *rgba) =>
+                if old.iter().zip(&sources).all(|(a, b)| a.same(b))
+                    && colours.iter().zip(&rgbas).all(|(c, rgba)| c.rgba == *rgba) =>
             {
                 colours.clone()
             }
             _ => {
                 let names = ["PENCOLOR", "FILLCOLOR", "BACKGROUND"];
                 let colours: Arc<[watch::Colour]> = (0..3)
-                    .map(|i| watch::Colour { name: names[i].into(), value: sources[i].show_styled(style), rgba: rgbas[i] })
+                    .map(|i| watch::Colour {
+                        name: names[i].into(),
+                        value: sources[i].show_styled(style),
+                        rgba: rgbas[i],
+                    })
                     .collect();
                 *shown = Some((sources, colours.clone()));
                 colours
             }
         };
-        Watch { counters, scopes, colours }
+        Watch {
+            counters,
+            scopes,
+            colours,
+        }
     }
 
     /// A special variable still at its starting value, which the panel
@@ -779,7 +900,12 @@ impl Interpreter {
                 let proc = self.lookup(sym, call)?;
                 let args = self.eval_args(call)?;
                 if tail {
-                    return Ok(Some(Tail { proc, args, span: call.span, wants_output: false }));
+                    return Ok(Some(Tail {
+                        proc,
+                        args,
+                        span: call.span,
+                        wants_output: false,
+                    }));
                 }
                 match self.call_user(proc, args, call.span)? {
                     Some(v) => Err(dont_say(&v, call.span)),
@@ -814,7 +940,10 @@ impl Interpreter {
             Imp::IfElse => self.exec_ifelse(call, tail),
             Imp::Repeat => {
                 let count_arg = [self.eval(&call.args[0], &call.name)?];
-                let args = Args { call, vals: &count_arg };
+                let args = Args {
+                    call,
+                    vals: &count_arg,
+                };
                 let count = args.int(0)?;
                 if count < 0 {
                     return Err(args.doesnt_like(0));
@@ -864,7 +993,13 @@ impl Interpreter {
 
     fn eval_bool(&mut self, call: &Call) -> Result<bool, Flow> {
         let v = self.eval(&call.args[0], &call.name)?;
-        v.as_bool().ok_or_else(|| Args { call, vals: std::slice::from_ref(&v) }.doesnt_like(0))
+        v.as_bool().ok_or_else(|| {
+            Args {
+                call,
+                vals: std::slice::from_ref(&v),
+            }
+            .doesnt_like(0)
+        })
     }
 
     fn eval_list(&mut self, call: &Call, i: usize) -> Result<Rc<List>, Flow> {
@@ -886,14 +1021,29 @@ impl Interpreter {
             return Ok(block.clone());
         }
         let used = self.stack_base.saturating_sub(stack_addr());
-        if self.limits.stack_bytes.is_some_and(|bytes| used + STACK_MARGIN > bytes) {
-            return Err(Error::new("Lists are being run inside each other too deeply", Some(fallback)).into());
+        if self
+            .limits
+            .stack_bytes
+            .is_some_and(|bytes| used + STACK_MARGIN > bytes)
+        {
+            return Err(Error::new(
+                "Lists are being run inside each other too deeply",
+                Some(fallback),
+            )
+            .into());
         }
         let procs = &self.procs;
         let known = |sym: Sym| -> Option<Arity> {
-            procs.get(sym as usize)?.as_ref().map(|p| Arity::fixed(p.inputs.len()))
+            procs
+                .get(sym as usize)?
+                .as_ref()
+                .map(|p| Arity::fixed(p.inputs.len()))
         };
-        let mut cx = Cx { names: &mut self.names, known: &known, defining: Default::default() };
+        let mut cx = Cx {
+            names: &mut self.names,
+            known: &known,
+            defining: Default::default(),
+        };
         let block = Rc::new(parse::parse_list(list, fallback, &mut cx)?);
         self.grow();
         if list.spans.is_some() {
@@ -925,7 +1075,9 @@ impl Interpreter {
     }
 
     pub(crate) fn run_block_maybe(&mut self, block: &Block) -> Result<Option<Value>, Flow> {
-        let Some((last, rest)) = block.split_last() else { return Ok(None) };
+        let Some((last, rest)) = block.split_last() else {
+            return Ok(None);
+        };
         self.run_block_slice(rest)?;
         self.begin(last.span)?;
         self.eval_maybe(&last.expr)
@@ -934,7 +1086,9 @@ impl Interpreter {
     /// Evaluates an expression that may or may not output, as the last
     /// instruction of a `RUN` list.
     pub(crate) fn eval_maybe(&mut self, expr: &Expr) -> Result<Option<Value>, Flow> {
-        let Expr::Call(call) = expr else { return Ok(Some(self.eval(expr, "")?)) };
+        let Expr::Call(call) = expr else {
+            return Ok(Some(self.eval(expr, "")?));
+        };
         match call.target {
             Target::Infix(_) => Ok(Some(self.eval(expr, "")?)),
             Target::User(sym) => {
@@ -977,7 +1131,12 @@ impl Interpreter {
         for (&sym, v) in syms.iter().zip(values) {
             saved.push((sym, self.vars[sym as usize].replace(v)));
         }
-        self.frames.push(Frame { proc: None, label: Some(label.clone()), call_span: span, saved });
+        self.frames.push(Frame {
+            proc: None,
+            label: Some(label.clone()),
+            call_span: span,
+            saved,
+        });
         let result = f(self);
         let frame = self.frames.pop().expect("pushed above");
         for (sym, old) in frame.saved.into_iter().rev() {
@@ -995,7 +1154,12 @@ impl Interpreter {
         repcount: bool,
         f: impl FnOnce(&mut Interpreter) -> Result<T, Flow>,
     ) -> Result<T, Flow> {
-        self.counters.push(Counter { name: name.clone(), count: 0, of, repcount });
+        self.counters.push(Counter {
+            name: name.clone(),
+            count: 0,
+            of,
+            repcount,
+        });
         let result = f(self);
         self.counters.pop();
         result
@@ -1009,7 +1173,11 @@ impl Interpreter {
     /// What `REPCOUNT` outputs: the innermost `REPEAT`, `FOREVER` or
     /// template's pass.
     pub(crate) fn repcount(&self) -> Option<i64> {
-        self.counters.iter().rev().find(|c| c.repcount).map(|c| c.count)
+        self.counters
+            .iter()
+            .rev()
+            .find(|c| c.repcount)
+            .map(|c| c.count)
     }
 
     /// What a template's name stands for, if it's a procedure: for `APPLY
@@ -1019,31 +1187,62 @@ impl Interpreter {
             return Some((Target::Prim(id), PRIMS[id].arity));
         }
         let sym = self.intern(name);
-        self.procs[sym as usize].as_ref().map(|p| (Target::User(sym), Arity::fixed(p.inputs.len())))
+        self.procs[sym as usize]
+            .as_ref()
+            .map(|p| (Target::User(sym), Arity::fixed(p.inputs.len())))
     }
 
     /// Calls a procedure with values already worked out, as a template does.
-    pub(crate) fn call_with(&mut self, target: Target, name: Rc<str>, args: Vec<Value>, span: Span) -> Result<Option<Value>, Flow> {
+    pub(crate) fn call_with(
+        &mut self,
+        target: Target,
+        name: Rc<str>,
+        args: Vec<Value>,
+        span: Span,
+    ) -> Result<Option<Value>, Flow> {
         let args = args.into_iter().map(|v| Expr::Lit(v, span)).collect();
-        let call = Expr::Call(Box::new(Call { target, name, args, span }));
+        let call = Expr::Call(Box::new(Call {
+            target,
+            name,
+            args,
+            span,
+        }));
         self.eval_maybe(&call)
     }
 
     /// Calls a procedure made from a template's text.
-    pub(crate) fn call_proc(&mut self, proc: Rc<Proc>, args: Vec<Value>, span: Span) -> Result<Option<Value>, Flow> {
+    pub(crate) fn call_proc(
+        &mut self,
+        proc: Rc<Proc>,
+        args: Vec<Value>,
+        span: Span,
+    ) -> Result<Option<Value>, Flow> {
         self.call_user(proc, args.into_iter().collect(), span)
     }
 
     /// Parses lines of procedure text into a procedure, for a
     /// procedure-text template, `[[x] [line] [line]]`.
-    pub(crate) fn make_proc(&mut self, name: &str, inputs: Vec<Sym>, lines: &[Value], fallback: Span) -> Result<Rc<Proc>, Flow> {
+    pub(crate) fn make_proc(
+        &mut self,
+        name: &str,
+        inputs: Vec<Sym>,
+        lines: &[Value],
+        fallback: Span,
+    ) -> Result<Rc<Proc>, Flow> {
         let mut body = Vec::new();
         for line in lines {
-            let Value::List(list) = line else { unreachable!("procedure text is lists") };
+            let Value::List(list) = line else {
+                unreachable!("procedure text is lists")
+            };
             let block = self.list_block(list, fallback)?;
             body.extend(block.iter().cloned());
         }
-        Ok(Rc::new(Proc { name: name.into(), inputs, body, title: fallback }))
+        Ok(Rc::new(Proc {
+            name: name.into(),
+            inputs,
+            body,
+            title: fallback,
+        }))
     }
 
     /// Runs instructions. With `tail`, the last one is in tail position.
@@ -1075,7 +1274,11 @@ impl Interpreter {
         };
         self.run_block_slice(rest)?;
         self.begin(last.span)?;
-        if tail { self.eval_tail(&last.expr, &call.name) } else { Ok(Ret::Value(self.eval(&last.expr, &call.name)?)) }
+        if tail {
+            self.eval_tail(&last.expr, &call.name)
+        } else {
+            Ok(Ret::Value(self.eval(&last.expr, &call.name)?))
+        }
     }
 
     fn run_block_slice(&mut self, instrs: &[Instr]) -> Result<(), Flow> {
@@ -1094,7 +1297,12 @@ impl Interpreter {
                 Target::User(sym) => {
                     let proc = self.lookup(sym, call)?;
                     let args = self.eval_args(call)?;
-                    return Ok(Ret::Tail(Tail { proc, args, span: call.span, wants_output: true }));
+                    return Ok(Ret::Tail(Tail {
+                        proc,
+                        args,
+                        span: call.span,
+                        wants_output: true,
+                    }));
                 }
                 Target::Prim(id) if matches!(PRIMS[id].imp, Imp::IfElse) => {
                     let which = if self.eval_bool(call)? { 1 } else { 2 };
@@ -1114,19 +1322,32 @@ impl Interpreter {
             Expr::Lit(v, _) => Ok(v.clone()),
             Expr::Var(sym, span) => match &self.vars[*sym as usize] {
                 Some(v) => Ok(v.clone()),
-                None => Err(Error::new(format!(":{} has no value", self.names.spelling(*sym)), Some(*span)).into()),
+                None => Err(Error::new(
+                    format!(":{} has no value", self.names.spelling(*sym)),
+                    Some(*span),
+                )
+                .into()),
             },
             Expr::Neg(operand, span) => {
                 let v = self.eval(operand, "-")?;
                 match v.as_num() {
                     Some(n) => Ok(Value::Num(-n)),
-                    None => Err(Error::new(format!("- doesn't like {} as input", v.show()), Some(*span)).into()),
+                    None => Err(Error::new(
+                        format!("- doesn't like {} as input", v.show()),
+                        Some(*span),
+                    )
+                    .into()),
                 }
             }
             Expr::Call(call) => match call.target {
                 Target::Infix(op) => {
-                    let vals = [self.eval(&call.args[0], op.symbol())?, self.eval(&call.args[1], op.symbol())?];
-                    let Imp::F(f) = prims::infix_prim(op).imp else { unreachable!("operators are plain primitives") };
+                    let vals = [
+                        self.eval(&call.args[0], op.symbol())?,
+                        self.eval(&call.args[1], op.symbol())?,
+                    ];
+                    let Imp::F(f) = prims::infix_prim(op).imp else {
+                        unreachable!("operators are plain primitives")
+                    };
                     Ok(f(self, &Args { call, vals: &vals })?.expect("operators always output"))
                 }
                 Target::User(sym) => {
@@ -1179,13 +1400,23 @@ impl Interpreter {
 
     /// Calls a user procedure, then runs any tail calls it hands back in
     /// the same frame, without growing the Rust stack.
-    fn call_user(&mut self, proc: Rc<Proc>, args: ArgVec, span: Span) -> Result<Option<Value>, Flow> {
+    fn call_user(
+        &mut self,
+        proc: Rc<Proc>,
+        args: ArgVec,
+        span: Span,
+    ) -> Result<Option<Value>, Flow> {
         self.check_depth(&proc, span)?;
         let mut saved = SmallVec::new();
         for (&sym, v) in proc.inputs.iter().zip(args) {
             saved.push((sym, self.vars[sym as usize].replace(v)));
         }
-        self.frames.push(Frame { proc: Some(proc.clone()), label: None, call_span: span, saved });
+        self.frames.push(Frame {
+            proc: Some(proc.clone()),
+            label: None,
+            call_span: span,
+            saved,
+        });
 
         let mut current = proc;
         // Set once any tail call was written as an instruction, after which
@@ -1214,7 +1445,11 @@ impl Interpreter {
                 }
                 // `(THROW "ERROR message)` is an error where this procedure
                 // was called, as if it were a primitive.
-                Err(Flow::Throw { tag, value: Some(v), .. }) if tag.eq_ignore_ascii_case("error") => {
+                Err(Flow::Throw {
+                    tag,
+                    value: Some(v),
+                    ..
+                }) if tag.eq_ignore_ascii_case("error") => {
                     let call_span = self.frames.last().expect("pushed above").call_span;
                     let e = Error::new(v.print_form(), Some(call_span));
                     break Err(match self.run_erract(&e) {
@@ -1222,7 +1457,9 @@ impl Interpreter {
                         Err(other) => other,
                     });
                 }
-                Err(Flow::Throw { tag, value, span }) => break Err(Flow::Throw { tag, value, span }),
+                Err(Flow::Throw { tag, value, span }) => {
+                    break Err(Flow::Throw { tag, value, span });
+                }
                 Err(Flow::Error(mut e)) => {
                     if e.calls.is_empty()
                         && let Err(other) = self.run_erract(&e)
@@ -1230,8 +1467,16 @@ impl Interpreter {
                         break Err(other);
                     }
                     let frame = self.frames.last().expect("pushed above");
-                    let name = frame.proc.as_ref().expect("a procedure's frame").name.to_string();
-                    e.calls.push(CallSite { procedure: name, span: frame.call_span });
+                    let name = frame
+                        .proc
+                        .as_ref()
+                        .expect("a procedure's frame")
+                        .name
+                        .to_string();
+                    e.calls.push(CallSite {
+                        procedure: name,
+                        span: frame.call_span,
+                    });
                     break Err(Flow::Error(e));
                 }
                 Err(Flow::Halt) => break Err(Flow::Halt),
@@ -1253,16 +1498,27 @@ impl Interpreter {
         let used = self.stack_base.saturating_sub(stack_addr());
         self.stats.max_depth = self.stats.max_depth.max(depth);
         self.stats.max_stack = self.stats.max_stack.max(used);
-        let out_of_stack = self.limits.stack_bytes.is_some_and(|bytes| used + STACK_MARGIN > bytes);
+        let out_of_stack = self
+            .limits
+            .stack_bytes
+            .is_some_and(|bytes| used + STACK_MARGIN > bytes);
         if depth <= self.limits.max_depth && !out_of_stack {
             return Ok(());
         }
-        let calls_itself = self.frames.last().and_then(|f| f.proc.as_ref()).is_some_and(|p| std::ptr::eq(Rc::as_ptr(p), proc));
+        let calls_itself = self
+            .frames
+            .last()
+            .and_then(|f| f.proc.as_ref())
+            .is_some_and(|p| std::ptr::eq(Rc::as_ptr(p), proc));
         let name = proc.name.to_uppercase();
         let message = if calls_itself {
-            format!("{name} called itself too many times: {depth} calls deep. Does it have a way to STOP?")
+            format!(
+                "{name} called itself too many times: {depth} calls deep. Does it have a way to STOP?"
+            )
         } else {
-            format!("Too many procedures were running inside each other ({depth} deep) when {name} was called")
+            format!(
+                "Too many procedures were running inside each other ({depth} deep) when {name} was called"
+            )
         };
         Err(Error::new(message, Some(span)).into())
     }

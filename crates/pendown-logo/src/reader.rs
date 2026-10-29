@@ -28,7 +28,12 @@ pub fn read(text: &str, source: SourceId) -> Result<Rc<List>, Error> {
         end: end as u32,
         line,
     };
-    let mut stack = vec![Open { items: vec![], spans: vec![], start: span(0, 0, 0), array: false }];
+    let mut stack = vec![Open {
+        items: vec![],
+        spans: vec![],
+        start: span(0, 0, 0),
+        array: false,
+    }];
     let mut line = 0;
     let mut word_start: Option<usize> = None;
     let bytes = text.as_bytes();
@@ -36,7 +41,10 @@ pub fn read(text: &str, source: SourceId) -> Result<Rc<List>, Error> {
 
     while i <= bytes.len() {
         let c = bytes.get(i).copied();
-        let ends_word = matches!(c, None | Some(b' ' | b'\t' | b'\r' | b'\n' | b'[' | b']' | b'{' | b'}' | b';'));
+        let ends_word = matches!(
+            c,
+            None | Some(b' ' | b'\t' | b'\r' | b'\n' | b'[' | b']' | b'{' | b'}' | b';')
+        );
         if ends_word && let Some(start) = word_start.take() {
             let top = stack.last_mut().expect("the outer list is never popped");
             top.items.push(Value::word(&text[start..i]));
@@ -51,12 +59,21 @@ pub fn read(text: &str, source: SourceId) -> Result<Rc<List>, Error> {
                 }
             }
             Some(open @ (b'[' | b'{')) => {
-                stack.push(Open { items: vec![], spans: vec![], start: span(i, i + 1, line), array: open == b'{' });
+                stack.push(Open {
+                    items: vec![],
+                    spans: vec![],
+                    start: span(i, i + 1, line),
+                    array: open == b'{',
+                });
             }
             Some(close @ (b']' | b'}')) => {
                 let array = close == b'}';
                 if stack.len() == 1 || stack.last().is_some_and(|top| top.array != array) {
-                    let message = if array { "Unexpected }" } else { "Unexpected ]" };
+                    let message = if array {
+                        "Unexpected }"
+                    } else {
+                        "Unexpected ]"
+                    };
                     return Err(Error::new(message, Some(span(i, i + 1, line))));
                 }
                 let open = stack.pop().expect("checked above");
@@ -72,7 +89,12 @@ pub fn read(text: &str, source: SourceId) -> Result<Rc<List>, Error> {
                         }
                         match text[digits..j].parse() {
                             Ok(n) => origin = n,
-                            Err(_) => return Err(Error::new("An array's origin must be a whole number, as in {a b c}@0", Some(span(i, j.max(end + 1), line)))),
+                            Err(_) => {
+                                return Err(Error::new(
+                                    "An array's origin must be a whole number, as in {a b c}@0",
+                                    Some(span(i, j.max(end + 1), line)),
+                                ));
+                            }
                         }
                         end = j;
                     }
@@ -94,7 +116,11 @@ pub fn read(text: &str, source: SourceId) -> Result<Rc<List>, Error> {
 
     if stack.len() > 1 {
         let open = stack.pop().expect("checked above");
-        let message = if open.array { "This { has no matching }" } else { "This [ has no matching ]" };
+        let message = if open.array {
+            "This { has no matching }"
+        } else {
+            "This [ has no matching ]"
+        };
         return Err(Error::new(message, Some(open.start)));
     }
     let top = stack.pop().expect("the outer list");

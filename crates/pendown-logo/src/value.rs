@@ -45,19 +45,26 @@ pub struct Array {
 
 impl Array {
     pub fn new(items: Vec<Value>, origin: i64) -> Array {
-        Array { items: RefCell::new(items), origin }
+        Array {
+            items: RefCell::new(items),
+            origin,
+        }
     }
 
     /// The position in `items` of the member numbered `index`, if there is one.
     pub fn position(&self, index: i64) -> Option<usize> {
         let i = index.checked_sub(self.origin)?;
-        (0..self.items.borrow().len() as i64).contains(&i).then_some(i as usize)
+        (0..self.items.borrow().len() as i64)
+            .contains(&i)
+            .then_some(i as usize)
     }
 
     /// Whether `value` is this array or contains it, at any depth.
     pub fn is_in(self: &Rc<Array>, value: &Value) -> bool {
         match value {
-            Value::Array(a) => Rc::ptr_eq(a, self) || a.items.borrow().iter().any(|v| self.is_in(v)),
+            Value::Array(a) => {
+                Rc::ptr_eq(a, self) || a.items.borrow().iter().any(|v| self.is_in(v))
+            }
             Value::List(l) => l.items.iter().any(|v| self.is_in(v)),
             _ => false,
         }
@@ -75,11 +82,19 @@ pub struct List {
 
 impl List {
     pub fn new(items: Vec<Value>) -> List {
-        List { items, spans: None, parsed: OnceCell::new() }
+        List {
+            items,
+            spans: None,
+            parsed: OnceCell::new(),
+        }
     }
 
     pub(crate) fn with_spans(items: Vec<Value>, spans: Vec<Span>) -> List {
-        List { items, spans: Some(spans), parsed: OnceCell::new() }
+        List {
+            items,
+            spans: Some(spans),
+            parsed: OnceCell::new(),
+        }
     }
 }
 
@@ -135,7 +150,9 @@ impl Value {
                 if i > 0 {
                     out.push(' ');
                 }
-                if style.width.is_some_and(|width| i >= width) || style.length.is_some_and(|length| out.len() >= length) {
+                if style.width.is_some_and(|width| i >= width)
+                    || style.length.is_some_and(|length| out.len() >= length)
+                {
                     out.push_str("...");
                     break;
                 }
@@ -196,7 +213,10 @@ pub fn equal(a: &Value, b: &Value, ignore_case: bool) -> bool {
     match (a, b) {
         (Value::List(x), Value::List(y)) => {
             x.items.len() == y.items.len()
-                && x.items.iter().zip(&y.items).all(|(a, b)| equal(a, b, ignore_case))
+                && x.items
+                    .iter()
+                    .zip(&y.items)
+                    .all(|(a, b)| equal(a, b, ignore_case))
         }
         (Value::Array(x), Value::Array(y)) => Rc::ptr_eq(x, y),
         (Value::List(_) | Value::Array(_), _) | (_, Value::List(_) | Value::Array(_)) => false,

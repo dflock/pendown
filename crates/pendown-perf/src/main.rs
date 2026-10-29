@@ -16,13 +16,7 @@
 mod cases;
 mod reports;
 
-use std::{
-    path::PathBuf,
-    process::ExitCode,
-    sync::Arc,
-    thread,
-    time::Duration,
-};
+use std::{path::PathBuf, process::ExitCode, sync::Arc, thread, time::Duration};
 
 use pendown_logo::{Event, EventSink, Halted, Interpreter, Limits};
 use serde_json::{Map, Value, json};
@@ -46,12 +40,20 @@ impl EventSink for Discard {
 }
 
 pub(crate) fn on_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
-    thread::Builder::new().stack_size(STACK).spawn(f).unwrap().join().unwrap()
+    thread::Builder::new()
+        .stack_size(STACK)
+        .spawn(f)
+        .unwrap()
+        .join()
+        .unwrap()
 }
 
 pub(crate) fn interpreter(sink: Box<dyn EventSink>, limits: Limits) -> Interpreter {
     let mut it = Interpreter::new(sink, Arc::default());
-    it.limits = Limits { stack_bytes: Some(STACK), ..limits };
+    it.limits = Limits {
+        stack_bytes: Some(STACK),
+        ..limits
+    };
     it
 }
 
@@ -63,7 +65,13 @@ fn baseline_path() -> PathBuf {
 fn machine() -> String {
     let model = std::fs::read_to_string("/proc/cpuinfo")
         .ok()
-        .and_then(|info| info.lines().find_map(|l| l.strip_prefix("model name")?.split_once(':').map(|(_, m)| m.trim().to_string())))
+        .and_then(|info| {
+            info.lines().find_map(|l| {
+                l.strip_prefix("model name")?
+                    .split_once(':')
+                    .map(|(_, m)| m.trim().to_string())
+            })
+        })
         .unwrap_or_else(|| "unknown CPU".into());
     let cpus = thread::available_parallelism().map_or(1, |n| n.get());
     format!("{model}, {cpus} CPUs, {}", std::env::consts::OS)
@@ -92,9 +100,13 @@ fn main() -> ExitCode {
     let filter = args.iter().find(|a| !a.starts_with("--"));
     let save = flag("--save");
 
-    let baseline: Option<Value> = std::fs::read_to_string(baseline_path()).ok().and_then(|text| serde_json::from_str(&text).ok());
+    let baseline: Option<Value> = std::fs::read_to_string(baseline_path())
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok());
     let machine = machine();
-    let same_machine = baseline.as_ref().is_some_and(|b| b["machine"] == machine.as_str());
+    let same_machine = baseline
+        .as_ref()
+        .is_some_and(|b| b["machine"] == machine.as_str());
     println!("# perf, best of {RUNS} runs, on {machine}\n");
     match &baseline {
         None => println!("There's no baseline yet: `perf --save` makes one.\n"),
@@ -109,10 +121,15 @@ fn main() -> ExitCode {
 
     let mut results = Map::new();
     let mut regressions = Vec::new();
-    for case in cases::CASES.iter().filter(|c| filter.is_none_or(|f| c.name.contains(f.as_str()))) {
+    for case in cases::CASES
+        .iter()
+        .filter(|c| filter.is_none_or(|f| c.name.contains(f.as_str())))
+    {
         let best = (0..RUNS).map(|_| (case.run)()).min().expect("RUNS > 0");
         results.insert(case.name.into(), json!((ms(best) * 100.0).round() / 100.0));
-        let was = baseline.as_ref().and_then(|b| b["results_ms"][case.name].as_f64());
+        let was = baseline
+            .as_ref()
+            .and_then(|b| b["results_ms"][case.name].as_f64());
         let (was_text, change) = match was {
             Some(was) => {
                 let ratio = ms(best) / was;
@@ -126,16 +143,26 @@ fn main() -> ExitCode {
                 } else {
                     ""
                 };
-                (format!("{was:.1} ms"), format!("{:+.0}%{verdict}", (ratio - 1.0) * 100.0))
+                (
+                    format!("{was:.1} ms"),
+                    format!("{:+.0}%{verdict}", (ratio - 1.0) * 100.0),
+                )
             }
             None => ("".into(), "new".into()),
         };
-        println!("| {} | {:.1} ms | {was_text} | {change} |", case.name, ms(best));
+        println!(
+            "| {} | {:.1} ms | {was_text} | {change} |",
+            case.name,
+            ms(best)
+        );
     }
 
     if save {
         // Saving some cases keeps the baseline's others.
-        let mut all = baseline.filter(|_| same_machine).and_then(|b| b["results_ms"].as_object().cloned()).unwrap_or_default();
+        let mut all = baseline
+            .filter(|_| same_machine)
+            .and_then(|b| b["results_ms"].as_object().cloned())
+            .unwrap_or_default();
         all.extend(results);
         let out = json!({ "machine": machine, "results_ms": all });
         let text = serde_json::to_string_pretty(&out).expect("JSON") + "\n";
@@ -147,14 +174,23 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     if regressions.is_empty() {
-        println!("\nNothing is more than {:.0}% slower than the baseline.", (SLOWER - 1.0) * 100.0);
+        println!(
+            "\nNothing is more than {:.0}% slower than the baseline.",
+            (SLOWER - 1.0) * 100.0
+        );
         ExitCode::SUCCESS
     } else {
-        println!("\n{} slower than the baseline by more than {:.0}%:", regressions.len(), (SLOWER - 1.0) * 100.0);
+        println!(
+            "\n{} slower than the baseline by more than {:.0}%:",
+            regressions.len(),
+            (SLOWER - 1.0) * 100.0
+        );
         for name in regressions {
             println!("- {name}");
         }
-        println!("\nFix the regression, or if it's deliberate, save a new baseline in its own commit saying why.");
+        println!(
+            "\nFix the regression, or if it's deliberate, save a new baseline in its own commit saying why."
+        );
         ExitCode::FAILURE
     }
 }

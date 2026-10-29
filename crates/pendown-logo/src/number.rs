@@ -20,7 +20,11 @@ pub fn format_number(x: f64) -> String {
 }
 
 fn trim_zeros(s: &str) -> &str {
-    if s.contains('.') { s.trim_end_matches('0').trim_end_matches('.') } else { s }
+    if s.contains('.') {
+        s.trim_end_matches('0').trim_end_matches('.')
+    } else {
+        s
+    }
 }
 
 /// Reads a word as a number, if it looks like one: an optional minus sign,

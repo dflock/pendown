@@ -64,15 +64,32 @@ pub(super) fn ignore(_: &mut Interpreter, _: &Args) -> Out {
 fn condition(it: &mut Interpreter, a: &Args, i: usize) -> Result<bool, Flow> {
     let list = a.runnable(i)?;
     match it.run_maybe(&list, a.call.span)? {
-        Some(v) => v.as_bool().ok_or_else(|| a.error(format!("{} doesn't like {} as a condition", a.call.name.to_uppercase(), v.show()))),
-        None => Err(a.error(format!("{} didn't output TRUE or FALSE to {}", a.vals[i].show(), a.call.name.to_uppercase()))),
+        Some(v) => v.as_bool().ok_or_else(|| {
+            a.error(format!(
+                "{} doesn't like {} as a condition",
+                a.call.name.to_uppercase(),
+                v.show()
+            ))
+        }),
+        None => Err(a.error(format!(
+            "{} didn't output TRUE or FALSE to {}",
+            a.vals[i].show(),
+            a.call.name.to_uppercase()
+        ))),
     }
 }
 
 /// `WHILE`, `UNTIL`, `DO.WHILE` and `DO.UNTIL`: the condition is input
 /// `test`, the body input `body`, and the loop goes on while the condition
 /// is `go_on`.
-fn while_loop(it: &mut Interpreter, a: &Args, test: usize, body: usize, go_on: bool, body_first: bool) -> Out {
+fn while_loop(
+    it: &mut Interpreter,
+    a: &Args,
+    test: usize,
+    body: usize,
+    go_on: bool,
+    body_first: bool,
+) -> Out {
     let list = a.list(body)?;
     if body_first {
         it.run_commands(&list, a.call.span)?;
@@ -118,7 +135,9 @@ fn sign(x: f64) -> i8 {
 pub(super) fn for_(it: &mut Interpreter, a: &Args) -> Out {
     let control = a.list(0)?;
     let body = a.list(1)?;
-    let (3 | 4) = control.items.len() else { return Err(a.doesnt_like(0)) };
+    let (3 | 4) = control.items.len() else {
+        return Err(a.doesnt_like(0));
+    };
     let name = match &control.items[0] {
         Value::Word(w) => w.clone(),
         _ => return Err(a.doesnt_like(0)),
@@ -139,33 +158,52 @@ pub(super) fn for_(it: &mut Interpreter, a: &Args) -> Out {
                 Rc::new(one)
             }
         };
-        match it.run_maybe(&list, a.call.span)?.as_ref().and_then(Value::as_num) {
+        match it
+            .run_maybe(&list, a.call.span)?
+            .as_ref()
+            .and_then(Value::as_num)
+        {
             Some(n) => Ok(n),
             None => Err(a.doesnt_like(0)),
         }
     };
     let start = number(it, 1)?;
     let limit = number(it, 2)?;
-    let step = if control.items.len() == 4 { number(it, 3)? } else if limit >= start { 1.0 } else { -1.0 };
+    let step = if control.items.len() == 4 {
+        number(it, 3)?
+    } else if limit >= start {
+        1.0
+    } else {
+        -1.0
+    };
     let sym = it.define(&name);
     // How many passes there will be, unless the body changes the variable.
     let passes = (step != 0.0).then(|| ((limit - start) / step).floor().max(-1.0) as i64 + 1);
-    it.with_locals(&[sym], vec![Value::Num(start)], &a.call.name, a.call.span, |it| {
-        it.counting(&a.call.name, passes, false, |it| {
-            let mut current = start;
-            let mut pass = 0;
-            while sign(current - limit) != sign(step) {
-                it.tick(a.call.span)?;
-                pass += 1;
-                it.set_count(pass);
-                it.vars[sym as usize] = Some(Value::Num(current));
-                it.run_commands(&body, a.call.span)?;
-                let now = it.vars[sym as usize].as_ref().and_then(Value::as_num).unwrap_or(current);
-                current = now + step;
-            }
-            Ok(None)
-        })
-    })
+    it.with_locals(
+        &[sym],
+        vec![Value::Num(start)],
+        &a.call.name,
+        a.call.span,
+        |it| {
+            it.counting(&a.call.name, passes, false, |it| {
+                let mut current = start;
+                let mut pass = 0;
+                while sign(current - limit) != sign(step) {
+                    it.tick(a.call.span)?;
+                    pass += 1;
+                    it.set_count(pass);
+                    it.vars[sym as usize] = Some(Value::Num(current));
+                    it.run_commands(&body, a.call.span)?;
+                    let now = it.vars[sym as usize]
+                        .as_ref()
+                        .and_then(Value::as_num)
+                        .unwrap_or(current);
+                    current = now + step;
+                }
+                Ok(None)
+            })
+        },
+    )
 }
 
 fn is_else(v: &Value) -> bool {
@@ -207,8 +245,15 @@ pub(super) fn cond(it: &mut Interpreter, a: &Args) -> Out {
         let chosen = match &clause.items[0] {
             v if is_else(v) => true,
             Value::List(test) => match it.run_maybe(test, a.call.span)? {
-                Some(v) => v.as_bool().ok_or_else(|| a.error(format!("COND doesn't like {} as a condition", v.show())))?,
-                None => return Err(a.error(format!("{} didn't output TRUE or FALSE to COND", clause.items[0].show()))),
+                Some(v) => v.as_bool().ok_or_else(|| {
+                    a.error(format!("COND doesn't like {} as a condition", v.show()))
+                })?,
+                None => {
+                    return Err(a.error(format!(
+                        "{} didn't output TRUE or FALSE to COND",
+                        clause.items[0].show()
+                    )));
+                }
             },
             _ => return Err(a.doesnt_like(0)),
         };
@@ -243,7 +288,11 @@ pub(super) fn catch(it: &mut Interpreter, a: &Args) -> Out {
     let result = it.run_maybe(&list, a.call.span);
     it.catching_errors -= usize::from(errors);
     match result {
-        Err(Flow::Throw { tag: thrown, value, span }) if thrown.eq_ignore_ascii_case(&tag) => {
+        Err(Flow::Throw {
+            tag: thrown,
+            value,
+            span,
+        }) if thrown.eq_ignore_ascii_case(&tag) => {
             if !errors {
                 return Ok(value);
             }
@@ -253,7 +302,11 @@ pub(super) fn catch(it: &mut Interpreter, a: &Args) -> Out {
             Ok(None)
         }
         Err(Flow::Error(e)) if errors => {
-            let procedure = e.calls.first().map(|c| Rc::from(c.procedure.as_str())).or_else(|| it.current_procedure());
+            let procedure = e
+                .calls
+                .first()
+                .map(|c| Rc::from(c.procedure.as_str()))
+                .or_else(|| it.current_procedure());
             it.caught = Some(error_list(&e.message, procedure, e.span));
             Ok(None)
         }
@@ -264,10 +317,16 @@ pub(super) fn catch(it: &mut Interpreter, a: &Args) -> Out {
 /// `THROW tag` or `(THROW tag value)`.
 pub(super) fn throw(_: &mut Interpreter, a: &Args) -> Out {
     let tag = a.word(0)?;
-    Err(Flow::Throw { tag, value: a.vals.get(1).cloned(), span: a.call.span })
+    Err(Flow::Throw {
+        tag,
+        value: a.vals.get(1).cloned(),
+        span: a.call.span,
+    })
 }
 
 /// The error `CATCH "ERROR` caught last, which it then forgets, or `[]`.
 pub(super) fn error(it: &mut Interpreter, _: &Args) -> Out {
-    Ok(Some(it.caught.take().unwrap_or_else(|| Value::List(Rc::new(List::new(Vec::new()))))))
+    Ok(Some(it.caught.take().unwrap_or_else(|| {
+        Value::List(Rc::new(List::new(Vec::new())))
+    })))
 }

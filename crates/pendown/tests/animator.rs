@@ -6,11 +6,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use pendown_logo::RunError;
 use pendown::{
     animator::{Animator, Mode, Speed},
     run::{self, DEFAULT_CHANNEL, Run},
 };
+use pendown_logo::RunError;
 
 const FRAME: Duration = Duration::from_millis(16);
 
@@ -38,7 +38,10 @@ fn highlighted<'a>(src: &'a str, animator: &Animator) -> &'a str {
 fn wait_for_exit(run: &Run) -> Duration {
     let start = Instant::now();
     while run.exited().is_none() {
-        assert!(start.elapsed() < Duration::from_secs(2), "the interpreter didn't stop");
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "the interpreter didn't stop"
+        );
         thread::sleep(Duration::from_micros(100));
     }
     run.exited().unwrap().saturating_duration_since(start)
@@ -61,10 +64,16 @@ fn highlight_follows_the_turtle() {
         }
     }
     let order: Vec<_> = seen.iter().map(|(t, ..)| t.as_str()).collect();
-    assert_eq!(order, ["REPEAT 2 [FD 50 RT 90]", "FD 50", "RT 90", "FD 50", "RT 90"]);
+    assert_eq!(
+        order,
+        ["REPEAT 2 [FD 50 RT 90]", "FD 50", "RT 90", "FD 50", "RT 90"]
+    );
     // 2 moves of 0.5 s, 2 turns of 0.3 s and REPEAT's dwell of 0.1 s.
     let expected = (2.0 * 0.5 + 2.0 * 0.3 + 0.1) / FRAME.as_secs_f64();
-    assert!((frames as f64 - expected).abs() <= 3.0, "{frames} frames, expected about {expected:.0}");
+    assert!(
+        (frames as f64 - expected).abs() <= 3.0,
+        "{frames} frames, expected about {expected:.0}"
+    );
 }
 
 #[test]
@@ -99,10 +108,17 @@ fn speed_changes_mid_move() {
         ys.push(animator.pos.y);
     }
     let steps: Vec<_> = ys.windows(2).map(|w| (w[1] - w[0]).round()).collect();
-    assert_eq!(steps, [10.0, 10.0, 10.0, 10.0, 40.0, 40.0, 40.0, 40.0, 40.0]);
+    assert_eq!(
+        steps,
+        [10.0, 10.0, 10.0, 10.0, 40.0, 40.0, 40.0, 40.0, 40.0]
+    );
     animator.set_speed(Speed::Instant);
     frame(&mut animator, dt);
-    assert_eq!(animator.pos.y.round(), 1000.0, "Instant finishes the move at once");
+    assert_eq!(
+        animator.pos.y.round(),
+        1000.0,
+        "Instant finishes the move at once"
+    );
 }
 
 const STEPPER: &str = "MAKE \"n 0
@@ -139,8 +155,21 @@ fn step_runs_one_line_and_nothing_ahead() {
         let printed = until_paused(&mut animator);
         // Give the interpreter every chance to run ahead, if it could.
         thread::sleep(Duration::from_millis(20));
-        assert_eq!(animator.lines_ahead(), 0, "at {:?}", highlighted(src, &animator));
-        steps.push(format!("{}{}", highlighted(src, &animator), if printed.is_empty() { String::new() } else { format!(" | printed {printed:?}") }));
+        assert_eq!(
+            animator.lines_ahead(),
+            0,
+            "at {:?}",
+            highlighted(src, &animator)
+        );
+        steps.push(format!(
+            "{}{}",
+            highlighted(src, &animator),
+            if printed.is_empty() {
+                String::new()
+            } else {
+                format!(" | printed {printed:?}")
+            }
+        ));
     }
     let expected = [
         "MAKE \"n 0",
@@ -169,13 +198,30 @@ fn step_instruction_goes_inside_a_line() {
         until_paused(&mut animator);
         order.push(highlighted(src, &animator).to_string());
     }
-    assert_eq!(order, ["REPEAT 2 [FD 10 RT 90]", "FD 10", "RT 90", "FD 10", "RT 90", "PRINT \"done", "PRINT \"done"]);
+    assert_eq!(
+        order,
+        [
+            "REPEAT 2 [FD 10 RT 90]",
+            "FD 10",
+            "RT 90",
+            "FD 10",
+            "RT 90",
+            "PRINT \"done",
+            "PRINT \"done"
+        ]
+    );
 }
 
 /// The panels' contents, in short: the counters, then the variables.
 fn watched(animator: &Animator) -> String {
-    let Some(w) = &animator.watch else { return String::new() };
-    let mut parts: Vec<String> = w.counters.iter().map(|c| format!("{} {}", c.name, c.count)).collect();
+    let Some(w) = &animator.watch else {
+        return String::new();
+    };
+    let mut parts: Vec<String> = w
+        .counters
+        .iter()
+        .map(|c| format!("{} {}", c.name, c.count))
+        .collect();
     for scope in &w.scopes {
         for v in &scope.variables {
             parts.push(format!("{}={}", v.name, v.value.as_deref().unwrap_or("-")));
@@ -196,7 +242,11 @@ fn the_panels_keep_in_step_with_the_highlight() {
         animator.step_instruction();
         until_paused(&mut animator);
         thread::sleep(Duration::from_millis(5));
-        seen.push(format!("{} | {}", highlighted(src, &animator), watched(&animator)));
+        seen.push(format!(
+            "{} | {}",
+            highlighted(src, &animator),
+            watched(&animator)
+        ));
     }
     assert_eq!(
         seen,
@@ -227,7 +277,15 @@ fn the_panels_follow_a_running_program() {
             seen.push(now);
         }
     }
-    assert_eq!(seen, ["MAKE \"x 1 | ", "FD 20 | x=1", "MAKE \"x 2 | x=1", "FD 20 | x=2"]);
+    assert_eq!(
+        seen,
+        [
+            "MAKE \"x 1 | ",
+            "FD 20 | x=1",
+            "MAKE \"x 2 | x=1",
+            "FD 20 | x=2"
+        ]
+    );
 }
 
 #[test]
@@ -342,7 +400,10 @@ TREE 200 14";
     }
     assert_eq!(run.result(), Some(Ok(())));
     assert_eq!(segments, 2 * (2usize.pow(14) - 1));
-    eprintln!("{segments} segments in {:?}, not drawing them", started.elapsed());
+    eprintln!(
+        "{segments} segments in {:?}, not drawing them",
+        started.elapsed()
+    );
 }
 
 #[test]
@@ -373,16 +434,30 @@ fn arcs_carry_the_turtle_along_them() {
         frame(&mut animator, FRAME);
         frames += 1;
         if frames == 48 {
-            halfway = Some((animator.pos, animator.heading, animator.partial(0.1).map(|(p, _)| p.len())));
+            halfway = Some((
+                animator.pos,
+                animator.heading,
+                animator.partial(0.1).map(|(p, _)| p.len()),
+            ));
         }
     }
-    assert!((frames as f64 - 157.0 / 100.0 / FRAME.as_secs_f64()).abs() <= 3.0, "{frames} frames");
+    assert!(
+        (frames as f64 - 157.0 / 100.0 / FRAME.as_secs_f64()).abs() <= 3.0,
+        "{frames} frames"
+    );
     let (pos, heading, partial) = halfway.unwrap();
     // Half way round, the turtle is 45 degrees along, on the circle.
     assert!((heading - 45.0).abs() < 2.0, "heading {heading}");
     assert!((((pos.x - 100.0).powi(2) + pos.y.powi(2)).sqrt() - 100.0).abs() < 1e-6);
     assert!(partial.unwrap() > 2, "the arc so far is drawn as a curve");
-    assert_eq!((animator.pos.x.round(), animator.pos.y.round(), animator.heading.round()), (100.0, 100.0, 90.0));
+    assert_eq!(
+        (
+            animator.pos.x.round(),
+            animator.pos.y.round(),
+            animator.heading.round()
+        ),
+        (100.0, 100.0, 90.0)
+    );
 }
 
 #[test]
@@ -395,11 +470,18 @@ fn shapes_sweep_round_and_pen_up_shapes_take_no_time() {
         if frames == 10 {
             let (points, _) = animator.partial(0.1).expect("sweeping");
             assert_eq!(points[0].y.round(), 50.0, "starting straight ahead");
-            assert_eq!((animator.pos.x, animator.pos.y), (0.0, 0.0), "the turtle stays put");
+            assert_eq!(
+                (animator.pos.x, animator.pos.y),
+                (0.0, 0.0),
+                "the turtle stays put"
+            );
         }
     }
     // 314 steps round at 100 a second.
-    assert!((frames as f64 - std::f64::consts::PI / FRAME.as_secs_f64()).abs() <= 3.0, "{frames} frames");
+    assert!(
+        (frames as f64 - std::f64::consts::PI / FRAME.as_secs_f64()).abs() <= 3.0,
+        "{frames} frames"
+    );
     let (mut animator, _run) = start("PU CIRCLE 50 SQUARE 80", Speed::Animated(100.0));
     let mut frames = 0;
     while !animator.finished() && frames < 1000 {
@@ -472,7 +554,11 @@ fn setspeed_changes_the_speed_where_it_runs() {
             changed = Some(speed);
         }
     }
-    assert_eq!(changed, Some(Speed::Animated(20.0)), "level 3 is 20 steps a second");
+    assert_eq!(
+        changed,
+        Some(Speed::Animated(20.0)),
+        "level 3 is 20 steps a second"
+    );
     assert_eq!(animator.speed(), Speed::Animated(20.0));
 }
 
@@ -487,14 +573,22 @@ fn metrics_count_frames_and_events() {
         frames += 1;
     }
     let m = &animator.metrics;
-    assert!(m.frames.count() >= frames, "every frame is timed: {} of {frames}", m.frames.count());
+    assert!(
+        m.frames.count() >= frames,
+        "every frame is timed: {} of {frames}",
+        m.frames.count()
+    );
     // REPEAT, then two each of FD and RT with their Instruction and Move or
     // Turn, and a Sync at the start of the one line. Four Watches: at
     // REPEAT, at each FD as the counter moves on, and at the end.
     assert_eq!(m.events.get(), 14);
     let interp = &run.control.metrics;
     assert_eq!(interp.lockstep.count(), 1, "one line, one Sync");
-    assert_eq!(interp.instructions.get(), 7, "REPEAT, its 2 passes, and 2 each of FD and RT");
+    assert_eq!(
+        interp.instructions.get(),
+        7,
+        "REPEAT, its 2 passes, and 2 each of FD and RT"
+    );
 }
 
 /// Issue 08: the window skips frames that would look the same.
@@ -517,7 +611,10 @@ fn next_change_is_when_the_picture_moves_a_pixel() {
     let (mut animator, _run) = start("RT 90", Speed::Animated(20.0));
     frame(&mut animator, FRAME);
     let gap = ms(animator.next_change(1.0, 18.0));
-    assert!((gap - 1000.0 / (18.0 * 60.0f64.to_radians())).abs() < 0.01, "{gap}");
+    assert!(
+        (gap - 1000.0 / (18.0 * 60.0f64.to_radians())).abs() < 0.01,
+        "{gap}"
+    );
 
     // A hidden turtle turning shows nothing until the turn is done.
     let (mut animator, _run) = start("HT\nRT 3", Speed::Animated(20.0));
@@ -603,7 +700,11 @@ mod budgets {
         animator.pause();
         assert!(!animator.wants_frames());
         let out = animator.frame(FRAME, usize::MAX);
-        assert_eq!((out.events, out.marks.len()), (0, 0), "a paused frame takes nothing");
+        assert_eq!(
+            (out.events, out.marks.len()),
+            (0, 0),
+            "a paused frame takes nothing"
+        );
         animator.resume();
         while !animator.finished() {
             frame(&mut animator, MAX_FRAME_GAP);

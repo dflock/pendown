@@ -4,11 +4,7 @@
 use std::{
     cell::RefCell,
     rc::Rc,
-    sync::{
-        Arc,
-        atomic::Ordering,
-        mpsc,
-    },
+    sync::{Arc, atomic::Ordering, mpsc},
     thread,
     time::{Duration, Instant},
 };
@@ -60,12 +56,21 @@ impl Run {
     fn printed(&self) -> String {
         self.events
             .iter()
-            .filter_map(|e| if let Event::Print(text) = e { Some(text.as_str()) } else { None })
+            .filter_map(|e| {
+                if let Event::Print(text) = e {
+                    Some(text.as_str())
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
     fn moves(&self) -> usize {
-        self.events.iter().filter(|e| matches!(e, Event::Move { .. })).count()
+        self.events
+            .iter()
+            .filter(|e| matches!(e, Event::Move { .. }))
+            .count()
     }
 
     fn error(&self) -> &Error {
@@ -81,11 +86,21 @@ fn run_with(src: &str, limits: Limits) -> Run {
     it.limits = limits;
     let result = it.run_program(src);
     let events = events.0.borrow().clone();
-    Run { result, events, stats: it.stats }
+    Run {
+        result,
+        events,
+        stats: it.stats,
+    }
 }
 
 fn run(src: &str) -> Run {
-    run_with(src, Limits { instruction_events: false, ..Limits::default() })
+    run_with(
+        src,
+        Limits {
+            instruction_events: false,
+            ..Limits::default()
+        },
+    )
 }
 
 /// What `src` prints, which must run without errors.
@@ -97,7 +112,12 @@ fn output(src: &str) -> String {
 
 /// Runs `f` on a thread with a stack of `bytes`, as the GUI will.
 fn on_stack<T: Send + 'static>(bytes: usize, f: impl FnOnce() -> T + Send + 'static) -> T {
-    thread::Builder::new().stack_size(bytes).spawn(f).unwrap().join().unwrap()
+    thread::Builder::new()
+        .stack_size(bytes)
+        .spawn(f)
+        .unwrap()
+        .join()
+        .unwrap()
 }
 
 const MB: usize = 1024 * 1024;
@@ -105,7 +125,12 @@ const MB: usize = 1024 * 1024;
 /// A small stack and a low depth limit: if a call that should be a tail call
 /// isn't one, these fail with "called itself too many times".
 fn tail_limits() -> Limits {
-    Limits { max_depth: 50, stack_bytes: Some(MB), instruction_events: false, max_instructions: None }
+    Limits {
+        max_depth: 50,
+        stack_bytes: Some(MB),
+        instruction_events: false,
+        max_instructions: None,
+    }
 }
 
 fn tail_run(src: &'static str) -> (Result<(), RunError>, String, usize) {
@@ -121,7 +146,10 @@ fn tail_run(src: &'static str) -> (Result<(), RunError>, String, usize) {
 fn spiral_runs_in_constant_space() {
     let (moves, result, stats) = on_stack(MB, || {
         let moves = Rc::new(RefCell::new(0));
-        let sink = StopAfterMoves { moves: moves.clone(), limit: 1_000_000 };
+        let sink = StopAfterMoves {
+            moves: moves.clone(),
+            limit: 1_000_000,
+        };
         let mut it = Interpreter::new(Box::new(sink), Arc::default());
         it.limits = tail_limits();
         // The one-line form from the issue.
@@ -136,19 +164,22 @@ fn spiral_runs_in_constant_space() {
 
 #[test]
 fn tail_call_inside_if() {
-    let (r, out, depth) = tail_run("TO DOWN :n\n IF :n > 0 [DOWN :n - 1]\nEND\nDOWN 1000000\nPRINT \"done");
+    let (r, out, depth) =
+        tail_run("TO DOWN :n\n IF :n > 0 [DOWN :n - 1]\nEND\nDOWN 1000000\nPRINT \"done");
     assert_eq!((r, out.as_str(), depth), (Ok(()), "done\n", 1));
 }
 
 #[test]
 fn tail_call_inside_ifelse() {
-    let (r, out, depth) = tail_run("TO DOWN :n\n IFELSE :n = 0 [PRINT \"done] [DOWN :n - 1]\nEND\nDOWN 1000000");
+    let (r, out, depth) =
+        tail_run("TO DOWN :n\n IFELSE :n = 0 [PRINT \"done] [DOWN :n - 1]\nEND\nDOWN 1000000");
     assert_eq!((r, out.as_str(), depth), (Ok(()), "done\n", 1));
 }
 
 #[test]
 fn tail_call_inside_three_input_if() {
-    let (r, out, _) = tail_run("TO DOWN :n\n (IF :n = 0 [PRINT \"done] [DOWN :n - 1])\nEND\nDOWN 1000000");
+    let (r, out, _) =
+        tail_run("TO DOWN :n\n (IF :n = 0 [PRINT \"done] [DOWN :n - 1])\nEND\nDOWN 1000000");
     assert_eq!((r, out.as_str()), (Ok(()), "done\n"));
 }
 
@@ -177,10 +208,14 @@ fn tail_call_inside_output_ifelse() {
 fn calls_that_are_not_tail_calls_still_nest() {
     // Something runs after the call, so it can't be a tail call.
     let (r, _, _) = tail_run("TO G :n\n IF :n > 0 [G :n - 1 PRINT :n]\nEND\nG 100");
-    assert!(matches!(r, Err(RunError::Runtime(e)) if e.message.starts_with("G called itself too many times")));
+    assert!(
+        matches!(r, Err(RunError::Runtime(e)) if e.message.starts_with("G called itself too many times"))
+    );
     // REPEAT's list is never in tail position.
     let (r, _, _) = tail_run("TO R :n\n IF :n > 0 [REPEAT 1 [R :n - 1]]\nEND\nR 100");
-    assert!(matches!(r, Err(RunError::Runtime(e)) if e.message.starts_with("R called itself too many times")));
+    assert!(
+        matches!(r, Err(RunError::Runtime(e)) if e.message.starts_with("R called itself too many times"))
+    );
 }
 
 #[test]
@@ -218,7 +253,11 @@ PRINT FIB 25
 ";
 
 fn deep_limits() -> Limits {
-    Limits { stack_bytes: Some(256 * MB), instruction_events: false, ..Limits::default() }
+    Limits {
+        stack_bytes: Some(256 * MB),
+        instruction_events: false,
+        ..Limits::default()
+    }
 }
 
 #[test]
@@ -247,7 +286,10 @@ fn past_the_depth_limit_is_a_friendly_error() {
         let e = r.error().clone();
         (e.message, r.stats.max_depth, e.calls.len())
     });
-    assert_eq!(message, "DOWN called itself too many times: 10001 calls deep. Does it have a way to STOP?");
+    assert_eq!(
+        message,
+        "DOWN called itself too many times: 10001 calls deep. Does it have a way to STOP?"
+    );
     assert_eq!(depth, 10_001);
     assert_eq!(calls, 10_000);
 }
@@ -257,17 +299,30 @@ fn running_out_of_stack_is_the_same_friendly_error() {
     // A small stack and no real depth limit: the stack guard stops it.
     let src = "TO DOWN :n\n DOWN :n + 1\n PRINT :n\nEND\nDOWN 1";
     let message = on_stack(4 * MB, move || {
-        let limits = Limits { max_depth: usize::MAX, stack_bytes: Some(4 * MB), instruction_events: false, max_instructions: None };
+        let limits = Limits {
+            max_depth: usize::MAX,
+            stack_bytes: Some(4 * MB),
+            instruction_events: false,
+            max_instructions: None,
+        };
         run_with(src, limits).error().message.clone()
     });
-    assert!(message.starts_with("DOWN called itself too many times"), "{message}");
+    assert!(
+        message.starts_with("DOWN called itself too many times"),
+        "{message}"
+    );
 }
 
 #[test]
 fn mutual_recursion_past_the_limit() {
     let src = "TO A :n\n B :n + 1\n PRINT :n\nEND\nTO B :n\n A :n + 1\n PRINT :n\nEND\nA 1";
-    let message = on_stack(256 * MB, move || run_with(src, deep_limits()).error().message.clone());
-    assert_eq!(message, "Too many procedures were running inside each other (10001 deep) when A was called");
+    let message = on_stack(256 * MB, move || {
+        run_with(src, deep_limits()).error().message.clone()
+    });
+    assert_eq!(
+        message,
+        "Too many procedures were running inside each other (10001 deep) when A was called"
+    );
 }
 
 // 3. Calls before definitions.
@@ -295,35 +350,61 @@ fn arity_from_a_later_definition_groups_inputs() {
 #[test]
 fn parse_errors_are_collected_and_nothing_runs() {
     let r = run("PRINT \"before\nFD\nFOO 3\nTO BOX :n\nREPEAT 4 [FD :n RT 90]");
-    let Err(RunError::Parse(errors)) = r.result else { panic!("{:?}", r.result) };
+    let Err(RunError::Parse(errors)) = r.result else {
+        panic!("{:?}", r.result)
+    };
     let messages: Vec<_> = errors.iter().map(|e| e.message.as_str()).collect();
-    assert_eq!(messages, ["BOX has no END", "Not enough inputs to FD", "I don't know how to FOO"]);
+    assert_eq!(
+        messages,
+        [
+            "BOX has no END",
+            "Not enough inputs to FD",
+            "I don't know how to FOO"
+        ]
+    );
     assert!(r.events.is_empty());
 }
 
 #[test]
 fn run_starts_from_a_clean_slate_and_the_console_keeps_it() {
     let (mut it, events) = interpreter();
-    it.run_program("TO BOX :n REPEAT 4 [FD :n RT 90] END\nMAKE \"size 20").unwrap();
+    it.run_program("TO BOX :n REPEAT 4 [FD :n RT 90] END\nMAKE \"size 20")
+        .unwrap();
     it.run_console("BOX :size").unwrap();
-    assert_eq!(events.0.borrow().iter().filter(|e| matches!(e, Event::Move { .. })).count(), 4);
+    assert_eq!(
+        events
+            .0
+            .borrow()
+            .iter()
+            .filter(|e| matches!(e, Event::Move { .. }))
+            .count(),
+        4
+    );
     it.run_program("PRINT 1").unwrap();
-    let Err(RunError::Parse(errors)) = it.run_console("BOX 10") else { panic!() };
+    let Err(RunError::Parse(errors)) = it.run_console("BOX 10") else {
+        panic!()
+    };
     assert_eq!(errors[0].message, "I don't know how to BOX");
 }
 
 #[test]
 fn bad_procedure_names() {
     let r = run("TO FD :n END");
-    let Err(RunError::Parse(errors)) = r.result else { panic!() };
-    assert_eq!(errors[0].message, "FD is already a Pendown command, so pick another name");
+    let Err(RunError::Parse(errors)) = r.result else {
+        panic!()
+    };
+    assert_eq!(
+        errors[0].message,
+        "FD is already a Pendown command, so pick another name"
+    );
 }
 
 // 4. The minus sign.
 
 fn sexp(src: &str) -> Vec<String> {
     let (mut it, _) = interpreter();
-    it.parse_to_sexp(src).unwrap_or_else(|e| panic!("{src}: {e:?}"))
+    it.parse_to_sexp(src)
+        .unwrap_or_else(|e| panic!("{src}: {e:?}"))
 }
 
 #[test]
@@ -355,13 +436,18 @@ fn minus_sign() {
 fn minus_sign_values() {
     assert_eq!(output("PRINT - 3 + 4"), "1\n");
     assert_eq!(output("PRINT MINUS 3 + 4"), "-7\n");
-    assert_eq!(output("MAKE \"a 10 PRINT :a-5 PRINT :a - 5 PRINT SUM :a -5"), "5\n5\n5\n");
+    assert_eq!(
+        output("MAKE \"a 10 PRINT :a-5 PRINT :a - 5 PRINT SUM :a -5"),
+        "5\n5\n5\n"
+    );
 }
 
 #[test]
 fn minus_sign_errors() {
     let r = run("MAKE \"a 10\nPRINT SUM :a - 5");
-    let Err(RunError::Parse(errors)) = r.result else { panic!() };
+    let Err(RunError::Parse(errors)) = r.result else {
+        panic!()
+    };
     assert_eq!(errors[0].message, "Not enough inputs to SUM");
 }
 
@@ -371,7 +457,9 @@ fn texts(src: &str, events: &[Event]) -> Vec<(String, bool)> {
     events
         .iter()
         .filter_map(|e| match e {
-            Event::Instruction { span, starts_line } => Some((src[span.range()].to_string(), *starts_line)),
+            Event::Instruction { span, starts_line } => {
+                Some((src[span.range()].to_string(), *starts_line))
+            }
             _ => None,
         })
         .collect()
@@ -404,8 +492,20 @@ fn spans_inside_repeat_and_procedures() {
 fn multi_line_lists_start_lines() {
     let src = "REPEAT 2 [\n  FD 10\n  RT 90\n]";
     let r = traced(src);
-    let starts: Vec<_> = texts(src, &r.events).into_iter().map(|(t, s)| format!("{t}:{s}")).collect();
-    assert_eq!(starts, ["REPEAT 2 [\n  FD 10\n  RT 90\n]:true", "FD 10:true", "RT 90:true", "FD 10:true", "RT 90:true"]);
+    let starts: Vec<_> = texts(src, &r.events)
+        .into_iter()
+        .map(|(t, s)| format!("{t}:{s}"))
+        .collect();
+    assert_eq!(
+        starts,
+        [
+            "REPEAT 2 [\n  FD 10\n  RT 90\n]:true",
+            "FD 10:true",
+            "RT 90:true",
+            "FD 10:true",
+            "RT 90:true"
+        ]
+    );
 }
 
 #[test]
@@ -424,30 +524,53 @@ fn runtime_error_spans_and_call_chain() {
     let e = r.error();
     assert_eq!(e.message, "FD doesn't like far as input");
     assert_eq!(&src[e.span.unwrap().range()], "\"far");
-    let chain: Vec<_> = e.calls.iter().map(|c| (c.procedure.as_str(), &src[c.span.range()], c.span.line)).collect();
+    let chain: Vec<_> = e
+        .calls
+        .iter()
+        .map(|c| (c.procedure.as_str(), &src[c.span.range()], c.span.line))
+        .collect();
     assert_eq!(chain, [("B", "B", 1), ("A", "A", 8)]);
-    assert_eq!(e.to_string(), "FD doesn't like far as input, in B (line 2), called from A (line 9)");
+    assert_eq!(
+        e.to_string(),
+        "FD doesn't like far as input, in B (line 2), called from A (line 9)"
+    );
 }
 
 #[test]
 fn parse_error_spans() {
     let src = "FD 10\nRT\nREPEAT 4 [FD 10";
     let r = run(src);
-    let Err(RunError::Parse(errors)) = r.result else { panic!() };
+    let Err(RunError::Parse(errors)) = r.result else {
+        panic!()
+    };
     // The reader fails first, on the unclosed bracket, before anything parses.
     assert_eq!(errors.len(), 1);
     assert_eq!(&src[errors[0].span.unwrap().range()], "[");
     let src = "FD 10\nRT\nPRINT (1 + 2";
-    let Err(RunError::Parse(errors)) = run(src).result else { panic!() };
-    let found: Vec<_> = errors.iter().map(|e| (e.message.as_str(), &src[e.span.unwrap().range()])).collect();
-    assert_eq!(found, [("Not enough inputs to RT", "RT"), ("This ( has no matching )", "(")]);
+    let Err(RunError::Parse(errors)) = run(src).result else {
+        panic!()
+    };
+    let found: Vec<_> = errors
+        .iter()
+        .map(|e| (e.message.as_str(), &src[e.span.unwrap().range()]))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            ("Not enough inputs to RT", "RT"),
+            ("This ( has no matching )", "(")
+        ]
+    );
 }
 
 #[test]
 fn errors_in_lists_point_into_the_list() {
     let src = "REPEAT 2 [FD 10 FOO]";
     let e = run(src).error().clone();
-    assert_eq!((e.message.as_str(), &src[e.span.unwrap().range()]), ("I don't know how to FOO", "FOO"));
+    assert_eq!(
+        (e.message.as_str(), &src[e.span.unwrap().range()]),
+        ("I don't know how to FOO", "FOO")
+    );
 }
 
 #[test]
@@ -483,7 +606,11 @@ fn printing_numbers() {
         ("(WORD 1 2) + 1", "13"),
     ];
     for (expr, expected) in cases {
-        assert_eq!(output(&format!("PRINT {expr}")), format!("{expected}\n"), "{expr}");
+        assert_eq!(
+            output(&format!("PRINT {expr}")),
+            format!("{expected}\n"),
+            "{expr}"
+        );
     }
 }
 
@@ -506,7 +633,11 @@ fn equality() {
         ("EQUALP 1 1", "true"),
     ];
     for (expr, expected) in cases {
-        assert_eq!(output(&format!("PRINT {expr}")), format!("{expected}\n"), "{expr}");
+        assert_eq!(
+            output(&format!("PRINT {expr}")),
+            format!("{expected}\n"),
+            "{expr}"
+        );
     }
 }
 
@@ -520,7 +651,10 @@ fn stepping_by_a_tenth_reaches_one() {
 fn one_line_and_multi_line_definitions_mix() {
     let src = "TO DOUBLE :n OUTPUT :n * 2 END\nTO BOX :n\n  REPEAT 4 [FD DOUBLE :n RT 90]\nEND\nBOX 5 PRINT DOUBLE 4";
     let r = run(src);
-    assert_eq!((r.result.clone(), r.moves(), r.printed().as_str()), (Ok(()), 4, "8\n"));
+    assert_eq!(
+        (r.result.clone(), r.moves(), r.printed().as_str()),
+        (Ok(()), 4, "8\n")
+    );
 }
 
 #[test]
@@ -576,12 +710,19 @@ fn stop_wakes_a_blocked_interpreter() {
     drop(rx);
     let result = interp.join().unwrap();
     assert_eq!(result, Err(RunError::Halted));
-    assert!(start.elapsed() < Duration::from_millis(50), "{:?}", start.elapsed());
+    assert!(
+        start.elapsed() < Duration::from_millis(50),
+        "{:?}",
+        start.elapsed()
+    );
 }
 
 #[test]
 fn stop_is_not_an_error_at_top_level() {
-    assert_eq!(run("STOP").error().message, "STOP can only be used inside a procedure");
+    assert_eq!(
+        run("STOP").error().message,
+        "STOP can only be used inside a procedure"
+    );
 }
 
 // Display spelling (ADR 0004), added with phase 1.
@@ -593,12 +734,19 @@ fn the_first_definition_decides_the_spelling() {
     assert_eq!(r.error().calls[0].procedure, "Box");
 
     let (mut it, _) = interpreter();
-    it.run_program("PRINT 1\nMAKE \"Size 3\nPRINT :SIZE").unwrap();
-    assert_eq!(it.parse_to_sexp("PRINT :size"), Ok(vec!["(print :Size)".to_string()]));
+    it.run_program("PRINT 1\nMAKE \"Size 3\nPRINT :SIZE")
+        .unwrap();
+    assert_eq!(
+        it.parse_to_sexp("PRINT :size"),
+        Ok(vec!["(print :Size)".to_string()])
+    );
 
     // Run starts again: the next definition decides.
     it.run_program("MAKE \"SIZE 4").unwrap();
-    assert_eq!(it.parse_to_sexp("PRINT :size"), Ok(vec!["(print :SIZE)".to_string()]));
+    assert_eq!(
+        it.parse_to_sexp("PRINT :size"),
+        Ok(vec!["(print :SIZE)".to_string()])
+    );
 }
 
 // The instruction limit, added for pendown-cli.
@@ -606,7 +754,17 @@ fn the_first_definition_decides_the_spelling() {
 #[test]
 fn an_endless_program_stops_at_the_instruction_limit() {
     let src = "FOREVER [FD 1 RT 1]";
-    let r = run_with(src, Limits { max_instructions: Some(1000), instruction_events: false, ..Limits::default() });
-    assert_eq!(r.error().message, "Stopped after 1000 instructions: does this program ever end?");
+    let r = run_with(
+        src,
+        Limits {
+            max_instructions: Some(1000),
+            instruction_events: false,
+            ..Limits::default()
+        },
+    );
+    assert_eq!(
+        r.error().message,
+        "Stopped after 1000 instructions: does this program ever end?"
+    );
     assert_eq!(r.stats.instructions, 1001);
 }

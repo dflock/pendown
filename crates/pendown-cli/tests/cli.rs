@@ -42,9 +42,16 @@ fn size_of(path: PathBuf) -> (u32, u32) {
 #[test]
 fn saves_next_to_the_program_by_default() {
     let d = dir("default-output");
-    std::fs::write(d.join("square.logo"), "REPEAT 4 [FD 100 RT 90]\nPRINT \"done").unwrap();
+    std::fs::write(
+        d.join("square.logo"),
+        "REPEAT 4 [FD 100 RT 90]\nPRINT \"done",
+    )
+    .unwrap();
     let r = cli(&d, &["square.logo"]);
-    assert_eq!((r.status, r.stdout.as_str(), r.stderr.as_str()), (0, "done\n", ""));
+    assert_eq!(
+        (r.status, r.stdout.as_str(), r.stderr.as_str()),
+        (0, "done\n", "")
+    );
     assert_eq!(size_of(d.join("square.png")), (1000, 1000));
 }
 
@@ -52,7 +59,10 @@ fn saves_next_to_the_program_by_default() {
 fn output_and_size_options() {
     let d = dir("options");
     std::fs::write(d.join("square.logo"), "REPEAT 4 [FD 100 RT 90]").unwrap();
-    let r = cli(&d, &["square.logo", "--output", "out.png", "--size", "250x300"]);
+    let r = cli(
+        &d,
+        &["square.logo", "--output", "out.png", "--size", "250x300"],
+    );
     assert_eq!(r.status, 0, "{}", r.stderr);
     assert_eq!(size_of(d.join("out.png")), (250, 300));
     let r = cli(&d, &["square.logo", "-o", "small.png", "-s", "20x10"]);
@@ -79,7 +89,12 @@ fn a_bad_size_is_a_usage_error() {
     std::fs::write(d.join("p.logo"), "FD 10").unwrap();
     let r = cli(&d, &["p.logo", "--size", "250"]);
     assert_eq!(r.status, 2);
-    assert!(r.stderr.contains("expected a size like 250x300, not \"250\""), "{}", r.stderr);
+    assert!(
+        r.stderr
+            .contains("expected a size like 250x300, not \"250\""),
+        "{}",
+        r.stderr
+    );
 }
 
 #[test]
@@ -88,7 +103,10 @@ fn parse_errors_are_reported_and_nothing_is_saved() {
     std::fs::write(d.join("p.logo"), "FD 10\nRT\nFOO 3").unwrap();
     let r = cli(&d, &["p.logo"]);
     assert_eq!(r.status, 1);
-    assert_eq!(r.stderr, "p.logo:2:1: Not enough inputs to RT\np.logo:3:1: I don't know how to FOO\n");
+    assert_eq!(
+        r.stderr,
+        "p.logo:2:1: Not enough inputs to RT\np.logo:3:1: I don't know how to FOO\n"
+    );
     assert!(!d.join("p.png").exists());
 }
 
@@ -113,7 +131,12 @@ fn endless_programs_stop_at_the_limit() {
     let r = cli(&d, &["forever.logo", "--limit", "5000"]);
     assert_eq!(r.status, 1);
     assert!(r.stderr.starts_with("forever.logo:1:"), "{}", r.stderr);
-    assert!(r.stderr.contains(": Stopped after 5000 instructions: does this program ever end?\n"), "{}", r.stderr);
+    assert!(
+        r.stderr
+            .contains(": Stopped after 5000 instructions: does this program ever end?\n"),
+        "{}",
+        r.stderr
+    );
     assert!(d.join("forever.png").exists());
 }
 
@@ -122,7 +145,11 @@ fn a_missing_program_is_an_error() {
     let d = dir("missing");
     let r = cli(&d, &["nothing.logo"]);
     assert_eq!(r.status, 1);
-    assert!(r.stderr.starts_with("nothing.logo: can't read it:"), "{}", r.stderr);
+    assert!(
+        r.stderr.starts_with("nothing.logo: can't read it:"),
+        "{}",
+        r.stderr
+    );
 }
 
 #[test]
@@ -142,7 +169,15 @@ fn metrics_print_a_summary_on_stderr() {
     let r = cli_with(&d, &["square.logo"], "1");
     // REPEAT, its 4 passes, and 4 each of FD and RT.
     assert_eq!((r.status, r.stdout.as_str()), (0, ""));
-    assert!(r.stderr.starts_with("run ") && r.stderr.contains(": 13 instructions at "), "{}", r.stderr);
-    assert!(r.stderr.contains("4 marks drawn in") && r.stderr.contains("; CPU main "), "{}", r.stderr);
+    assert!(
+        r.stderr.starts_with("run ") && r.stderr.contains(": 13 instructions at "),
+        "{}",
+        r.stderr
+    );
+    assert!(
+        r.stderr.contains("4 marks drawn in") && r.stderr.contains("; CPU main "),
+        "{}",
+        r.stderr
+    );
     assert_eq!(cli_with(&d, &["square.logo"], "0").stderr, "");
 }

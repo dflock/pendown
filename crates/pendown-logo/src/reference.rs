@@ -86,7 +86,11 @@ pub struct Chapter {
 impl Chapter {
     /// Every command in the chapter, in order.
     pub fn all(&self) -> impl Iterator<Item = usize> + '_ {
-        self.commands.iter().copied().chain(self.sections.iter().flat_map(|s| s.commands.iter().copied()))
+        self.commands.iter().copied().chain(
+            self.sections
+                .iter()
+                .flat_map(|s| s.commands.iter().copied()),
+        )
     }
 }
 
@@ -101,46 +105,76 @@ pub struct Reference {
 /// The reference, parsed the first time it's asked for.
 pub fn reference() -> &'static Reference {
     static REFERENCE: OnceLock<Reference> = OnceLock::new();
-    REFERENCE.get_or_init(|| Reference::parse(SOURCE).unwrap_or_else(|e| panic!("pendown-logo.kdl doesn't parse: {e}")))
+    REFERENCE.get_or_init(|| {
+        Reference::parse(SOURCE).unwrap_or_else(|e| panic!("pendown-logo.kdl doesn't parse: {e}"))
+    })
 }
 
 /// `turtle-motion` as a title: "Turtle motion".
 fn title(key: &str) -> String {
     let words = key.replace('-', " ");
     let mut chars = words.chars();
-    chars.next().map(|c| c.to_uppercase().chain(chars).collect()).unwrap_or_default()
+    chars
+        .next()
+        .map(|c| c.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
 }
 
 fn child<'a>(node: &'a KdlNode, name: &str) -> Option<&'a KdlValue> {
-    node.children()?.get(name)?.entries().iter().find(|e| e.name().is_none()).map(|e| e.value())
+    node.children()?
+        .get(name)?
+        .entries()
+        .iter()
+        .find(|e| e.name().is_none())
+        .map(|e| e.value())
 }
 
 fn string(node: &KdlNode, name: &str) -> Option<String> {
-    child(node, name).and_then(|v| v.as_string()).map(str::to_string)
+    child(node, name)
+        .and_then(|v| v.as_string())
+        .map(str::to_string)
 }
 
 /// Every unnamed string a child node holds, in order, from every node of
 /// that name: `see "back" "left"`.
 fn strings(node: &KdlNode, name: &str) -> Vec<String> {
-    let Some(children) = node.children() else { return Vec::new() };
+    let Some(children) = node.children() else {
+        return Vec::new();
+    };
     children
         .nodes()
         .iter()
         .filter(|n| n.name().value() == name)
-        .flat_map(|n| n.entries().iter().filter(|e| e.name().is_none()).filter_map(|e| e.value().as_string()))
+        .flat_map(|n| {
+            n.entries()
+                .iter()
+                .filter(|e| e.name().is_none())
+                .filter_map(|e| e.value().as_string())
+        })
         .map(str::to_string)
         .collect()
 }
 
 fn examples(node: &KdlNode) -> Vec<Example> {
-    let Some(children) = node.children() else { return Vec::new() };
+    let Some(children) = node.children() else {
+        return Vec::new();
+    };
     children
         .nodes()
         .iter()
         .filter(|n| n.name().value() == "example")
         .filter_map(|n| {
-            let code = n.entries().iter().find(|e| e.name().is_none())?.value().as_string()?.to_string();
-            let title = n.get("title").and_then(|v| v.as_string()).map(str::to_string);
+            let code = n
+                .entries()
+                .iter()
+                .find(|e| e.name().is_none())?
+                .value()
+                .as_string()?
+                .to_string();
+            let title = n
+                .get("title")
+                .and_then(|v| v.as_string())
+                .map(str::to_string);
             let fails = n.get("fails").and_then(|v| v.as_bool()) == Some(true);
             Some(Example { title, code, fails })
         })
@@ -154,9 +188,15 @@ fn examples(node: &KdlNode) -> Vec<Example> {
 fn names_in(usage: &str) -> (Vec<String>, Vec<String>) {
     let (mut names, mut operators): (Vec<String>, Vec<String>) = (Vec::new(), Vec::new());
     for line in usage.lines() {
-        let words: Vec<_> = line.trim().trim_start_matches('(').split_whitespace().collect();
+        let words: Vec<_> = line
+            .trim()
+            .trim_start_matches('(')
+            .split_whitespace()
+            .collect();
         // `(EDIT)` is EDIT with no inputs.
-        let Some(first) = words.first().map(|w| w.trim_end_matches(')')) else { continue };
+        let Some(first) = words.first().map(|w| w.trim_end_matches(')')) else {
+            continue;
+        };
         let name = if OPERATORS.contains(&first) {
             Err(first)
         } else if let Some(op) = words.get(1).filter(|w| OPERATORS.contains(w)) {
@@ -167,7 +207,9 @@ fn names_in(usage: &str) -> (Vec<String>, Vec<String>) {
             Ok(first)
         };
         match name {
-            Ok(n) if !names.iter().any(|m| m.eq_ignore_ascii_case(n)) => names.push(n.to_uppercase()),
+            Ok(n) if !names.iter().any(|m| m.eq_ignore_ascii_case(n)) => {
+                names.push(n.to_uppercase())
+            }
             Err(op) if !operators.iter().any(|o| o == op) => operators.push(op.to_string()),
             _ => {}
         }
@@ -181,10 +223,14 @@ fn names_in(usage: &str) -> (Vec<String>, Vec<String>) {
 fn implemented(key: &str, kind: Kind) -> bool {
     match kind {
         Kind::Syntax => true,
-        Kind::Variable => crate::special_variables().iter().any(|v| v.eq_ignore_ascii_case(key)),
+        Kind::Variable => crate::special_variables()
+            .iter()
+            .any(|v| v.eq_ignore_ascii_case(key)),
         // TO and END are syntax to the interpreter, not primitives.
         Kind::Command => {
-            crate::command_names().any(|ns| ns.iter().any(|n| n.eq_ignore_ascii_case(key))) || key == "to" || key == "end"
+            crate::command_names().any(|ns| ns.iter().any(|n| n.eq_ignore_ascii_case(key)))
+                || key == "to"
+                || key == "end"
         }
     }
 }
@@ -192,9 +238,18 @@ fn implemented(key: &str, kind: Kind) -> bool {
 impl Reference {
     pub fn parse(source: &str) -> Result<Reference, String> {
         let document: KdlDocument = source.parse().map_err(|e| format!("{e:?}"))?;
-        let mut reference = Reference { chapters: Vec::new(), commands: Vec::new(), index: HashMap::new() };
+        let mut reference = Reference {
+            chapters: Vec::new(),
+            commands: Vec::new(),
+            index: HashMap::new(),
+        };
         if let Some(syntax) = document.get("syntax") {
-            let chapter = Chapter { key: "syntax".into(), title: "Syntax".into(), sections: Vec::new(), commands: Vec::new() };
+            let chapter = Chapter {
+                key: "syntax".into(),
+                title: "Syntax".into(),
+                sections: Vec::new(),
+                commands: Vec::new(),
+            };
             reference.chapters.push(chapter);
             for node in syntax.children().map(|c| c.nodes()).unwrap_or_default() {
                 let i = reference.add(node, Kind::Syntax, 0, None);
@@ -205,8 +260,17 @@ impl Reference {
         for chapter_node in logo.children().map(|c| c.nodes()).unwrap_or_default() {
             let c = reference.chapters.len();
             let key = chapter_node.name().value().to_string();
-            reference.chapters.push(Chapter { title: title(&key), key, sections: Vec::new(), commands: Vec::new() });
-            for node in chapter_node.children().map(|c| c.nodes()).unwrap_or_default() {
+            reference.chapters.push(Chapter {
+                title: title(&key),
+                key,
+                sections: Vec::new(),
+                commands: Vec::new(),
+            });
+            for node in chapter_node
+                .children()
+                .map(|c| c.nodes())
+                .unwrap_or_default()
+            {
                 if child(node, "eg").is_some() {
                     let i = reference.add(node, Kind::Command, c, None);
                     reference.chapters[c].commands.push(i);
@@ -214,7 +278,11 @@ impl Reference {
                 }
                 let s = reference.chapters[c].sections.len();
                 let key = node.name().value().to_string();
-                reference.chapters[c].sections.push(Section { title: title(&key), key, commands: Vec::new() });
+                reference.chapters[c].sections.push(Section {
+                    title: title(&key),
+                    key,
+                    commands: Vec::new(),
+                });
                 for command in node.children().map(|c| c.nodes()).unwrap_or_default() {
                     let i = reference.add(command, Kind::Command, c, Some(s));
                     reference.chapters[c].sections[s].commands.push(i);
@@ -228,8 +296,16 @@ impl Reference {
         let usage = string(node, "eg").unwrap_or_default();
         // A syntax entry's usage shows operators and such, which are other
         // pages: it's found only by its `names`.
-        let (mut names, operators) = if kind == Kind::Syntax { Default::default() } else { names_in(&usage) };
-        let kind = if kind == Kind::Command && usage.contains("(variable)") { Kind::Variable } else { kind };
+        let (mut names, operators) = if kind == Kind::Syntax {
+            Default::default()
+        } else {
+            names_in(&usage)
+        };
+        let kind = if kind == Kind::Command && usage.contains("(variable)") {
+            Kind::Variable
+        } else {
+            kind
+        };
         for extra in strings(node, "names") {
             if !names.iter().any(|n| n.eq_ignore_ascii_case(&extra)) {
                 names.push(extra.to_uppercase());
@@ -238,7 +314,9 @@ impl Reference {
         let key = node.name().value().to_string();
         let obsolete = child(node, "obsolete").and_then(|v| v.as_bool()) == Some(true);
         let command = Command {
-            title: string(node, "title").or_else(|| names.first().cloned()).unwrap_or_else(|| key.to_uppercase()),
+            title: string(node, "title")
+                .or_else(|| names.first().cloned())
+                .unwrap_or_else(|| key.to_uppercase()),
             implemented: implemented(&key, kind),
             key,
             operators,
@@ -247,9 +325,15 @@ impl Reference {
             help: string(node, "help"),
             examples: examples(node),
             see: strings(node, "see"),
-            phase: child(node, "phase").and_then(|v| v.as_integer()).map(|p| p as u8),
+            phase: child(node, "phase")
+                .and_then(|v| v.as_integer())
+                .map(|p| p as u8),
             extension: child(node, "extension").and_then(|v| v.as_bool()) == Some(true),
-            obsolete: if obsolete { string(node, "obsolete_reason") } else { None },
+            obsolete: if obsolete {
+                string(node, "obsolete_reason")
+            } else {
+                None
+            },
             chapter,
             section,
             usage,
@@ -260,7 +344,10 @@ impl Reference {
         // and implemented commands before ones that aren't.
         for name in command.names.iter().chain(&command.operators) {
             let name = name.to_lowercase();
-            let replace = self.index.get(&name).is_some_and(|&j| !self.commands[j].implemented && command.implemented);
+            let replace = self
+                .index
+                .get(&name)
+                .is_some_and(|&j| !self.commands[j].implemented && command.implemented);
             if replace || !self.index.contains_key(&name) {
                 self.index.insert(name, i);
             }
@@ -279,7 +366,10 @@ impl Reference {
     /// is how a link names a syntax entry, as in `[parentheses]`.
     pub fn find_index(&self, name: &str) -> Option<usize> {
         let name = name.to_lowercase();
-        self.index.get(&name).copied().or_else(|| self.commands.iter().position(|c| c.key == name))
+        self.index
+            .get(&name)
+            .copied()
+            .or_else(|| self.commands.iter().position(|c| c.key == name))
     }
 
     /// Commands with a name starting with `query`, an exact match first,
@@ -302,7 +392,11 @@ impl Reference {
                 .filter(|n| n.to_lowercase().starts_with(&query))
                 .min_by_key(|n| n.len());
             if let Some(name) = best {
-                let rank = if name.eq_ignore_ascii_case(&query) { 0 } else { 1 };
+                let rank = if name.eq_ignore_ascii_case(&query) {
+                    0
+                } else {
+                    1
+                };
                 hits.push((rank, i, name));
             }
         }
@@ -319,7 +413,11 @@ impl Reference {
             Some(s) => &chapter.sections[s].commands,
             None => &chapter.commands,
         };
-        let mut out: Vec<usize> = command.see.iter().filter_map(|n| self.find_index(n)).collect();
+        let mut out: Vec<usize> = command
+            .see
+            .iter()
+            .filter_map(|n| self.find_index(n))
+            .collect();
         out.extend(section.iter().copied());
         let mut seen = std::collections::HashSet::new();
         out.retain(|&j| j != i && self.commands[j].implemented && seen.insert(j));
@@ -329,7 +427,11 @@ impl Reference {
     /// Why a name isn't in Pendown, if it's an obsolete command.
     pub fn obsolete_reason(&self, name: &str) -> Option<&str> {
         let command = &self.commands[self.find_index(name)?];
-        if command.implemented { None } else { command.obsolete.as_deref() }
+        if command.implemented {
+            None
+        } else {
+            command.obsolete.as_deref()
+        }
     }
 }
 
@@ -339,10 +441,22 @@ mod tests {
 
     #[test]
     fn names_come_from_the_usage() {
-        assert_eq!(names_in("FORWARD dist\nFD dist"), (vec!["FORWARD".into(), "FD".into()], vec![]));
-        assert_eq!(names_in("SUM num1 num2\n(SUM num1 num2 num3 ...)\nnum1 + num2"), (vec!["SUM".into()], vec!["+".into()]));
-        assert_eq!(names_in("MINUS num\n- num"), (vec!["MINUS".into()], vec!["-".into()]));
-        assert_eq!(names_in("EDIT contentslist\nED contentslist\n(EDIT)\n(ED)").0, ["EDIT", "ED"]);
+        assert_eq!(
+            names_in("FORWARD dist\nFD dist"),
+            (vec!["FORWARD".into(), "FD".into()], vec![])
+        );
+        assert_eq!(
+            names_in("SUM num1 num2\n(SUM num1 num2 num3 ...)\nnum1 + num2"),
+            (vec!["SUM".into()], vec!["+".into()])
+        );
+        assert_eq!(
+            names_in("MINUS num\n- num"),
+            (vec!["MINUS".into()], vec!["-".into()])
+        );
+        assert_eq!(
+            names_in("EDIT contentslist\nED contentslist\n(EDIT)\n(ED)").0,
+            ["EDIT", "ED"]
+        );
     }
 
     #[test]

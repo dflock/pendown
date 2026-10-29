@@ -24,7 +24,11 @@ fn help_has_no_code_blocks() {
     // Programs go in examples, which have Run and pictures.
     for c in reference().commands.iter().filter(|c| c.implemented) {
         let blocks = markup::parse(c.help.as_deref().unwrap_or_default());
-        assert!(!blocks.iter().any(|b| matches!(b, Block::Code { .. })), "{}", c.key);
+        assert!(
+            !blocks.iter().any(|b| matches!(b, Block::Code { .. })),
+            "{}",
+            c.key
+        );
     }
 }
 
@@ -33,9 +37,17 @@ fn every_link_in_the_tutorial_resolves() {
     let r = reference();
     for (n, lesson) in pendown::tutorial::lessons().iter().enumerate() {
         for link in markup::links(&lesson.blocks) {
-            assert!(r.find(link).is_some_and(|c| c.implemented), "lesson {}: [{link}]", n + 1);
+            assert!(
+                r.find(link).is_some_and(|c| c.implemented),
+                "lesson {}: [{link}]",
+                n + 1
+            );
         }
-        assert!(lesson.programs().count() >= 3, "lesson {} has few programs", n + 1);
+        assert!(
+            lesson.programs().count() >= 3,
+            "lesson {} has few programs",
+            n + 1
+        );
     }
     assert_eq!(pendown::tutorial::lessons().len(), 6);
 }

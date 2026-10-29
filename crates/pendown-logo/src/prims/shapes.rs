@@ -17,7 +17,11 @@ impl Args<'_> {
     /// A number that's zero or more: a size or a radius.
     fn size(&self, i: usize) -> Result<f64, Flow> {
         let n = self.num(i)?;
-        if n >= 0.0 { Ok(n) } else { Err(self.doesnt_like(i)) }
+        if n >= 0.0 {
+            Ok(n)
+        } else {
+            Err(self.doesnt_like(i))
+        }
     }
 }
 
@@ -40,7 +44,13 @@ pub(super) fn arc(it: &mut Interpreter, a: &Args) -> Out {
     let inside = points.iter().all(|p| it.area.contains(*p));
     if it.turtle.mode == TurtleMode::Window || inside {
         let pen = it.turtle.pen;
-        it.emit(Event::Arc { center, radius, start_heading: heading, angle, pen })?;
+        it.emit(Event::Arc {
+            center,
+            radius,
+            start_heading: heading,
+            angle,
+            pen,
+        })?;
         it.turtle.pos = *points.last().expect("at least two points");
         it.turtle.heading = (heading + angle).rem_euclid(360.0);
         return Ok(None);
@@ -51,9 +61,15 @@ pub(super) fn arc(it: &mut Interpreter, a: &Args) -> Out {
     let step = angle / (points.len() - 1) as f64;
     let mut offset = Point { x: 0.0, y: 0.0 };
     for to in &points[1..] {
-        let target = Point { x: to.x + offset.x, y: to.y + offset.y };
+        let target = Point {
+            x: to.x + offset.x,
+            y: to.y + offset.y,
+        };
         move_to(it, a, target)?;
-        offset = Point { x: it.turtle.pos.x - to.x, y: it.turtle.pos.y - to.y };
+        offset = Point {
+            x: it.turtle.pos.x - to.x,
+            y: it.turtle.pos.y - to.y,
+        };
         turn(it, step)?;
     }
     Ok(None)
@@ -61,17 +77,34 @@ pub(super) fn arc(it: &mut Interpreter, a: &Args) -> Out {
 
 fn ellipse_event(it: &mut Interpreter, radii: (f64, f64)) -> Out {
     let t = &it.turtle;
-    let event = Event::Ellipse { center: t.pos, radii, heading: t.heading, pen: t.pen, fill: t.fill };
+    let event = Event::Ellipse {
+        center: t.pos,
+        radii,
+        heading: t.heading,
+        pen: t.pen,
+        fill: t.fill,
+    };
     it.emit(event)?;
     Ok(None)
 }
 
 fn rect_event(it: &mut Interpreter, a: &Args, size: (f64, f64), corner_input: usize) -> Out {
-    let corner = if a.vals.len() > corner_input { a.size(corner_input)? } else { 0.0 };
+    let corner = if a.vals.len() > corner_input {
+        a.size(corner_input)?
+    } else {
+        0.0
+    };
     // A corner can't be rounder than half the shorter side.
     let corner = corner.min(size.0.min(size.1) / 2.0);
     let t = &it.turtle;
-    let event = Event::Rect { center: t.pos, size, corner, heading: t.heading, pen: t.pen, fill: t.fill };
+    let event = Event::Rect {
+        center: t.pos,
+        size,
+        corner,
+        heading: t.heading,
+        pen: t.pen,
+        fill: t.fill,
+    };
     it.emit(event)?;
     Ok(None)
 }

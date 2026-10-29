@@ -60,10 +60,14 @@ pub enum Source {
 impl Source {
     pub fn code(&self) -> String {
         match *self {
-            Source::Example { command, example } => reference().commands[command].examples[example].code.clone(),
-            Source::Lesson { lesson, program } => {
-                pendown::tutorial::lessons()[lesson].programs().nth(program).unwrap_or_default().to_string()
+            Source::Example { command, example } => {
+                reference().commands[command].examples[example].code.clone()
             }
+            Source::Lesson { lesson, program } => pendown::tutorial::lessons()[lesson]
+                .programs()
+                .nth(program)
+                .unwrap_or_default()
+                .to_string(),
         }
     }
 
@@ -77,7 +81,10 @@ impl Source {
                     None => format!("From {}", command.title),
                 }
             }
-            Source::Lesson { lesson, .. } => format!("From the lesson “{}”", pendown::tutorial::lessons()[lesson].title),
+            Source::Lesson { lesson, .. } => format!(
+                "From the lesson “{}”",
+                pendown::tutorial::lessons()[lesson].title
+            ),
         }
     }
 }
@@ -122,7 +129,11 @@ fn usage_lines(usage: &str) -> Vec<String> {
         .lines()
         .map(|l| {
             let l = l.trim();
-            ["(library procedure)", "(special form)", "(variable)"].iter().fold(l.to_string(), |l, note| l.replace(note, "")).trim().to_string()
+            ["(library procedure)", "(special form)", "(variable)"]
+                .iter()
+                .fold(l.to_string(), |l, note| l.replace(note, ""))
+                .trim()
+                .to_string()
         })
         .filter(|l| !l.is_empty())
         .collect()
@@ -131,17 +142,27 @@ fn usage_lines(usage: &str) -> Vec<String> {
 /// How many commands a list of indexes holds that the panel lists.
 fn listed(indexes: impl Iterator<Item = usize>, obsolete: bool) -> usize {
     let r = reference();
-    indexes.filter(|&i| r.commands[i].implemented || (obsolete && r.commands[i].obsolete.is_some())).count()
+    indexes
+        .filter(|&i| r.commands[i].implemented || (obsolete && r.commands[i].obsolete.is_some()))
+        .count()
 }
 
 impl HelpPanel {
-    pub fn new(app: WeakEntity<PendownWindow>, window: &mut Window, cx: &mut Context<Self>) -> HelpPanel {
+    pub fn new(
+        app: WeakEntity<PendownWindow>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> HelpPanel {
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search commands"));
-        let subscriptions = vec![cx.subscribe_in(&search, window, |this, _, event: &InputEvent, _, cx| match event {
-            InputEvent::Change => cx.notify(),
-            InputEvent::PressEnter { .. } => this.open_first_result(cx),
-            _ => {}
-        })];
+        let subscriptions = vec![cx.subscribe_in(
+            &search,
+            window,
+            |this, _, event: &InputEvent, _, cx| match event {
+                InputEvent::Change => cx.notify(),
+                InputEvent::PressEnter { .. } => this.open_first_result(cx),
+                _ => {}
+            },
+        )];
         HelpPanel {
             app,
             tab: Tab::Help,
@@ -193,9 +214,13 @@ impl HelpPanel {
     }
 
     fn open_first_result(&mut self, cx: &mut Context<Self>) {
-        let first = reference().search(&self.query(cx), self.show_obsolete).first().copied();
+        let first = reference()
+            .search(&self.query(cx), self.show_obsolete)
+            .first()
+            .copied();
         if let Some(i) = first {
-            self.back.push(std::mem::replace(&mut self.page, Page::Command(i)));
+            self.back
+                .push(std::mem::replace(&mut self.page, Page::Command(i)));
             self.forward.clear();
             self.show_in_contents(Page::Command(i));
             // The search is cleared when the window next has a chance.
@@ -211,7 +236,8 @@ impl HelpPanel {
             let chapter = &reference().chapters[command.chapter];
             self.expanded.insert(chapter.key.clone());
             if let Some(s) = command.section {
-                self.expanded.insert(format!("{}/{}", chapter.key, chapter.sections[s].key));
+                self.expanded
+                    .insert(format!("{}/{}", chapter.key, chapter.sections[s].key));
             }
         }
     }
@@ -240,7 +266,9 @@ impl HelpPanel {
             return;
         }
         let Some((name, line)) = word else { return };
-        let Some(i) = reference().find_index(&name) else { return };
+        let Some(i) = reference().find_index(&name) else {
+            return;
+        };
         let following = Some((name, line));
         if self.page != Page::Command(i) || self.following != following {
             if self.page != Page::Command(i) {
@@ -253,7 +281,12 @@ impl HelpPanel {
     }
 
     /// F1: Help for the word under the cursor, following it from now on.
-    pub fn help_for(&mut self, word: Option<(String, u32)>, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn help_for(
+        &mut self,
+        word: Option<(String, u32)>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.tab = Tab::Help;
         self.pinned = false;
         self.search.update(cx, |s, cx| s.set_value("", window, cx));
@@ -261,7 +294,8 @@ impl HelpPanel {
             && let Some(i) = reference().find_index(name)
         {
             if self.page != Page::Command(i) {
-                self.back.push(std::mem::replace(&mut self.page, Page::Command(i)));
+                self.back
+                    .push(std::mem::replace(&mut self.page, Page::Command(i)));
                 self.forward.clear();
             }
             self.show_in_contents(self.page);
@@ -278,15 +312,20 @@ impl HelpPanel {
         let key = code.to_string();
         // Drawing it can take a moment: in the meantime, the panel shows a
         // blank square.
-        self.pictures.insert(key.clone(), Picture::Printed(String::new()));
+        self.pictures
+            .insert(key.clone(), Picture::Printed(String::new()));
         let code = key.clone();
-        let task = cx.background_spawn(async move { pendown_cli::render(&code, picture_options()) });
+        let task =
+            cx.background_spawn(async move { pendown_cli::render(&code, picture_options()) });
         cx.spawn(async move |this, cx| {
             let output = task.await;
             let picture = match &output.result {
                 Err(e) if output.drawn == 0 => Picture::Failed(format!("{e:?}")),
                 _ if output.drawn == 0 => Picture::Printed(output.printed.clone()),
-                _ => Picture::Drawing(Arc::from(output.svg.expect("asked for").into_bytes()), Rendered::default()),
+                _ => Picture::Drawing(
+                    Arc::from(output.svg.expect("asked for").into_bytes()),
+                    Rendered::default(),
+                ),
             };
             this.update(cx, |this, cx| {
                 this.pictures.insert(key, picture);
@@ -318,8 +357,15 @@ fn tab(id: &'static str, label: &'static str, active: bool, cx: &App) -> Statefu
         .text_sm()
         .cursor_pointer()
         .border_b_2()
-        .when(active, |t| t.border_color(theme.foreground).text_color(theme.foreground).font_weight(FontWeight::SEMIBOLD))
-        .when(!active, |t| t.border_color(transparent_black()).text_color(theme.muted_foreground))
+        .when(active, |t| {
+            t.border_color(theme.foreground)
+                .text_color(theme.foreground)
+                .font_weight(FontWeight::SEMIBOLD)
+        })
+        .when(!active, |t| {
+            t.border_color(transparent_black())
+                .text_color(theme.muted_foreground)
+        })
         .child(label)
 }
 
@@ -333,14 +379,22 @@ type Rendered = Arc<Mutex<HashMap<(i32, i32), Arc<RenderImage>>>>;
 fn svg_image(svg: Arc<[u8]>, rendered: Rendered, width: f32, height: f32) -> Img {
     let source = ImageSource::Custom(Arc::new(move |window: &mut Window, cx: &mut App| {
         let scale = window.scale_factor();
-        let device = ((width * scale).round() as i32, (height * scale).round() as i32);
+        let device = (
+            (width * scale).round() as i32,
+            (height * scale).round() as i32,
+        );
         if let Some(image) = rendered.lock().unwrap().get(&device) {
             return Some(Ok(image.clone()));
         }
         let renderer = cx.svg_renderer();
         let image = renderer
             .parse_svg(&svg)
-            .and_then(|tree| renderer.render_parsed(&tree, SvgSize::Size(size(DevicePixels(device.0), DevicePixels(device.1)))))
+            .and_then(|tree| {
+                renderer.render_parsed(
+                    &tree,
+                    SvgSize::Size(size(DevicePixels(device.0), DevicePixels(device.1))),
+                )
+            })
             .map_err(|e| ImageCacheError::Asset(e.to_string().into()));
         if let Ok(image) = &image {
             rendered.lock().unwrap().insert(device, image.clone());
@@ -353,13 +407,20 @@ fn svg_image(svg: Arc<[u8]>, rendered: Rendered, width: f32, height: f32) -> Img
 /// Kame's picture, `width` by `height` logical pixels.
 fn kame(width: f32, height: f32) -> impl IntoElement {
     static KAME: OnceLock<(Arc<[u8]>, Rendered)> = OnceLock::new();
-    let (svg, rendered) = KAME.get_or_init(|| (Arc::from(pendown::tutorial::KAME), Rendered::default()));
+    let (svg, rendered) =
+        KAME.get_or_init(|| (Arc::from(pendown::tutorial::KAME), Rendered::default()));
     svg_image(svg.clone(), rendered.clone(), width, height)
 }
 
 /// A heading for a part of a page, such as Examples.
 fn part(text: &'static str, cx: &App) -> Div {
-    div().mt_4().mb_2().text_xs().font_weight(FontWeight::SEMIBOLD).text_color(cx.theme().muted_foreground).child(text.to_uppercase())
+    div()
+        .mt_4()
+        .mb_2()
+        .text_xs()
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(cx.theme().muted_foreground)
+        .child(text.to_uppercase())
 }
 
 impl HelpPanel {
@@ -379,35 +440,68 @@ impl HelpPanel {
                 Inline::Code(t) => {
                     text.push_str(t);
                     fonts.push((start..text.len(), mono.clone()));
-                    highlights.push((start..text.len(), HighlightStyle { background_color: Some(theme.muted), ..Default::default() }));
+                    highlights.push((
+                        start..text.len(),
+                        HighlightStyle {
+                            background_color: Some(theme.muted),
+                            ..Default::default()
+                        },
+                    ));
                 }
                 Inline::Bold(t) => {
                     text.push_str(t);
-                    highlights.push((start..text.len(), HighlightStyle { font_weight: Some(FontWeight::BOLD), ..Default::default() }));
+                    highlights.push((
+                        start..text.len(),
+                        HighlightStyle {
+                            font_weight: Some(FontWeight::BOLD),
+                            ..Default::default()
+                        },
+                    ));
                 }
                 Inline::Italic(t) => {
                     text.push_str(t);
-                    highlights.push((start..text.len(), HighlightStyle { font_style: Some(FontStyle::Italic), ..Default::default() }));
+                    highlights.push((
+                        start..text.len(),
+                        HighlightStyle {
+                            font_style: Some(FontStyle::Italic),
+                            ..Default::default()
+                        },
+                    ));
                 }
                 Inline::Link(name) => {
                     text.push_str(name);
-                    let is_command = reference().find(name).is_some_and(|c| c.kind != Kind::Syntax);
+                    let is_command = reference()
+                        .find(name)
+                        .is_some_and(|c| c.kind != Kind::Syntax);
                     if is_command {
                         fonts.push((start..text.len(), mono.clone()));
                     }
-                    highlights.push((start..text.len(), HighlightStyle { color: Some(theme.blue), ..Default::default() }));
+                    highlights.push((
+                        start..text.len(),
+                        HighlightStyle {
+                            color: Some(theme.blue),
+                            ..Default::default()
+                        },
+                    ));
                     links.push(start..text.len());
                     targets.push(name.clone());
                 }
             }
         }
         let panel = cx.entity().downgrade();
-        InteractiveText::new(id, StyledText::new(text).with_highlights(highlights).with_font_family_overrides(fonts))
-            .on_click(links, move |ix, window, cx| {
-                let name = targets[ix].clone();
-                panel.update(cx, |p, cx| p.open_name(&name, window, cx)).ok();
-            })
-            .into_any_element()
+        InteractiveText::new(
+            id,
+            StyledText::new(text)
+                .with_highlights(highlights)
+                .with_font_family_overrides(fonts),
+        )
+        .on_click(links, move |ix, window, cx| {
+            let name = targets[ix].clone();
+            panel
+                .update(cx, |p, cx| p.open_name(&name, window, cx))
+                .ok();
+        })
+        .into_any_element()
     }
 
     /// Blocks of markup.
@@ -452,11 +546,29 @@ impl HelpPanel {
 
 /// A program, in the editor's font and colours, with the running
 /// instruction highlighted.
-fn code_block(code: &str, highlight: Option<Range<usize>>, theme: &gpui_kit::component::Theme) -> Div {
-    let running = HighlightStyle { background_color: Some(theme.warning.opacity(0.35)), ..Default::default() };
-    let styles = crate::highlighter::program_styles(code, &*theme.highlight_theme, highlight.map(|r| (r, running)));
+fn code_block(
+    code: &str,
+    highlight: Option<Range<usize>>,
+    theme: &gpui_kit::component::Theme,
+) -> Div {
+    let running = HighlightStyle {
+        background_color: Some(theme.warning.opacity(0.35)),
+        ..Default::default()
+    };
+    let styles = crate::highlighter::program_styles(
+        code,
+        &*theme.highlight_theme,
+        highlight.map(|r| (r, running)),
+    );
     let text = StyledText::new(code.to_string()).with_highlights(styles);
-    div().p_2().rounded_md().bg(theme.muted).font_family(theme.mono_font_family.clone()).text_xs().whitespace_normal().child(text)
+    div()
+        .p_2()
+        .rounded_md()
+        .bg(theme.muted)
+        .font_family(theme.mono_font_family.clone())
+        .text_xs()
+        .whitespace_normal()
+        .child(text)
 }
 
 impl HelpPanel {
@@ -468,7 +580,10 @@ impl HelpPanel {
         let mut out = Vec::new();
 
         // Where it is.
-        let mut crumbs = h_flex().gap_1().text_xs().text_color(theme.muted_foreground);
+        let mut crumbs = h_flex()
+            .gap_1()
+            .text_xs()
+            .text_color(theme.muted_foreground);
         let chapter_key = chapter.key.clone();
         crumbs = crumbs.child(
             div()
@@ -514,22 +629,39 @@ impl HelpPanel {
                 div()
                     .text_xl()
                     .font_weight(FontWeight::BOLD)
-                    .when(command.kind != Kind::Syntax, |d| d.font_family(theme.mono_font_family.clone()))
+                    .when(command.kind != Kind::Syntax, |d| {
+                        d.font_family(theme.mono_font_family.clone())
+                    })
                     .child(command.title.clone()),
             )
-            .children(command.names.iter().skip(if command.kind == Kind::Syntax { 0 } else { 1 }).map(|alias| {
-                div()
-                    .px_1()
-                    .rounded_sm()
-                    .border_1()
-                    .border_color(theme.border)
-                    .text_xs()
-                    .font_family(theme.mono_font_family.clone())
-                    .text_color(theme.muted_foreground)
-                    .child(alias.clone())
-            }))
-            .when(command.extension, |t| t.child(div().text_xs().text_color(theme.primary).child("Pendown")))
-            .when_some(kind, |t, kind| t.child(div().flex_1()).child(div().text_xs().text_color(theme.muted_foreground).child(kind)));
+            .children(
+                command
+                    .names
+                    .iter()
+                    .skip(if command.kind == Kind::Syntax { 0 } else { 1 })
+                    .map(|alias| {
+                        div()
+                            .px_1()
+                            .rounded_sm()
+                            .border_1()
+                            .border_color(theme.border)
+                            .text_xs()
+                            .font_family(theme.mono_font_family.clone())
+                            .text_color(theme.muted_foreground)
+                            .child(alias.clone())
+                    }),
+            )
+            .when(command.extension, |t| {
+                t.child(div().text_xs().text_color(theme.primary).child("Pendown"))
+            })
+            .when_some(kind, |t, kind| {
+                t.child(div().flex_1()).child(
+                    div()
+                        .text_xs()
+                        .text_color(theme.muted_foreground)
+                        .child(kind),
+                )
+            });
         out.push(title.into_any_element());
 
         if let Some(reason) = &command.obsolete
@@ -545,7 +677,15 @@ impl HelpPanel {
                     .into_any_element(),
             );
         } else if !command.implemented {
-            out.push(div().mt_3().p_2().rounded_md().bg(theme.muted).child("Not in Pendown yet.").into_any_element());
+            out.push(
+                div()
+                    .mt_3()
+                    .p_2()
+                    .rounded_md()
+                    .bg(theme.muted)
+                    .child("Not in Pendown yet.")
+                    .into_any_element(),
+            );
         }
 
         // How to call it.
@@ -568,9 +708,13 @@ impl HelpPanel {
         match &command.help {
             Some(help) => out.extend(self.blocks("help", &markup::parse(help), cx)),
             // An obsolete command's reason says enough.
-            None if !command.desc.is_empty() && command.obsolete.is_none() => {
-                out.push(div().mt_2().text_color(theme.muted_foreground).child(command.desc.clone()).into_any_element())
-            }
+            None if !command.desc.is_empty() && command.obsolete.is_none() => out.push(
+                div()
+                    .mt_2()
+                    .text_color(theme.muted_foreground)
+                    .child(command.desc.clone())
+                    .into_any_element(),
+            ),
             None => {}
         }
 
@@ -595,9 +739,13 @@ impl HelpPanel {
                             .id(SharedString::from(format!("see-{j}")))
                             .cursor_pointer()
                             .text_color(theme.blue)
-                            .when(target.kind != Kind::Syntax, |d| d.font_family(theme.mono_font_family.clone()).text_xs())
+                            .when(target.kind != Kind::Syntax, |d| {
+                                d.font_family(theme.mono_font_family.clone()).text_xs()
+                            })
                             .child(target.title.clone())
-                            .on_click(cx.listener(move |this, _, window, cx| this.go(Page::Command(j), window, cx)))
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.go(Page::Command(j), window, cx)
+                            }))
                     }))
                     .into_any_element(),
             );
@@ -609,17 +757,32 @@ impl HelpPanel {
         let theme = cx.theme().clone();
         let example = &reference().commands[i].examples[n];
         let picture = self.picture(&example.code, cx);
-        let running = self.running.as_ref().filter(|r| r.source == Source::Example { command: i, example: n });
+        let running = self.running.as_ref().filter(|r| {
+            r.source
+                == Source::Example {
+                    command: i,
+                    example: n,
+                }
+        });
         let highlight = running.and_then(|r| r.highlight.clone());
         let is_running = running.is_some_and(|r| !r.finished);
         let code = example.code.clone();
         let shown = PICTURE_SIZE as f32;
         let size = px(shown);
         let picture_element = match &picture {
-            Some(Picture::Drawing(svg, rendered)) => {
-                Some(svg_image(svg.clone(), rendered.clone(), shown, shown).rounded_sm().into_any_element())
-            }
-            None => Some(div().size(size).flex_none().rounded_sm().bg(black()).into_any_element()),
+            Some(Picture::Drawing(svg, rendered)) => Some(
+                svg_image(svg.clone(), rendered.clone(), shown, shown)
+                    .rounded_sm()
+                    .into_any_element(),
+            ),
+            None => Some(
+                div()
+                    .size(size)
+                    .flex_none()
+                    .rounded_sm()
+                    .bg(black())
+                    .into_any_element(),
+            ),
             _ => None,
         };
         let printed = match &picture {
@@ -632,7 +795,11 @@ impl HelpPanel {
         let copy_code = code.clone();
         v_flex()
             .border_1()
-            .border_color(if is_running { theme.foreground } else { theme.border })
+            .border_color(if is_running {
+                theme.foreground
+            } else {
+                theme.border
+            })
             .rounded_md()
             .mb_2()
             .child(
@@ -642,21 +809,45 @@ impl HelpPanel {
                     .child(
                         h_flex()
                             .gap_2()
-                            .child(div().flex_1().font_weight(FontWeight::SEMIBOLD).child(example.title.clone().unwrap_or_else(|| format!("Example {}", n + 1))))
-                            .when(example.fails, |h| h.child(div().text_xs().text_color(theme.muted_foreground).child("stops with an error"))),
+                            .child(
+                                div().flex_1().font_weight(FontWeight::SEMIBOLD).child(
+                                    example
+                                        .title
+                                        .clone()
+                                        .unwrap_or_else(|| format!("Example {}", n + 1)),
+                                ),
+                            )
+                            .when(example.fails, |h| {
+                                h.child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(theme.muted_foreground)
+                                        .child("stops with an error"),
+                                )
+                            }),
                     )
                     .child(
                         h_flex()
                             .items_start()
                             .gap_2()
-                            .child(div().flex_1().min_w_0().child(code_block(&code, highlight, &theme)))
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .child(code_block(&code, highlight, &theme)),
+                            )
                             .children(picture_element),
                     )
                     .when_some(printed, |v, text| {
                         v.child(
                             v_flex()
                                 .gap_1()
-                                .child(div().text_xs().text_color(theme.muted_foreground).child("Prints"))
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(theme.muted_foreground)
+                                        .child("Prints"),
+                                )
                                 .child(
                                     div()
                                         .p_2()
@@ -665,7 +856,11 @@ impl HelpPanel {
                                         .border_color(theme.border)
                                         .font_family(theme.mono_font_family.clone())
                                         .text_xs()
-                                        .children(text.lines().take(12).map(|l| div().child(l.to_string()))),
+                                        .children(
+                                            text.lines()
+                                                .take(12)
+                                                .map(|l| div().child(l.to_string())),
+                                        ),
                                 ),
                         )
                     }),
@@ -678,23 +873,35 @@ impl HelpPanel {
                     .border_color(theme.border)
                     .bg(theme.muted.opacity(0.4))
                     .child(if is_running {
-                        Button::new(SharedString::from(format!("stop-{i}-{n}"))).small().icon(IconName::Square).label("Stop").on_click(
-                            move |_, _, cx| {
+                        Button::new(SharedString::from(format!("stop-{i}-{n}")))
+                            .small()
+                            .icon(IconName::Square)
+                            .label("Stop")
+                            .on_click(move |_, _, cx| {
                                 app.update(cx, |this, cx| this.stop(cx)).ok();
-                            },
-                        )
+                            })
                     } else {
-                        Button::new(SharedString::from(format!("run-{i}-{n}"))).small().icon(IconName::Play).label("Run").on_click(
-                            move |_, _, cx| {
+                        Button::new(SharedString::from(format!("run-{i}-{n}")))
+                            .small()
+                            .icon(IconName::Play)
+                            .label("Run")
+                            .on_click(move |_, _, cx| {
                                 app.update(cx, |this, cx| this.run_example(i, n, cx)).ok();
-                            },
-                        )
+                            })
                     })
-                    .child(Button::new(SharedString::from(format!("copy-{i}-{n}"))).small().ghost().label("Copy to editor").on_click(
-                        move |_, window, cx| {
-                            app_copy.update(cx, |this, cx| this.copy_to_editor(&copy_code, window, cx)).ok();
-                        },
-                    )),
+                    .child(
+                        Button::new(SharedString::from(format!("copy-{i}-{n}")))
+                            .small()
+                            .ghost()
+                            .label("Copy to editor")
+                            .on_click(move |_, window, cx| {
+                                app_copy
+                                    .update(cx, |this, cx| {
+                                        this.copy_to_editor(&copy_code, window, cx)
+                                    })
+                                    .ok();
+                            }),
+                    ),
             )
             .into_any_element()
     }
@@ -714,9 +921,22 @@ impl HelpPanel {
                 .rounded_md()
                 .cursor_pointer()
                 .hover(|s| s.bg(theme.muted))
-                .child(Icon::new(if open { IconName::ChevronDown } else { IconName::ChevronRight }).small().text_color(theme.muted_foreground))
+                .child(
+                    Icon::new(if open {
+                        IconName::ChevronDown
+                    } else {
+                        IconName::ChevronRight
+                    })
+                    .small()
+                    .text_color(theme.muted_foreground),
+                )
                 .child(div().flex_1().child(label))
-                .child(div().text_xs().text_color(theme.muted_foreground).child(count.to_string()))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(theme.muted_foreground)
+                        .child(count.to_string()),
+                )
         };
         for chapter in &r.chapters {
             let count = listed(chapter.all(), obsolete);
@@ -726,14 +946,20 @@ impl HelpPanel {
             let open = self.expanded.contains(&chapter.key);
             let key = chapter.key.clone();
             out.push(
-                row(format!("chapter-{}", chapter.key), chapter.title.clone(), count, open, 4.)
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        if !this.expanded.remove(&key) {
-                            this.expanded.insert(key.clone());
-                        }
-                        cx.notify();
-                    }))
-                    .into_any_element(),
+                row(
+                    format!("chapter-{}", chapter.key),
+                    chapter.title.clone(),
+                    count,
+                    open,
+                    4.,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    if !this.expanded.remove(&key) {
+                        this.expanded.insert(key.clone());
+                    }
+                    cx.notify();
+                }))
+                .into_any_element(),
             );
             if !open {
                 continue;
@@ -748,14 +974,20 @@ impl HelpPanel {
                 let open = self.expanded.contains(&key);
                 let toggle = key.clone();
                 out.push(
-                    row(format!("section-{key}"), section.title.clone(), count, open, 22.)
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            if !this.expanded.remove(&toggle) {
-                                this.expanded.insert(toggle.clone());
-                            }
-                            cx.notify();
-                        }))
-                        .into_any_element(),
+                    row(
+                        format!("section-{key}"),
+                        section.title.clone(),
+                        count,
+                        open,
+                        22.,
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        if !this.expanded.remove(&toggle) {
+                            this.expanded.insert(toggle.clone());
+                        }
+                        cx.notify();
+                    }))
+                    .into_any_element(),
                 );
                 if open {
                     out.extend(self.command_rows(&section.commands, 44., cx));
@@ -766,13 +998,21 @@ impl HelpPanel {
     }
 
     /// A row for each listed command, to open its page.
-    fn command_rows(&self, indexes: &[usize], indent: f32, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    fn command_rows(
+        &self,
+        indexes: &[usize],
+        indent: f32,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
         let theme = cx.theme().clone();
         let r = reference();
         indexes
             .iter()
             .copied()
-            .filter(|&i| r.commands[i].implemented || (self.show_obsolete && r.commands[i].obsolete.is_some()))
+            .filter(|&i| {
+                r.commands[i].implemented
+                    || (self.show_obsolete && r.commands[i].obsolete.is_some())
+            })
             .map(|i| {
                 let command = &r.commands[i];
                 let current = self.page == Page::Command(i);
@@ -786,14 +1026,35 @@ impl HelpPanel {
                     .cursor_pointer()
                     .when(current, |r| r.bg(theme.accent))
                     .hover(|s| s.bg(theme.muted))
-                    .when(command.kind != Kind::Syntax, |r| r.font_family(theme.mono_font_family.clone()).text_xs())
-                    .when(!command.implemented, |r| r.text_color(theme.muted_foreground))
+                    .when(command.kind != Kind::Syntax, |r| {
+                        r.font_family(theme.mono_font_family.clone()).text_xs()
+                    })
+                    .when(!command.implemented, |r| {
+                        r.text_color(theme.muted_foreground)
+                    })
                     .child(command.title.clone())
                     .when(command.kind != Kind::Syntax, |r| {
-                        r.child(div().text_color(theme.muted_foreground).child(command.names.iter().skip(1).cloned().collect::<Vec<_>>().join(" ")))
+                        r.child(
+                            div().text_color(theme.muted_foreground).child(
+                                command
+                                    .names
+                                    .iter()
+                                    .skip(1)
+                                    .cloned()
+                                    .collect::<Vec<_>>()
+                                    .join(" "),
+                            ),
+                        )
                     })
-                    .when(command.extension, |r| r.child(div().flex_1()).child(div().text_color(theme.primary).child("Pendown")))
-                    .on_click(cx.listener(move |this, _, window, cx| this.go(Page::Command(i), window, cx)))
+                    .when(command.extension, |r| {
+                        r.child(div().flex_1())
+                            .child(div().text_color(theme.primary).child("Pendown"))
+                    })
+                    .on_click(
+                        cx.listener(move |this, _, window, cx| {
+                            this.go(Page::Command(i), window, cx)
+                        }),
+                    )
                     .into_any_element()
             })
             .collect()
@@ -803,10 +1064,17 @@ impl HelpPanel {
         let theme = cx.theme().clone();
         let r = reference();
         let hits = r.search(query, self.show_obsolete);
-        let (current, old): (Vec<usize>, Vec<usize>) = hits.into_iter().partition(|&i| r.commands[i].implemented);
+        let (current, old): (Vec<usize>, Vec<usize>) =
+            hits.into_iter().partition(|&i| r.commands[i].implemented);
         let mut out = Vec::new();
         if current.is_empty() && old.is_empty() {
-            out.push(div().mt_2().text_color(theme.muted_foreground).child(format!("Nothing is called {}.", query.to_uppercase())).into_any_element());
+            out.push(
+                div()
+                    .mt_2()
+                    .text_color(theme.muted_foreground)
+                    .child(format!("Nothing is called {}.", query.to_uppercase()))
+                    .into_any_element(),
+            );
         }
         for (heading, group) in [("Commands", current), ("Obsolete", old)] {
             if group.is_empty() {
@@ -815,7 +1083,12 @@ impl HelpPanel {
             out.push(part(heading, cx).into_any_element());
             for i in group {
                 let command = &r.commands[i];
-                let summary = command.help.as_deref().map(markup::summary).or_else(|| command.obsolete.clone().map(|r| format!("Not in Pendown: {r}")));
+                let summary = command.help.as_deref().map(markup::summary).or_else(|| {
+                    command
+                        .obsolete
+                        .clone()
+                        .map(|r| format!("Not in Pendown: {r}"))
+                });
                 let place = match command.section {
                     Some(s) => r.chapters[command.chapter].sections[s].title.clone(),
                     None => r.chapters[command.chapter].title.clone(),
@@ -827,23 +1100,54 @@ impl HelpPanel {
                         .rounded_md()
                         .cursor_pointer()
                         .hover(|s| s.bg(theme.muted))
-                        .when(!command.implemented, |v| v.text_color(theme.muted_foreground))
+                        .when(!command.implemented, |v| {
+                            v.text_color(theme.muted_foreground)
+                        })
                         .child(
                             h_flex()
                                 .gap_2()
-                                .child(div().font_family(theme.mono_font_family.clone()).text_sm().font_weight(FontWeight::SEMIBOLD).child(command.title.clone()))
+                                .child(
+                                    div()
+                                        .font_family(theme.mono_font_family.clone())
+                                        .text_sm()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .child(command.title.clone()),
+                                )
                                 .child(
                                     div()
                                         .font_family(theme.mono_font_family.clone())
                                         .text_xs()
                                         .text_color(theme.muted_foreground)
-                                        .child(command.names.iter().skip(1).cloned().collect::<Vec<_>>().join(" ")),
+                                        .child(
+                                            command
+                                                .names
+                                                .iter()
+                                                .skip(1)
+                                                .cloned()
+                                                .collect::<Vec<_>>()
+                                                .join(" "),
+                                        ),
                                 )
                                 .child(div().flex_1())
-                                .child(div().text_xs().text_color(theme.muted_foreground).child(place)),
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(theme.muted_foreground)
+                                        .child(place),
+                                ),
                         )
-                        .when_some(summary, |v, s| v.child(div().mt_1().text_xs().text_color(theme.muted_foreground).child(s)))
-                        .on_click(cx.listener(move |this, _, window, cx| this.go(Page::Command(i), window, cx)))
+                        .when_some(summary, |v, s| {
+                            v.child(
+                                div()
+                                    .mt_1()
+                                    .text_xs()
+                                    .text_color(theme.muted_foreground)
+                                    .child(s),
+                            )
+                        })
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.go(Page::Command(i), window, cx)
+                        }))
                         .into_any_element(),
                 );
             }
@@ -868,24 +1172,44 @@ impl Render for HelpPanel {
             .gap_1()
             .border_b_1()
             .border_color(theme.border)
-            .child(tab("tab-help", "Help", self.tab == Tab::Help, cx).on_click(cx.listener(|this, _, _, cx| {
-                this.tab = Tab::Help;
-                cx.notify();
-            })))
-            .child(tab("tab-tutorial", "Tutorial", self.tab == Tab::Tutorial, cx).on_click(cx.listener(|this, _, _, cx| {
-                this.tab = Tab::Tutorial;
-                cx.notify();
-            })))
+            .child(
+                tab("tab-help", "Help", self.tab == Tab::Help, cx).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.tab = Tab::Help;
+                        cx.notify();
+                    },
+                )),
+            )
+            .child(
+                tab("tab-tutorial", "Tutorial", self.tab == Tab::Tutorial, cx).on_click(
+                    cx.listener(|this, _, _, cx| {
+                        this.tab = Tab::Tutorial;
+                        cx.notify();
+                    }),
+                ),
+            )
             .child(div().flex_1())
-            .child(Button::new("close-help").ghost().small().icon(IconName::Close).tooltip("Close the panel").on_click(move |_, _, cx| {
-                app.update(cx, |this, cx| this.toggle_help(cx)).ok();
-            }));
+            .child(
+                Button::new("close-help")
+                    .ghost()
+                    .small()
+                    .icon(IconName::Close)
+                    .tooltip("Close the panel")
+                    .on_click(move |_, _, cx| {
+                        app.update(cx, |this, cx| this.toggle_help(cx)).ok();
+                    }),
+            );
 
         let body = match self.tab {
             Tab::Help => self.render_help(&query, window, cx),
             Tab::Tutorial => self.render_tutorial(window, cx),
         };
-        v_flex().size_full().bg(theme.background).text_sm().child(tabs).child(body)
+        v_flex()
+            .size_full()
+            .bg(theme.background)
+            .text_sm()
+            .child(tabs)
+            .child(body)
     }
 }
 
@@ -897,9 +1221,13 @@ impl HelpPanel {
             .gap_1()
             .p_2()
             .child(
-                Button::new("help-back").ghost().small().icon(IconName::ArrowLeft).tooltip("Back").disabled(self.back.is_empty()).on_click(
-                    cx.listener(|this, _, _, cx| this.go_back(cx)),
-                ),
+                Button::new("help-back")
+                    .ghost()
+                    .small()
+                    .icon(IconName::ArrowLeft)
+                    .tooltip("Back")
+                    .disabled(self.back.is_empty())
+                    .on_click(cx.listener(|this, _, _, cx| this.go_back(cx))),
             )
             .child(
                 Button::new("help-forward")
@@ -917,16 +1245,31 @@ impl HelpPanel {
                     .icon(IconName::Menu)
                     .tooltip("Contents")
                     .selected(self.page == Page::Contents && query.is_empty())
-                    .on_click(cx.listener(|this, _, window, cx| this.go(Page::Contents, window, cx))),
+                    .on_click(
+                        cx.listener(|this, _, window, cx| this.go(Page::Contents, window, cx)),
+                    ),
             )
-            .child(div().flex_1().child(Input::new(&self.search).small().prefix(Icon::new(IconName::Search).small()).cleanable(true)));
+            .child(
+                div().flex_1().child(
+                    Input::new(&self.search)
+                        .small()
+                        .prefix(Icon::new(IconName::Search).small())
+                        .cleanable(true),
+                ),
+            );
 
         // What the page is following, or that it's pinned.
         let strip = match (&self.page, query.is_empty()) {
             (Page::Command(_), true) => {
                 let (text, button) = match (&self.following, self.pinned) {
-                    (_, true) => ("Pinned: the page stays as the cursor moves".to_string(), "Follow"),
-                    (Some((word, line)), false) => (format!("Following the cursor: {word}, line {}", line + 1), "Pin"),
+                    (_, true) => (
+                        "Pinned: the page stays as the cursor moves".to_string(),
+                        "Follow",
+                    ),
+                    (Some((word, line)), false) => (
+                        format!("Following the cursor: {word}, line {}", line + 1),
+                        "Pin",
+                    ),
                     (None, false) => ("Following the editor's cursor".to_string(), "Pin"),
                 };
                 Some(
@@ -941,10 +1284,16 @@ impl HelpPanel {
                         .bg(theme.info.opacity(0.12))
                         .text_xs()
                         .child(div().flex_1().child(text))
-                        .child(Button::new("help-pin").ghost().xsmall().label(button).on_click(cx.listener(|this, _, _, cx| {
-                            this.pinned = !this.pinned;
-                            cx.notify();
-                        }))),
+                        .child(
+                            Button::new("help-pin")
+                                .ghost()
+                                .xsmall()
+                                .label(button)
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.pinned = !this.pinned;
+                                    cx.notify();
+                                })),
+                        ),
                 )
             }
             _ => None,
@@ -958,7 +1307,11 @@ impl HelpPanel {
                 Page::Command(i) => (format!("help-page-{i}"), self.render_command(i, cx)),
             }
         };
-        let count = reference().commands.iter().filter(|c| c.implemented && c.kind != Kind::Syntax).count();
+        let count = reference()
+            .commands
+            .iter()
+            .filter(|c| c.implemented && c.kind != Kind::Syntax)
+            .count();
         let footer = h_flex()
             .flex_none()
             .px_3()
@@ -977,14 +1330,27 @@ impl HelpPanel {
                     })),
             )
             .child(div().flex_1())
-            .child(div().text_color(theme.muted_foreground).child(format!("{count} commands")));
+            .child(
+                div()
+                    .text_color(theme.muted_foreground)
+                    .child(format!("{count} commands")),
+            );
 
         v_flex()
             .flex_1()
             .min_h_0()
             .child(nav)
             .children(strip)
-            .child(div().id(SharedString::from(id)).flex_1().min_h_0().overflow_y_scroll().px_3().pb_4().children(content))
+            .child(
+                div()
+                    .id(SharedString::from(id))
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .px_3()
+                    .pb_4()
+                    .children(content),
+            )
             .child(footer)
             .into_any_element()
     }
@@ -996,25 +1362,31 @@ impl HelpPanel {
         let lesson = &lessons[l];
 
         // Which lesson, and a bar to go to any of them.
-        let progress = h_flex().mt_2().gap_1().children((0..lessons.len()).map(|i| {
-            let colour = match i.cmp(&l) {
-                std::cmp::Ordering::Less => theme.success,
-                std::cmp::Ordering::Equal => theme.foreground,
-                std::cmp::Ordering::Greater => theme.border,
-            };
-            div()
-                .id(SharedString::from(format!("lesson-{i}")))
-                .flex_1()
-                .h(px(5.))
-                .rounded_sm()
-                .bg(colour)
-                .cursor_pointer()
-                .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(lessons[i].title.clone()).build(window, cx))
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.lesson = i;
-                    cx.notify();
-                }))
-        }));
+        let progress = h_flex()
+            .mt_2()
+            .gap_1()
+            .children((0..lessons.len()).map(|i| {
+                let colour = match i.cmp(&l) {
+                    std::cmp::Ordering::Less => theme.success,
+                    std::cmp::Ordering::Equal => theme.foreground,
+                    std::cmp::Ordering::Greater => theme.border,
+                };
+                div()
+                    .id(SharedString::from(format!("lesson-{i}")))
+                    .flex_1()
+                    .h(px(5.))
+                    .rounded_sm()
+                    .bg(colour)
+                    .cursor_pointer()
+                    .tooltip(move |window, cx| {
+                        gpui_kit::component::tooltip::Tooltip::new(lessons[i].title.clone())
+                            .build(window, cx)
+                    })
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.lesson = i;
+                        cx.notify();
+                    }))
+            }));
         let header = v_flex()
             .flex_none()
             .px_3()
@@ -1027,8 +1399,18 @@ impl HelpPanel {
                         v_flex()
                             .flex_1()
                             .min_w_0()
-                            .child(div().text_xs().text_color(theme.muted_foreground).child(format!("Lesson {} of {}", l + 1, lessons.len())))
-                            .child(div().text_lg().font_weight(FontWeight::BOLD).child(lesson.title.clone())),
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(theme.muted_foreground)
+                                    .child(format!("Lesson {} of {}", l + 1, lessons.len())),
+                            )
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::BOLD)
+                                    .child(lesson.title.clone()),
+                            ),
                     )
                     // The first lesson has Kame beside its introduction instead.
                     .when(l > 0, |h| h.child(kame(66., 44.))),
@@ -1050,21 +1432,36 @@ impl HelpPanel {
                         .gap_3()
                         .items_center()
                         .child(div().mt_2().child(kame(96., 64.)))
-                        .child(div().flex_1().min_w_0().children(self.blocks(&format!("lesson-{l}-{b}"), std::slice::from_ref(block), cx)))
+                        .child(div().flex_1().min_w_0().children(self.blocks(
+                            &format!("lesson-{l}-{b}"),
+                            std::slice::from_ref(block),
+                            cx,
+                        )))
                         .into_any_element(),
                 ),
-                block => body.extend(self.blocks(&format!("lesson-{l}-{b}"), std::slice::from_ref(block), cx)),
+                block => body.extend(self.blocks(
+                    &format!("lesson-{l}-{b}"),
+                    std::slice::from_ref(block),
+                    cx,
+                )),
             }
         }
 
         let nav = |id: &'static str, to: Option<usize>, back: bool| {
             to.map(|i| {
                 let label = lessons[i].title.clone();
-                let button = Button::new(id).small().flex_shrink(1.).min_w_0().tooltip(label.clone()).label(label);
+                let button = Button::new(id)
+                    .small()
+                    .flex_shrink(1.)
+                    .min_w_0()
+                    .tooltip(label.clone())
+                    .label(label);
                 let button = if back {
                     button.icon(IconName::ArrowLeft)
                 } else {
-                    button.primary().child(Icon::new(IconName::ArrowRight).small().flex_none())
+                    button
+                        .primary()
+                        .child(Icon::new(IconName::ArrowRight).small().flex_none())
                 };
                 button.on_click(cx.listener(move |this, _, _, cx| {
                     this.lesson = i;
@@ -1081,19 +1478,38 @@ impl HelpPanel {
             .border_color(theme.border)
             .children(nav("lesson-previous", l.checked_sub(1), true))
             .child(div().flex_1())
-            .children(nav("lesson-next", (l + 1 < lessons.len()).then_some(l + 1), false));
+            .children(nav(
+                "lesson-next",
+                (l + 1 < lessons.len()).then_some(l + 1),
+                false,
+            ));
 
         v_flex()
             .flex_1()
             .min_h_0()
             .child(header)
-            .child(div().id(SharedString::from(format!("lesson-{l}"))).flex_1().min_h_0().overflow_y_scroll().px_3().pb_4().children(body))
+            .child(
+                div()
+                    .id(SharedString::from(format!("lesson-{l}")))
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .px_3()
+                    .pb_4()
+                    .children(body),
+            )
             .child(footer)
             .into_any_element()
     }
 
     /// One of a lesson's programs, with Load into editor and Run.
-    fn program_card(&self, lesson: usize, program: usize, code: &str, cx: &mut Context<Self>) -> AnyElement {
+    fn program_card(
+        &self,
+        lesson: usize,
+        program: usize,
+        code: &str,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         let source = Source::Lesson { lesson, program };
         let running = self.running.as_ref().filter(|r| r.source == source);
@@ -1103,7 +1519,11 @@ impl HelpPanel {
         v_flex()
             .mt_2()
             .border_1()
-            .border_color(if is_running { theme.foreground } else { theme.border })
+            .border_color(if is_running {
+                theme.foreground
+            } else {
+                theme.border
+            })
             .rounded_md()
             .child(div().p_2().child(code_block(code, highlight, &theme)))
             .child(
@@ -1112,23 +1532,39 @@ impl HelpPanel {
                     .p_2()
                     .border_t_1()
                     .border_color(theme.border)
-                    .child(Button::new(SharedString::from(format!("load-{lesson}-{program}"))).small().primary().label("Load into editor").on_click(
-                        move |_, window, cx| {
-                            app_load.update(cx, |this, cx| this.load_into_editor(lesson, program, window, cx)).ok();
-                        },
-                    ))
+                    .child(
+                        Button::new(SharedString::from(format!("load-{lesson}-{program}")))
+                            .small()
+                            .primary()
+                            .label("Load into editor")
+                            .on_click(move |_, window, cx| {
+                                app_load
+                                    .update(cx, |this, cx| {
+                                        this.load_into_editor(lesson, program, window, cx)
+                                    })
+                                    .ok();
+                            }),
+                    )
                     .child(if is_running {
-                        Button::new(SharedString::from(format!("stop-lesson-{lesson}-{program}"))).small().icon(IconName::Square).label("Stop").on_click(
-                            move |_, _, cx| {
-                                app_run.update(cx, |this, cx| this.stop(cx)).ok();
-                            },
-                        )
+                        Button::new(SharedString::from(format!(
+                            "stop-lesson-{lesson}-{program}"
+                        )))
+                        .small()
+                        .icon(IconName::Square)
+                        .label("Stop")
+                        .on_click(move |_, _, cx| {
+                            app_run.update(cx, |this, cx| this.stop(cx)).ok();
+                        })
                     } else {
-                        Button::new(SharedString::from(format!("run-lesson-{lesson}-{program}"))).small().icon(IconName::Play).label("Run").on_click(
-                            move |_, _, cx| {
-                                app_run.update(cx, |this, cx| this.run_source(source, cx)).ok();
-                            },
-                        )
+                        Button::new(SharedString::from(format!("run-lesson-{lesson}-{program}")))
+                            .small()
+                            .icon(IconName::Play)
+                            .label("Run")
+                            .on_click(move |_, _, cx| {
+                                app_run
+                                    .update(cx, |this, cx| this.run_source(source, cx))
+                                    .ok();
+                            })
                     }),
             )
             .into_any_element()
@@ -1151,13 +1587,20 @@ impl PendownWindow {
         self.help_open = true;
         let word = self.word_at_cursor(cx);
         self.cursor_word = word.clone();
-        self.help_panel.update(cx, |panel, cx| panel.help_for(word, window, cx));
+        self.help_panel
+            .update(cx, |panel, cx| panel.help_for(word, window, cx));
         cx.notify();
     }
 
     /// Load into editor: a lesson's program as a new, untitled program,
     /// once any unsaved changes have been dealt with, as New does.
-    pub(crate) fn load_into_editor(&mut self, lesson: usize, program: usize, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn load_into_editor(
+        &mut self,
+        lesson: usize,
+        program: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.then(crate::files::After::Load { lesson, program }, window, cx);
     }
 
@@ -1189,13 +1632,19 @@ impl PendownWindow {
         let word = self.word_at_cursor(cx);
         if word.is_some() && word != self.cursor_word {
             self.cursor_word = word.clone();
-            self.help_panel.update(cx, |panel, cx| panel.follow(word, cx));
+            self.help_panel
+                .update(cx, |panel, cx| panel.follow(word, cx));
         }
     }
 
     /// Copy to editor: adds an example to the end of the program, as one
     /// edit that Undo takes back out.
-    pub(crate) fn copy_to_editor(&mut self, code: &str, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn copy_to_editor(
+        &mut self,
+        code: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.editor.update(cx, |state, cx| {
             let text = state.value().to_string();
             let end = crate::app::position(&text, text.len());
@@ -1245,13 +1694,20 @@ impl PendownWindow {
         self.show_watch(cx, |watched| watched.set(None));
         let (animator, run) = pendown::run::start(code, self.speed, pendown::run::DEFAULT_CHANNEL);
         self.play(animator, run, cx);
-        let running = Running { source, highlight: None, finished: false };
-        self.help_panel.update(cx, |panel, cx| panel.set_running(Some(running), cx));
+        let running = Running {
+            source,
+            highlight: None,
+            finished: false,
+        };
+        self.help_panel
+            .update(cx, |panel, cx| panel.set_running(Some(running), cx));
     }
 
     /// Back to my drawing: puts back what an example set aside.
     pub(crate) fn back_to_my_drawing(&mut self, cx: &mut Context<Self>) {
-        let Some(example) = self.example.take() else { return };
+        let Some(example) = self.example.take() else {
+            return;
+        };
         if let Some(animator) = &mut self.animator {
             animator.stop();
         }
@@ -1267,7 +1723,8 @@ impl PendownWindow {
         canvas.drawing.push(&saved.marks);
         drop(canvas);
         self.show_watch(cx, |watched| watched.set(saved.watch));
-        self.help_panel.update(cx, |panel, cx| panel.set_running(None, cx));
+        self.help_panel
+            .update(cx, |panel, cx| panel.set_running(None, cx));
         self.show_highlight(cx);
         cx.notify();
     }
@@ -1276,23 +1733,38 @@ impl PendownWindow {
     /// Run starts from a clean slate anyway.
     pub(crate) fn forget_example(&mut self, cx: &mut Context<Self>) {
         if self.example.take().is_some() {
-            self.help_panel.update(cx, |panel, cx| panel.set_running(None, cx));
+            self.help_panel
+                .update(cx, |panel, cx| panel.set_running(None, cx));
         }
     }
 
     /// The highlight goes on the example's code, in the panel.
     pub(crate) fn show_example_highlight(&mut self, cx: &mut Context<Self>) {
         let Some(example) = &self.example else { return };
-        let highlight = self.animator.as_ref().and_then(|a| a.highlight).map(|s| s.range());
-        let running = Running { source: example.source, highlight, finished: false };
-        self.help_panel.update(cx, |panel, cx| panel.set_running(Some(running), cx));
+        let highlight = self
+            .animator
+            .as_ref()
+            .and_then(|a| a.highlight)
+            .map(|s| s.range());
+        let running = Running {
+            source: example.source,
+            highlight,
+            finished: false,
+        };
+        self.help_panel
+            .update(cx, |panel, cx| panel.set_running(Some(running), cx));
     }
 
     /// The example has finished or been stopped: its picture stays.
     pub(crate) fn example_finished(&mut self, cx: &mut Context<Self>) {
         let Some(example) = &self.example else { return };
-        let running = Running { source: example.source, highlight: None, finished: true };
-        self.help_panel.update(cx, |panel, cx| panel.set_running(Some(running), cx));
+        let running = Running {
+            source: example.source,
+            highlight: None,
+            finished: true,
+        };
+        self.help_panel
+            .update(cx, |panel, cx| panel.set_running(Some(running), cx));
     }
 
     /// The banner over the canvas while it shows an example.
@@ -1313,7 +1785,15 @@ impl PendownWindow {
                 .bg(theme.background.opacity(0.94))
                 .text_color(theme.foreground)
                 .text_sm()
-                .child(div().px_1().rounded_sm().bg(theme.foreground).text_color(theme.background).text_xs().child("Example"))
+                .child(
+                    div()
+                        .px_1()
+                        .rounded_sm()
+                        .bg(theme.foreground)
+                        .text_color(theme.background)
+                        .text_xs()
+                        .child("Example"),
+                )
                 .child(div().flex_1().min_w_0().truncate().child(text))
                 .child(
                     Button::new("back-to-my-drawing")

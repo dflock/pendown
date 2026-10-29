@@ -184,7 +184,10 @@ pub enum ColourError {
     /// Not any colour form. The caller says "X doesn't like Y as input".
     NotAColour,
     /// A word that isn't a known name, with the closest names.
-    UnknownName { name: String, suggestions: Vec<&'static str> },
+    UnknownName {
+        name: String,
+        suggestions: Vec<&'static str>,
+    },
     BadHex(String),
 }
 
@@ -198,12 +201,15 @@ impl ColourError {
                 [one] => format!("I don't know the colour \"{name}\". Did you mean \"{one}\"?"),
                 [rest @ .., last] => {
                     let rest: Vec<_> = rest.iter().map(|s| format!("\"{s}\"")).collect();
-                    format!("I don't know the colour \"{name}\". Did you mean {} or \"{last}\"?", rest.join(", "))
+                    format!(
+                        "I don't know the colour \"{name}\". Did you mean {} or \"{last}\"?",
+                        rest.join(", ")
+                    )
                 }
             }),
-            ColourError::BadHex(word) => {
-                Some(format!("\"{word}\" isn't a hex colour: use 3, 4, 6 or 8 hex digits after the #, as in \"#ff8800"))
-            }
+            ColourError::BadHex(word) => Some(format!(
+                "\"{word}\" isn't a hex colour: use 3, 4, 6 or 8 hex digits after the #, as in \"#ff8800"
+            )),
         }
     }
 }
@@ -219,7 +225,11 @@ pub fn parse(value: &Value) -> Result<Rgba, ColourError> {
 /// Like `parse`, with the palette as `SETPALETTE` has left it.
 pub fn parse_with(value: &Value, palette: &[Rgba; 16]) -> Result<Rgba, ColourError> {
     if let Some(n) = value.as_num() {
-        return if n.fract() == 0.0 && (0.0..16.0).contains(&n) { Ok(palette[n as usize]) } else { Err(ColourError::NotAColour) };
+        return if n.fract() == 0.0 && (0.0..16.0).contains(&n) {
+            Ok(palette[n as usize])
+        } else {
+            Err(ColourError::NotAColour)
+        };
     }
     match value {
         Value::List(list) => {
@@ -235,7 +245,9 @@ pub fn parse_with(value: &Value, palette: &[Rgba; 16]) -> Result<Rgba, ColourErr
             }
             Ok(rgba)
         }
-        Value::Word(word) if word.starts_with('#') => hex(&word[1..]).ok_or_else(|| ColourError::BadHex(word.to_string())),
+        Value::Word(word) if word.starts_with('#') => {
+            hex(&word[1..]).ok_or_else(|| ColourError::BadHex(word.to_string()))
+        }
         Value::Word(word) => {
             let lower = word.to_lowercase();
             match NAMES.binary_search_by(|(name, _)| name.cmp(&lower.as_str())) {
@@ -243,7 +255,10 @@ pub fn parse_with(value: &Value, palette: &[Rgba; 16]) -> Result<Rgba, ColourErr
                     let rgb = NAMES[i].1;
                     Ok([(rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8, 255])
                 }
-                Err(_) => Err(ColourError::UnknownName { name: word.to_string(), suggestions: suggest(&lower) }),
+                Err(_) => Err(ColourError::UnknownName {
+                    name: word.to_string(),
+                    suggestions: suggest(&lower),
+                }),
             }
         }
         Value::Num(_) | Value::Array(_) => Err(ColourError::NotAColour),
@@ -254,7 +269,11 @@ fn hex(digits: &str) -> Option<Rgba> {
     if !digits.chars().all(|c| c.is_ascii_hexdigit()) {
         return None;
     }
-    let nibble = |i: usize| u8::from_str_radix(&digits[i..i + 1], 16).ok().map(|n| n * 17);
+    let nibble = |i: usize| {
+        u8::from_str_radix(&digits[i..i + 1], 16)
+            .ok()
+            .map(|n| n * 17)
+    };
     let byte = |i: usize| u8::from_str_radix(&digits[i..i + 2], 16).ok();
     match digits.len() {
         3 => Some([nibble(0)?, nibble(1)?, nibble(2)?, 255]),
@@ -302,16 +321,28 @@ mod tests {
     use crate::value::List;
 
     fn list(items: &[f64]) -> Value {
-        Value::List(Rc::new(List::new(items.iter().map(|n| Value::Num(*n)).collect())))
+        Value::List(Rc::new(List::new(
+            items.iter().map(|n| Value::Num(*n)).collect(),
+        )))
     }
 
     #[test]
     fn every_form() {
         assert_eq!(parse(&Value::Num(4.0)), Ok([255, 0, 0, 255]));
-        assert_eq!(parse(&Value::word("4")), Ok([255, 0, 0, 255]), "numbers are words");
+        assert_eq!(
+            parse(&Value::word("4")),
+            Ok([255, 0, 0, 255]),
+            "numbers are words"
+        );
         assert_eq!(parse(&list(&[10.0, 20.0, 30.0])), Ok([10, 20, 30, 255]));
-        assert_eq!(parse(&list(&[10.0, 20.0, 30.0, 128.0])), Ok([10, 20, 30, 128]));
-        assert_eq!(parse(&Value::word("CornflowerBlue")), Ok([100, 149, 237, 255]));
+        assert_eq!(
+            parse(&list(&[10.0, 20.0, 30.0, 128.0])),
+            Ok([10, 20, 30, 128])
+        );
+        assert_eq!(
+            parse(&Value::word("CornflowerBlue")),
+            Ok([100, 149, 237, 255])
+        );
         assert_eq!(parse(&Value::word("#ff8800")), Ok([255, 136, 0, 255]));
         assert_eq!(parse(&Value::word("#f80")), Ok([255, 136, 0, 255]));
         assert_eq!(parse(&Value::word("#ff880080")), Ok([255, 136, 0, 128]));
@@ -323,9 +354,18 @@ mod tests {
         assert_eq!(parse(&Value::Num(16.0)), Err(ColourError::NotAColour));
         assert_eq!(parse(&Value::Num(2.5)), Err(ColourError::NotAColour));
         assert_eq!(parse(&list(&[1.0, 2.0])), Err(ColourError::NotAColour));
-        assert_eq!(parse(&list(&[1.0, 2.0, 300.0])), Err(ColourError::NotAColour));
-        assert_eq!(parse(&Value::word("#12")), Err(ColourError::BadHex("#12".into())));
-        assert_eq!(parse(&Value::word("#ggg")), Err(ColourError::BadHex("#ggg".into())));
+        assert_eq!(
+            parse(&list(&[1.0, 2.0, 300.0])),
+            Err(ColourError::NotAColour)
+        );
+        assert_eq!(
+            parse(&Value::word("#12")),
+            Err(ColourError::BadHex("#12".into()))
+        );
+        assert_eq!(
+            parse(&Value::word("#ggg")),
+            Err(ColourError::BadHex("#ggg".into()))
+        );
     }
 
     #[test]
@@ -336,9 +376,18 @@ mod tests {
     #[test]
     fn suggestions() {
         let message = |w: &str| parse(&Value::word(w)).unwrap_err().message().unwrap();
-        assert_eq!(message("bleu"), "I don't know the colour \"bleu\". Did you mean \"blue\"?");
-        assert_eq!(message("gren"), "I don't know the colour \"gren\". Did you mean \"green\", \"grey\" or \"gray\"?");
-        assert_eq!(message("cornflower"), "I don't know the colour \"cornflower\". Did you mean \"cornflowerblue\"?");
+        assert_eq!(
+            message("bleu"),
+            "I don't know the colour \"bleu\". Did you mean \"blue\"?"
+        );
+        assert_eq!(
+            message("gren"),
+            "I don't know the colour \"gren\". Did you mean \"green\", \"grey\" or \"gray\"?"
+        );
+        assert_eq!(
+            message("cornflower"),
+            "I don't know the colour \"cornflower\". Did you mean \"cornflowerblue\"?"
+        );
         assert_eq!(message("zzzzzz"), "I don't know the colour \"zzzzzz\"");
     }
 }

@@ -10,11 +10,30 @@ use crate::Segment;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Mark {
     Line(Segment),
-    Arc { center: Point, radius: f64, start_heading: f64, angle: f64, pen: Pen },
+    Arc {
+        center: Point,
+        radius: f64,
+        start_heading: f64,
+        angle: f64,
+        pen: Pen,
+    },
     /// Shapes are filled with `fill`, if there is one, then outlined if the
     /// pen is down (ADR 0017).
-    Ellipse { center: Point, radii: (f64, f64), heading: f64, pen: Pen, fill: Option<[u8; 4]> },
-    Rect { center: Point, size: (f64, f64), corner: f64, heading: f64, pen: Pen, fill: Option<[u8; 4]> },
+    Ellipse {
+        center: Point,
+        radii: (f64, f64),
+        heading: f64,
+        pen: Pen,
+        fill: Option<[u8; 4]>,
+    },
+    Rect {
+        center: Point,
+        size: (f64, f64),
+        corner: f64,
+        heading: f64,
+        pen: Pen,
+        fill: Option<[u8; 4]>,
+    },
 }
 
 impl From<Segment> for Mark {
@@ -37,7 +56,10 @@ fn pieces(radius: f64, radians: f64, tolerance: f64) -> usize {
 /// it to the right, to turtle coordinates.
 fn placed(center: Point, heading: f64, x: f64, y: f64) -> Point {
     let (sin, cos) = heading.to_radians().sin_cos();
-    Point { x: center.x + x * cos + y * sin, y: center.y - x * sin + y * cos }
+    Point {
+        x: center.x + x * cos + y * sin,
+        y: center.y - x * sin + y * cos,
+    }
 }
 
 impl Mark {
@@ -72,11 +94,24 @@ impl Mark {
     pub fn outline(&self, tolerance: f64) -> Vec<Point> {
         match *self {
             Mark::Line(s) => vec![s.from, s.to],
-            Mark::Arc { center, radius, start_heading, angle, .. } => {
+            Mark::Arc {
+                center,
+                radius,
+                start_heading,
+                angle,
+                ..
+            } => {
                 let n = pieces(radius, angle.to_radians(), tolerance);
-                (0..=n).map(|i| arc_point(center, radius, start_heading, angle, i as f64 / n as f64).0).collect()
+                (0..=n)
+                    .map(|i| arc_point(center, radius, start_heading, angle, i as f64 / n as f64).0)
+                    .collect()
             }
-            Mark::Ellipse { center, radii: (across, along), heading, .. } => {
+            Mark::Ellipse {
+                center,
+                radii: (across, along),
+                heading,
+                ..
+            } => {
                 let n = pieces(across.max(along), std::f64::consts::TAU, tolerance).max(8);
                 (0..=n)
                     .map(|i| {
@@ -85,12 +120,23 @@ impl Mark {
                     })
                     .collect()
             }
-            Mark::Rect { center, size: (across, along), corner, heading, .. } => {
+            Mark::Rect {
+                center,
+                size: (across, along),
+                corner,
+                heading,
+                ..
+            } => {
                 let (w, l, r) = (across / 2.0, along / 2.0, corner);
                 let mut local = vec![(0.0, l)];
                 // Each corner, clockwise from the front right: its centre,
                 // and the angle (clockwise from straight ahead) it starts at.
-                let corners = [((w - r, l - r), 0.0), ((w - r, -l + r), 90.0), ((-w + r, -l + r), 180.0), ((-w + r, l - r), 270.0)];
+                let corners = [
+                    ((w - r, l - r), 0.0),
+                    ((w - r, -l + r), 90.0),
+                    ((-w + r, -l + r), 180.0),
+                    ((-w + r, l - r), 270.0),
+                ];
                 for ((cx, cy), start) in corners {
                     if r > 0.0 {
                         let n = pieces(r, std::f64::consts::FRAC_PI_2, tolerance);
@@ -103,7 +149,10 @@ impl Mark {
                     }
                 }
                 local.push((0.0, l));
-                local.into_iter().map(|(x, y)| placed(center, heading, x, y)).collect()
+                local
+                    .into_iter()
+                    .map(|(x, y)| placed(center, heading, x, y))
+                    .collect()
             }
         }
     }
@@ -124,8 +173,15 @@ impl Mark {
         for pair in points.windows(2) {
             let step = distance(pair[0], pair[1]);
             if gone + step >= want {
-                let t = if step > 0.0 { (want - gone) / step } else { 0.0 };
-                out.push(Point { x: pair[0].x + (pair[1].x - pair[0].x) * t, y: pair[0].y + (pair[1].y - pair[0].y) * t });
+                let t = if step > 0.0 {
+                    (want - gone) / step
+                } else {
+                    0.0
+                };
+                out.push(Point {
+                    x: pair[0].x + (pair[1].x - pair[0].x) * t,
+                    y: pair[0].y + (pair[1].y - pair[0].y) * t,
+                });
                 return out;
             }
             gone += step;
@@ -147,7 +203,11 @@ fn length(points: &[Point]) -> f64 {
 mod tests {
     use super::*;
 
-    const PEN: Pen = Pen { down: true, color: [255, 255, 255, 255], size: 1.0 };
+    const PEN: Pen = Pen {
+        down: true,
+        color: [255, 255, 255, 255],
+        size: 1.0,
+    };
 
     fn p(x: f64, y: f64) -> Point {
         Point { x, y }
@@ -159,7 +219,13 @@ mod tests {
 
     #[test]
     fn a_circles_length_is_its_circumference() {
-        let circle = Mark::Ellipse { center: p(0.0, 0.0), radii: (100.0, 100.0), heading: 0.0, pen: PEN, fill: None };
+        let circle = Mark::Ellipse {
+            center: p(0.0, 0.0),
+            radii: (100.0, 100.0),
+            heading: 0.0,
+            pen: PEN,
+            fill: None,
+        };
         assert!((circle.length() - std::f64::consts::TAU * 100.0).abs() < 0.1);
         let points = circle.outline(0.1);
         assert!(close(points[0], p(0.0, 100.0)), "starts straight ahead");
@@ -169,27 +235,61 @@ mod tests {
     #[test]
     fn ellipses_turn_with_the_heading() {
         // At heading 90, "along" points east.
-        let e = Mark::Ellipse { center: p(0.0, 0.0), radii: (20.0, 50.0), heading: 90.0, pen: PEN, fill: None };
+        let e = Mark::Ellipse {
+            center: p(0.0, 0.0),
+            radii: (20.0, 50.0),
+            heading: 90.0,
+            pen: PEN,
+            fill: None,
+        };
         assert!(close(e.outline(0.1)[0], p(50.0, 0.0)));
     }
 
     #[test]
     fn rectangles() {
-        let r = Mark::Rect { center: p(0.0, 0.0), size: (200.0, 100.0), corner: 0.0, heading: 0.0, pen: PEN, fill: None };
+        let r = Mark::Rect {
+            center: p(0.0, 0.0),
+            size: (200.0, 100.0),
+            corner: 0.0,
+            heading: 0.0,
+            pen: PEN,
+            fill: None,
+        };
         let points = r.outline(0.1);
         assert_eq!(points.len(), 6);
-        assert!(close(points[0], p(0.0, 50.0)) && close(points[1], p(100.0, 50.0)) && close(points[2], p(100.0, -50.0)));
+        assert!(
+            close(points[0], p(0.0, 50.0))
+                && close(points[1], p(100.0, 50.0))
+                && close(points[2], p(100.0, -50.0))
+        );
         assert!((r.length() - 600.0).abs() < 1e-6);
         // Rounded corners make it shorter: each corner trades 2r for a
         // quarter circle.
-        let rounded = Mark::Rect { center: p(0.0, 0.0), size: (200.0, 100.0), corner: 10.0, heading: 0.0, pen: PEN, fill: None };
+        let rounded = Mark::Rect {
+            center: p(0.0, 0.0),
+            size: (200.0, 100.0),
+            corner: 10.0,
+            heading: 0.0,
+            pen: PEN,
+            fill: None,
+        };
         let expected = 600.0 - 4.0 * 20.0 + std::f64::consts::TAU * 10.0;
-        assert!((rounded.length() - expected).abs() < 0.1, "{}", rounded.length());
+        assert!(
+            (rounded.length() - expected).abs() < 0.1,
+            "{}",
+            rounded.length()
+        );
     }
 
     #[test]
     fn arcs_follow_the_turtle() {
-        let arc = Mark::Arc { center: p(100.0, 0.0), radius: 100.0, start_heading: 0.0, angle: 90.0, pen: PEN };
+        let arc = Mark::Arc {
+            center: p(100.0, 0.0),
+            radius: 100.0,
+            start_heading: 0.0,
+            angle: 90.0,
+            pen: PEN,
+        };
         let points = arc.outline(0.1);
         assert!(close(points[0], p(0.0, 0.0)));
         assert!(close(*points.last().unwrap(), p(100.0, 100.0)));
@@ -198,10 +298,24 @@ mod tests {
 
     #[test]
     fn partial_outlines() {
-        let line = Mark::Line(Segment { from: p(0.0, 0.0), to: p(0.0, 100.0), pen: PEN });
+        let line = Mark::Line(Segment {
+            from: p(0.0, 0.0),
+            to: p(0.0, 100.0),
+            pen: PEN,
+        });
         assert_eq!(line.partial(0.25, 0.1), [p(0.0, 0.0), p(0.0, 25.0)]);
-        let square = Mark::Rect { center: p(0.0, 0.0), size: (100.0, 100.0), corner: 0.0, heading: 0.0, pen: PEN, fill: None };
+        let square = Mark::Rect {
+            center: p(0.0, 0.0),
+            size: (100.0, 100.0),
+            corner: 0.0,
+            heading: 0.0,
+            pen: PEN,
+            fill: None,
+        };
         // Half way round from the top middle: the bottom middle.
-        assert!(close(*square.partial(0.5, 0.1).last().unwrap(), p(0.0, -50.0)));
+        assert!(close(
+            *square.partial(0.5, 0.1).last().unwrap(),
+            p(0.0, -50.0)
+        ));
     }
 }

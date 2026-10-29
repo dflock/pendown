@@ -27,7 +27,9 @@ pub(super) fn move_to(it: &mut Interpreter, a: &Args, to: Point) -> Out {
     }
     it.turtle.pos = path.end;
     if path.fenced {
-        return Err(a.error("The turtle can't go past the edge in FENCE mode. Use WRAP or WINDOW to let it.".into()));
+        return Err(a.error(
+            "The turtle can't go past the edge in FENCE mode. Use WRAP or WINDOW to let it.".into(),
+        ));
     }
     Ok(None)
 }
@@ -35,7 +37,14 @@ pub(super) fn move_to(it: &mut Interpreter, a: &Args, to: Point) -> Out {
 fn walk(it: &mut Interpreter, a: &Args, distance: f64) -> Out {
     let (sin, cos) = sin_cos_degrees(it.turtle.heading);
     let from = it.turtle.pos;
-    move_to(it, a, Point { x: from.x + distance * sin, y: from.y + distance * cos })
+    move_to(
+        it,
+        a,
+        Point {
+            x: from.x + distance * sin,
+            y: from.y + distance * cos,
+        },
+    )
 }
 
 /// Turns the turtle by `by` degrees, clockwise if positive. The event
@@ -81,17 +90,26 @@ pub(super) fn setpos(it: &mut Interpreter, a: &Args) -> Out {
 }
 
 pub(super) fn setxy(it: &mut Interpreter, a: &Args) -> Out {
-    let to = Point { x: a.num(0)?, y: a.num(1)? };
+    let to = Point {
+        x: a.num(0)?,
+        y: a.num(1)?,
+    };
     move_to(it, a, to)
 }
 
 pub(super) fn setx(it: &mut Interpreter, a: &Args) -> Out {
-    let to = Point { x: a.num(0)?, y: it.turtle.pos.y };
+    let to = Point {
+        x: a.num(0)?,
+        y: it.turtle.pos.y,
+    };
     move_to(it, a, to)
 }
 
 pub(super) fn sety(it: &mut Interpreter, a: &Args) -> Out {
-    let to = Point { x: it.turtle.pos.x, y: a.num(0)? };
+    let to = Point {
+        x: it.turtle.pos.x,
+        y: a.num(0)?,
+    };
     move_to(it, a, to)
 }
 
@@ -106,7 +124,10 @@ pub(super) fn home(it: &mut Interpreter, a: &Args) -> Out {
 }
 
 fn point_value(p: Point) -> Value {
-    Value::List(Rc::new(List::new(vec![Value::Num(tidy(p.x)), Value::Num(tidy(p.y))])))
+    Value::List(Rc::new(List::new(vec![
+        Value::Num(tidy(p.x)),
+        Value::Num(tidy(p.y)),
+    ])))
 }
 
 /// Positions are reported without the tiny errors that sines and cosines
@@ -115,7 +136,11 @@ fn point_value(p: Point) -> Value {
 /// number.
 fn tidy(x: f64) -> f64 {
     let whole = x.round();
-    if (x - whole).abs() < 1e-9 { whole + 0.0 } else { x }
+    if (x - whole).abs() < 1e-9 {
+        whole + 0.0
+    } else {
+        x
+    }
 }
 
 pub(super) fn pos(it: &mut Interpreter, _: &Args) -> Out {
@@ -138,7 +163,10 @@ pub(super) fn heading(it: &mut Interpreter, _: &Args) -> Out {
 pub(super) fn towards(it: &mut Interpreter, a: &Args) -> Out {
     let to = a.point(0)?;
     let from = it.turtle.pos;
-    let heading = (to.x - from.x).atan2(to.y - from.y).to_degrees().rem_euclid(360.0);
+    let heading = (to.x - from.x)
+        .atan2(to.y - from.y)
+        .to_degrees()
+        .rem_euclid(360.0);
     Ok(Some(Value::Num(tidy(heading).rem_euclid(360.0))))
 }
 
@@ -184,7 +212,10 @@ fn set_mode(it: &mut Interpreter, mode: TurtleMode) -> Out {
         let from = it.turtle.pos;
         let to = it.area.wrap_point(from);
         it.turtle.pos = to;
-        let pen = Pen { down: false, ..it.turtle.pen };
+        let pen = Pen {
+            down: false,
+            ..it.turtle.pen
+        };
         it.emit(Event::Move { from, to, pen })?;
     }
     it.turtle.mode = mode;

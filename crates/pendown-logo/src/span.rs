@@ -19,7 +19,10 @@ pub struct Span {
 impl Span {
     /// The span from the start of `self` to the end of `last`.
     pub fn to(self, last: Span) -> Span {
-        Span { end: self.end.max(last.end), ..self }
+        Span {
+            end: self.end.max(last.end),
+            ..self
+        }
     }
 
     pub fn range(self) -> std::ops::Range<usize> {

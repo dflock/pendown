@@ -30,8 +30,8 @@ pub mod watch;
 
 pub use colour::{NAMES as COLOUR_NAMES, PALETTE, Rgba};
 pub use error::{CallSite, Error, RunError};
-pub use geometry::{Area, TurtleMode, arc_center, arc_point};
 pub use event::{BatchSender, Event, EventSink, Halted, Pen, Point, SyncPoint};
+pub use geometry::{Area, TurtleMode, arc_center, arc_point};
 pub use interp::{Control, Interpreter, Limits, STACK_MARGIN, Stats};
 pub use number::{format_number, parse_number};
 pub use span::{SourceId, Span};

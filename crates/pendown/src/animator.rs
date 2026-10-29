@@ -49,6 +49,30 @@ pub const INSTANT_SLICE: Duration = Duration::from_millis(8);
 /// limit the program to one line a frame.
 pub const SYNC_WAIT: Duration = Duration::from_millis(4);
 
+/// How long Kame's last thought takes to fade once the next move or turn
+/// starts, in seconds.
+pub const FADE: f64 = 1.0 / 3.0;
+
+/// What Kame is thinking about, for "Show Kame thinking": the turn or move
+/// it's making, so far.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Thought {
+    /// Turning `at` a point, from heading `from`, by `by` degrees so far:
+    /// positive for right, and past 360 for more than a whole turn.
+    Turn { at: Point, from: f64, by: f64 },
+    /// Moving `from` a point, to where it's got `to`, `length` steps so far.
+    Move { from: Point, to: Point, length: f64 },
+}
+
+/// What to show of Kame thinking in a frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Thinking {
+    /// The turn or move in progress, or the last one, until the next starts.
+    pub current: Option<Thought>,
+    /// The one before, fading: how much of it is left, from 1 to 0.
+    pub fading: Option<(Thought, f64)>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Mode {
     Running,
@@ -141,6 +165,10 @@ pub struct Animator {
     /// Line starts shown, to compare with `Control::lines_started`.
     pub lines_shown: u64,
     pub instructions_shown: u64,
+    /// What Kame is thinking about, and the last thought fading, with its
+    /// seconds left: only at animated speeds.
+    thought: Option<Thought>,
+    fading: Option<(Thought, f64)>,
     /// The interpreter has finished, and every event has been taken.
     disconnected: bool,
     pub stopped: bool,
@@ -168,6 +196,8 @@ impl Animator {
             shown_this_step: 0,
             lines_shown: 0,
             instructions_shown: 0,
+            thought: None,
+            fading: None,
             disconnected: false,
             stopped: false,
             metrics: AnimatorMetrics::default(),
@@ -251,6 +281,28 @@ impl Animator {
             Some(Current::Dwell { left } | Current::Wait { left }) => secs(*left),
         };
         gap.min(MAX_FRAME_GAP)
+    }
+
+    /// What to show of Kame thinking: nothing at Instant, where a thousand
+    /// arcs a second would be noise.
+    pub fn thinking(&self) -> Thinking {
+        Thinking {
+            current: self.thought,
+            fading: self
+                .fading
+                .map(|(t, left)| (t, (left / FADE).clamp(0.0, 1.0))),
+        }
+    }
+
+    /// A move or turn starts: it's what Kame thinks about now, and the last
+    /// thought starts to fade.
+    fn think(&mut self, thought: Thought) {
+        if self.speed == Speed::Instant {
+            return;
+        }
+        if let Some(last) = self.thought.replace(thought) {
+            self.fading = Some((last, FADE));
+        }
     }
 
     /// Whether a move, turn or dwell is part-way through.
@@ -367,6 +419,12 @@ impl Animator {
         // window was hidden, say) doesn't make the turtle jump.
         let mut budget = dt.min(MAX_FRAME_GAP).as_secs_f64();
         let mut replied = false;
+        if instant {
+            (self.thought, self.fading) = (None, None);
+        } else if let Some((thought, left)) = self.fading {
+            let left = left - dt.as_secs_f64();
+            self.fading = (left > 0.0).then_some((thought, left));
+        }
 
         loop {
             if !self.is_playing() {
@@ -422,6 +480,13 @@ impl Animator {
                 }
                 Event::Move { from, to, pen } => {
                     self.idle_instruction = false;
+                    if from != to {
+                        self.think(Thought::Move {
+                            from,
+                            to: from,
+                            length: 0.0,
+                        });
+                    }
                     self.current = Some(Current::Move {
                         from,
                         to,
@@ -431,6 +496,13 @@ impl Animator {
                 }
                 Event::Turn { from, by } => {
                     self.idle_instruction = false;
+                    if by != 0.0 {
+                        self.think(Thought::Turn {
+                            at: self.pos,
+                            from,
+                            by: 0.0,
+                        });
+                    }
                     self.current = Some(Current::Turn {
                         from,
                         by,
@@ -597,9 +669,10 @@ impl Animator {
                 done,
             } => {
                 let length = ((to.x - from.x).powi(2) + (to.y - from.y).powi(2)).sqrt();
-                let done = done + progress(length - done, rate);
+                let done = (done + progress(length - done, rate)).min(length);
                 if done >= length {
                     self.pos = to;
+                    self.thought_moved(done);
                     if pen.down {
                         out.marks.push(Segment { from, to, pen }.into());
                     }
@@ -610,6 +683,7 @@ impl Animator {
                     x: from.x + (to.x - from.x) * t,
                     y: from.y + (to.y - from.y) * t,
                 };
+                self.thought_moved(done);
                 self.current = Some(Current::Move {
                     from,
                     to,
@@ -645,7 +719,11 @@ impl Animator {
             }
             Current::Turn { from, by, done } => {
                 let done = done + progress(by.abs() - done, rate.map(|r| r * DEGREES_PER_STEP));
+                let done = done.min(by.abs());
                 self.heading = (from + by.signum() * done).rem_euclid(360.0);
+                if let Some(Thought::Turn { by: so_far, .. }) = &mut self.thought {
+                    *so_far = by.signum() * done;
+                }
                 if done >= by.abs() {
                     return true;
                 }
@@ -673,6 +751,14 @@ impl Animator {
                 self.current = Some(Current::Dwell { left: left - done });
                 false
             }
+        }
+    }
+
+    /// The move Kame is thinking about has got to where Kame is, `done`
+    /// steps along.
+    fn thought_moved(&mut self, done: f64) {
+        if let Some(Thought::Move { to, length, .. }) = &mut self.thought {
+            (*to, *length) = (self.pos, done);
         }
     }
 

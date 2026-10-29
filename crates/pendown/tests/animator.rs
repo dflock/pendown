@@ -7,7 +7,7 @@ use std::{
 };
 
 use pendown::{
-    animator::{Animator, Mode, Speed},
+    animator::{Animator, FADE, Mode, Speed, Thinking, Thought},
     run::{self, DEFAULT_CHANNEL, Run},
 };
 use pendown_logo::RunError;
@@ -712,4 +712,119 @@ mod budgets {
         assert!(!animator.wants_frames());
         assert_eq!(animator.frame(FRAME, usize::MAX).events, 0);
     }
+}
+
+/// Plays frames until the program has finished, keeping what Kame thought
+/// about in each.
+fn thoughts(src: &str, speed: Speed) -> Vec<Thinking> {
+    let (mut animator, _run) = start(src, speed);
+    let mut seen = Vec::new();
+    for _ in 0..1000 {
+        if animator.finished() {
+            break;
+        }
+        frame(&mut animator, FRAME);
+        seen.push(animator.thinking());
+    }
+    assert!(animator.finished());
+    seen
+}
+
+#[test]
+fn kame_thinks_about_the_turn_as_it_turns() {
+    let seen = thoughts("RT 90", Speed::Animated(100.0));
+    let turned: Vec<f64> = seen
+        .iter()
+        .filter_map(|t| match t.current {
+            Some(Thought::Turn { from, by, .. }) => {
+                assert_eq!(from, 0.0);
+                Some(by)
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(turned.len() > 5, "{turned:?}");
+    assert!(
+        turned.windows(2).all(|w| w[0] <= w[1]),
+        "it grows: {turned:?}"
+    );
+    assert!(turned[0] > 0.0 && turned[0] < 90.0);
+    assert_eq!(turned.last(), Some(&90.0), "and stays at the end");
+}
+
+#[test]
+fn kame_thinks_about_the_move_so_far() {
+    let seen = thoughts("RT 90 FD 50", Speed::Animated(200.0));
+    let moves: Vec<(f64, f64)> = seen
+        .iter()
+        .filter_map(|t| match t.current {
+            Some(Thought::Move { from, to, length }) => {
+                assert_eq!((from.x, from.y), (0.0, 0.0));
+                Some((to.x, length))
+            }
+            _ => None,
+        })
+        .collect();
+    assert!(moves.len() > 5, "{moves:?}");
+    for (x, length) in &moves {
+        assert!(
+            (x - length).abs() < 1e-9,
+            "to is where Kame has got: {moves:?}"
+        );
+    }
+    assert_eq!(moves.last(), Some(&(50.0, 50.0)));
+}
+
+#[test]
+fn the_last_thought_fades_as_the_next_starts() {
+    let seen = thoughts("FD 50 RT 90 FD 50", Speed::Animated(100.0));
+    let first_turn = seen
+        .iter()
+        .position(|t| matches!(t.current, Some(Thought::Turn { .. })))
+        .unwrap();
+    let Some((Thought::Move { length, .. }, left)) = seen[first_turn].fading else {
+        panic!("the move fades as the turn starts: {:?}", seen[first_turn]);
+    };
+    assert_eq!(length, 50.0);
+    assert!(left > 0.0 && left <= 1.0);
+    // A third of a second later, it's gone.
+    let after = (FADE / FRAME.as_secs_f64()).ceil() as usize + 1;
+    assert!(
+        !matches!(
+            seen[first_turn + after].fading,
+            Some((Thought::Move { .. }, _))
+        ),
+        "{:?}",
+        seen[first_turn + after]
+    );
+    // The turn fades as the second move starts.
+    let second_move = first_turn
+        + seen[first_turn..]
+            .iter()
+            .position(|t| matches!(t.current, Some(Thought::Move { .. })))
+            .unwrap();
+    assert!(matches!(
+        seen[second_move].fading,
+        Some((Thought::Turn { by: 90.0, .. }, _))
+    ));
+}
+
+#[test]
+fn more_than_a_whole_turn_and_turning_left() {
+    let seen = thoughts("RT 450", Speed::Animated(2000.0));
+    assert!(matches!(
+        seen.last().unwrap().current,
+        Some(Thought::Turn { by: 450.0, .. })
+    ));
+    let seen = thoughts("LT 30", Speed::Animated(100.0));
+    assert!(matches!(
+        seen.last().unwrap().current,
+        Some(Thought::Turn { by: -30.0, .. })
+    ));
+}
+
+#[test]
+fn nothing_to_think_about_at_instant() {
+    let seen = thoughts("FD 50 RT 90 FD 50", Speed::Instant);
+    assert!(seen.iter().all(|t| *t == Thinking::default()), "{seen:?}");
 }

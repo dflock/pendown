@@ -1,5 +1,9 @@
 //! Pendown: a Logo playground where you can watch the turtle think.
 
+// On Windows, a release build opens no console window beside the app. Debug
+// builds keep it, for what Pendown prints while it's being worked on.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod app;
 mod autotest;
 mod canvas;
@@ -13,7 +17,7 @@ mod panes;
 mod teach_dialog;
 mod watching;
 
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use gpui_kit::*;
 
@@ -24,6 +28,14 @@ const FONTS: [&[u8]; 4] = [
     include_bytes!("../fonts/NotoSans-Bold.ttf"),
     include_bytes!("../fonts/NotoSans-BoldItalic.ttf"),
 ];
+
+/// Kame, the window's icon on X11. Wayland finds it through the desktop
+/// file, `linux/pendown.desktop`, by the app's ID.
+const ICON: &[u8] = include_bytes!("../linux/pendown.png");
+
+/// The app's ID: the Wayland app ID and the X11 class, which match the
+/// desktop file's name and its `StartupWMClass`.
+const APP_ID: &str = "pendown";
 
 fn main() {
     gpui_kit::application()
@@ -55,6 +67,10 @@ fn main() {
                     size(px(1400.), px(900.)),
                     cx,
                 ))),
+                app_id: Some(APP_ID.into()),
+                icon: image::load_from_memory(ICON)
+                    .ok()
+                    .map(|icon| Arc::new(icon.into_rgba8())),
                 ..Default::default()
             };
             gpui_kit::open_window(options, cx, |window, cx| {

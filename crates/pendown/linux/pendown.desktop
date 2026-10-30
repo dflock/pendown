@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Pendown
+GenericName=Logo playground
+Comment=A Logo playground where you can watch the turtle think
+Exec=pendown
+Icon=pendown
+Terminal=false
+Categories=Education;
+Keywords=logo;turtle;programming;
+StartupWMClass=pendown

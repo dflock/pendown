@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{
     ActiveTheme, Disableable as _, Sizable as _, WindowExt as _,
     button::{Button, ButtonVariants as _},
@@ -443,12 +444,12 @@ impl Render for TeachKame {
                             )
                             .child(
                                 div()
-                                    .id("teach-rows")
                                     .flex_1()
                                     .min_h_0()
-                                    .overflow_y_scroll()
                                     .p_1()
-                                    .children(rows),
+                                    .children(rows)
+                                    .overflow_y_scrollbar()
+                                    .id("teach-rows"),
                             )
                             .child(
                                 div()
@@ -498,10 +499,10 @@ impl Render for TeachKame {
                                             .child(heading("Goes in your program", cx))
                                             .child(
                                                 div()
-                                                    .id("teach-code")
                                                     .max_h(px(250.))
-                                                    .overflow_y_scroll()
-                                                    .child(code_block(&code, None, &theme)),
+                                                    .child(code_block(&code, None, &theme))
+                                                    .overflow_y_scrollbar()
+                                                    .id("teach-code"),
                                             ),
                                     )
                                     .child(

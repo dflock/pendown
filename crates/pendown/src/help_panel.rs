@@ -8,6 +8,7 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 
+use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{
     ActiveTheme, Disableable as _, Icon, Selectable as _, Sizable as _,
     button::{Button, ButtonVariants as _},
@@ -1417,15 +1418,23 @@ impl HelpPanel {
             .child(nav)
             .children(strip)
             .child(
+                // The page keeps its own scroll handle, which the scripted
+                // session scrolls, so its scrollbar sits over it here.
                 div()
-                    .id(SharedString::from(id))
-                    .track_scroll(&self.page_scroll)
                     .flex_1()
                     .min_h_0()
-                    .overflow_y_scroll()
-                    .px_3()
-                    .pb_4()
-                    .children(content),
+                    .relative()
+                    .child(
+                        div()
+                            .id(SharedString::from(id))
+                            .track_scroll(&self.page_scroll)
+                            .size_full()
+                            .overflow_y_scroll()
+                            .px_3()
+                            .pb_4()
+                            .children(content),
+                    )
+                    .vertical_scrollbar(&self.page_scroll),
             )
             .map(|el| match self.colours.clone() {
                 // The current colour, always in view on the Colours page.
@@ -1578,13 +1587,13 @@ impl HelpPanel {
             .child(header)
             .child(
                 div()
-                    .id(SharedString::from(format!("lesson-{l}")))
                     .flex_1()
                     .min_h_0()
-                    .overflow_y_scroll()
                     .px_3()
                     .pb_4()
-                    .children(body),
+                    .children(body)
+                    .overflow_y_scrollbar()
+                    .id(SharedString::from(format!("lesson-{l}"))),
             )
             .child(footer)
             .into_any_element()

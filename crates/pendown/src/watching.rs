@@ -7,6 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{ActiveTheme, h_flex, v_flex};
 use gpui_kit::{prelude::FluentBuilder as _, *};
 use pendown_logo::{
@@ -219,16 +220,16 @@ impl Render for CountersPane {
             .child(title("Repeat counters", cx))
             .child(
                 div()
-                    .id("counters")
                     .flex_1()
                     .min_h_0()
-                    .overflow_y_scroll()
                     .font_family(theme.mono_font_family.clone())
                     .text_xs()
                     .when(rows.is_empty(), |list| {
                         list.child(empty("No loops running", cx))
                     })
-                    .children(rows),
+                    .children(rows)
+                    .overflow_y_scrollbar()
+                    .id("counters"),
             )
     }
 }
@@ -335,16 +336,16 @@ impl Render for VariablesPane {
         }
         v_flex().size_full().child(title("Variables", cx)).child(
             div()
-                .id("variables")
                 .flex_1()
                 .min_h_0()
-                .overflow_y_scroll()
                 .font_family(theme.mono_font_family.clone())
                 .text_xs()
                 .when(rows.is_empty(), |list| {
                     list.child(empty("No variables", cx))
                 })
-                .children(rows),
+                .children(rows)
+                .overflow_y_scrollbar()
+                .id("variables"),
         )
     }
 }

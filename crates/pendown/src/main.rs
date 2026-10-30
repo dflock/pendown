@@ -50,6 +50,12 @@ fn main() {
                 .add_fonts(FONTS.iter().map(|&f| Cow::Borrowed(f)).collect())
                 .expect("the built-in fonts load");
             cx.global_mut::<gpui_kit::component::Theme>().font_family = "Noto Sans".into();
+            // Scrollbars always show when there's more than fits, so it's
+            // plain that there's more to scroll to.
+            gpui_kit::component::Theme::set_scrollbar_mode(
+                gpui_kit::component::scroll::ScrollbarMode::Always,
+                cx,
+            );
             // Closing the window ends the app.
             cx.on_window_closed(|cx, _| {
                 if cx.windows().is_empty() {

@@ -947,23 +947,17 @@ impl HelpPanel {
                     .border_t_1()
                     .border_color(theme.border)
                     .bg(theme.muted.opacity(0.4))
-                    .child(if is_running {
-                        Button::new(SharedString::from(format!("stop-{i}-{n}")))
-                            .small()
-                            .icon(IconName::Square)
-                            .label("Stop")
-                            .on_click(move |_, _, cx| {
-                                app.update(cx, |this, cx| this.stop(cx)).ok();
-                            })
-                    } else {
+                    // There's no Stop (ADR 0028): Run starts it again, as the
+                    // toolbar's does, and Back to my drawing ends it.
+                    .child(
                         Button::new(SharedString::from(format!("run-{i}-{n}")))
                             .small()
                             .icon(IconName::Play)
                             .label("Run")
                             .on_click(move |_, _, cx| {
                                 app.update(cx, |this, cx| this.run_example(i, n, cx)).ok();
-                            })
-                    })
+                            }),
+                    )
                     .child(
                         Button::new(SharedString::from(format!("copy-{i}-{n}")))
                             .small()
@@ -1672,17 +1666,8 @@ impl HelpPanel {
                                     .ok();
                             }),
                     )
-                    .child(if is_running {
-                        Button::new(SharedString::from(format!(
-                            "stop-lesson-{lesson}-{program}"
-                        )))
-                        .small()
-                        .icon(IconName::Square)
-                        .label("Stop")
-                        .on_click(move |_, _, cx| {
-                            app_run.update(cx, |this, cx| this.stop(cx)).ok();
-                        })
-                    } else {
+                    // No Stop (ADR 0028): Run starts it again.
+                    .child(
                         Button::new(SharedString::from(format!("run-lesson-{lesson}-{program}")))
                             .small()
                             .icon(IconName::Play)
@@ -1691,8 +1676,8 @@ impl HelpPanel {
                                 app_run
                                     .update(cx, |this, cx| this.run_source(source, cx))
                                     .ok();
-                            })
-                    }),
+                            }),
+                    ),
             )
             .into_any_element()
     }

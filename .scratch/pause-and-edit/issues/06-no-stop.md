@@ -1,6 +1,6 @@
 # No Stop: the toolbar, the console while paused, help and the tutorial, README and the session
 
-Status: needs-triage
+Status: resolved
 Type: task
 Blocked by: 05, 07
 
@@ -22,3 +22,9 @@ Blocked by: 05, 07
 No Stop anywhere in the UI, help, tutorial or README; the tutorial explains editing while paused; a `FOREVER` program can be paused and the console used; the whole session passes.
 
 ## Comments
+
+2026-10-31: Done.
+- The toolbar is Run, Pause/Resume and Single Step. The help panel's examples and lesson programs had Stop buttons too: they now always say Run, which starts them again, and Back to my drawing ends an example.
+- A console entry while paused ends the paused program (printing "Stopped.", as Stop did) and then runs.
+- The scripted session's `Stop` step is now `EndRun`, which still calls `App::stop`, what Run and console entries use, so its timings stay. There's a new section, "typing in the console ends a paused program".
+- The redraw-count check in phase 3 now takes focus off the window first. A focused editor redraws to blink its caret, so an earlier section that pressed keys in the editor made it fail.

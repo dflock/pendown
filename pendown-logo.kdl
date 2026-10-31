@@ -4417,7 +4417,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step line buttons do that."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Single Step buttons do that."
       }
       untrace {
         eg "UNTRACE contentslist"
@@ -4425,7 +4425,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step line buttons do that."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Single Step buttons do that."
       }
       tracedp {
         eg """
@@ -4436,7 +4436,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step line buttons do that."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Single Step buttons do that."
       }
       step {
         eg "STEP contentslist"
@@ -4445,7 +4445,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step line buttons do that."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Single Step buttons do that."
       }
       unstep {
         eg "UNSTEP contentslist"
@@ -4453,7 +4453,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step line buttons do that."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Single Step buttons do that."
       }
       steppedp {
         eg """
@@ -4464,7 +4464,7 @@ logo {
         supported #false
         obsolete #true
         phase #null
-        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Step line buttons do that."
+        obsolete_reason "it turns on tracing or stepping, and Pendown's Pause and Single Step buttons do that."
       }
       edit {
         eg """
@@ -4763,7 +4763,7 @@ logo {
         obsolete #false
         phase 1
         help """
-        Runs a list of instructions again and again, until something stops it: [STOP] in a procedure, [THROW], an error, or the Stop button. [REPCOUNT] says which time it is.
+        Runs a list of instructions again and again, until something stops it: [STOP] in a procedure, [THROW], an error, or ending the run, by pressing Run or by pausing and typing in the console. [REPCOUNT] says which time it is.
         """
         example title="Until it's big enough" """
         TO GROW
@@ -4944,14 +4944,14 @@ logo {
 
         If the tag is the word ERROR, then any error condition that arises during the running of the instructionlist has the effect of THROW "ERROR instead of printing an error message and returning to toplevel. The CATCH does not output if an error is caught. Also, during the running of the instructionlist, the variable ERRACT is temporarily unbound. (If there is an error while ERRACT has a value, that value is taken as an instructionlist to be run after printing the error message. Typically the value of ERRACT, if any, is the list [PAUSE].)
         """
-        differs "Stop, from the toolbar, is never caught, even by CATCH \"ERROR."
+        differs "Ending a run, by pressing Run or by typing in the console while it's paused, is never caught, even by CATCH \"ERROR."
         supported #true
         obsolete #false
         phase 2
         help """
         Runs a list of instructions, and catches a [THROW] with the same tag, which stops the list there. If the throw has a value, `CATCH` outputs it.
 
-        With the tag `"ERROR`, it catches errors instead, so the program carries on. [ERROR] then says what went wrong. The Stop button is never caught.
+        With the tag `"ERROR`, it catches errors instead, so the program carries on. [ERROR] then says what went wrong. Ending the run, by pressing Run or by typing in the console while it's paused, is never caught.
         """
         example title="Leaving early" """
         CATCH "done [

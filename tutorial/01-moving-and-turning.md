@@ -35,7 +35,9 @@ FD 100
 RT 90
 ```
 
-Slow Kame down with the speed slider, and watch the highlight in the editor move from line to line as Kame goes. **Pause** stops Kame part-way, and **Step line** goes one line at a time.
+Slow Kame down with the speed slider, and watch the highlight in the editor move from line to line as Kame goes. **Pause** lets Kame finish what it's doing, then waits, and **Single Step** goes one instruction at a time.
+
+While Kame's paused, you can change your program. **Resume** runs the changed version from the start, quickly, up to where you were, then carries on. To end a program that would go on forever, pause it and type in the console.
 
 ## Backwards and left
 

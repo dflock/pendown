@@ -1,6 +1,6 @@
 # Single Step: one step button
 
-Status: needs-triage
+Status: resolved
 Type: task
 
 ## What
@@ -19,3 +19,5 @@ What goes is stepping a whole line of several instructions in one press. Resume 
 The toolbar has one step button, Single Step. The animator tests' Step line cases are removed, or become Single Step cases where they test something Single Step still does. The scripted session's uses of Step line step with Single Step instead, and the whole session passes. No "Step line" or "Step instruction" is left in the UI, help, tutorial or README.
 
 ## Comments
+
+2026-10-31: Done. The animator no longer holds a `Sync` at all: paused, it doesn't take the next line's, so `held`, `after_line_start` and `shown_this_step` went too. The STEPPER test gives the same sequence under Single Step as it did under Step line. ADR 0028 isn't written yet, so the note went in ADR 0012 itself.

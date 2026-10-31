@@ -61,6 +61,13 @@ MAKE \"sizes [40 80]
 FOREACH :sizes [TILE ?]
 ";
 
+/// ADR 0028: a program to pause and change, and the changes.
+const SQUARE_SIDES: &str = "TO SIDE :n\n  FD :n\n  RT 90\nEND\nREPEAT 4 [SIDE 100]\nPRINT \"done\n";
+const TRIANGLE_SIDES: &str =
+    "TO SIDE :n\n  FD :n * 2\n  RT 120\nEND\nREPEAT 3 [SIDE 100]\nPRINT \"done\n";
+const ONE_SIDE: &str = "TO SIDE :n\n  FD :n\n  RT 90\nEND\nREPEAT 1 [SIDE 100]\nPRINT \"done\n";
+const UNCLOSED: &str = "TO SIDE :n\n  FD :n\n  RT 90\nEND\nREPEAT 4 [SIDE 100\nPRINT \"done\n";
+
 const COUNTING: &str = "MAKE \"n 0\nFOREVER [MAKE \"n :n + 1]";
 
 const ERRORS: &str = "TO BOX :n\n  FD :n RT 90\n  FD \"far\n  PRINT 1\nEND\nBOX 100";
@@ -77,9 +84,10 @@ enum Step {
     SetSpeed(Speed),
     Pause,
     Resume,
-    StepLine,
-    StepInstruction,
-    Stop,
+    SingleStep,
+    /// End the run, as Run and a console entry do (ADR 0028): there's no
+    /// Stop button, but ending a run works as Stop did.
+    EndRun,
     Screenshot(&'static str),
     /// Start recording the turtle's y position at every frame.
     Track,
@@ -93,6 +101,16 @@ enum Step {
     CheckHighlight(&'static str),
     /// The turtle is part-way through a move.
     CheckMoving,
+    /// Nothing is part-way through: the move, turn or shape is finished.
+    CheckNotMoving,
+    /// The editor shows the highlight, or doesn't.
+    CheckEditorHighlight(bool),
+    /// The editor can be typed in, or is read-only.
+    CheckEditable(bool),
+    /// The run is paused, with something left to run, or isn't.
+    CheckPaused(bool),
+    /// The console holds exactly these lines.
+    CheckConsoleExactly(&'static [&'static str]),
     /// The interpreter has started exactly as many lines as the highlight
     /// has reached.
     CheckNothingAhead,
@@ -361,41 +379,141 @@ fn script() -> Vec<Step> {
         CheckSpeeds(ms(1500), 50.0, 200.0),
         SetSpeed(Speed::Instant),
         WaitFinished,
-        Say("Step stops at each line, with nothing run ahead"),
+        Say("Pause lets the move finish, and pauses before the next instruction"),
+        Run("FD 300\nRT 90\nFD 300", Speed::Animated(50.0)),
+        Wait(ms(1500)),
+        CheckMoving,
+        Pause,
+        WaitPaused,
+        CheckNotMoving,
+        CheckHighlight("RT 90"),
+        Wait(ms(300)),
+        CheckHighlight("RT 90"),
+        Screenshot("paused-after-the-move"),
+        EndRun,
+        Say("Single Step stops at each instruction, with nothing run ahead"),
         Run(STEPPER, Speed::Animated(100.0)),
         Wait(ms(1200)),
         Pause,
-        StepLine,
+        SingleStep,
         WaitPaused,
         Wait(ms(50)),
         CheckNothingAhead,
-        StepLine,
+        SingleStep,
         WaitPaused,
         Wait(ms(50)),
         CheckNothingAhead,
-        StepLine,
+        SingleStep,
         WaitPaused,
         Wait(ms(50)),
         CheckNothingAhead,
         Screenshot("paused"),
-        Stop,
+        EndRun,
         CheckStopsWithin(ms(50)),
-        Say("Stop at Instant"),
+        Say("ADR 0028: the program can be changed while paused, and Resume replays it"),
+        Run(SQUARE_SIDES, Speed::Animated(100.0)),
+        Wait(ms(1500)),
+        CheckEditable(false),
+        Pause,
+        WaitPaused,
+        Wait(ms(50)),
+        CheckEditable(true),
+        CheckEditorHighlight(true),
+        Type(TRIANGLE_SIDES),
+        Wait(ms(100)),
+        CheckEditorHighlight(false),
+        EditorKeys("secondary-z"),
+        Wait(ms(100)),
+        CheckEditor(SQUARE_SIDES),
+        CheckEditorHighlight(true),
+        Type(TRIANGLE_SIDES),
+        Wait(ms(100)),
+        Screenshot("changed-while-paused"),
+        Resume,
+        Wait(ms(300)),
+        CheckEditorHighlight(true),
+        Screenshot("replayed"),
+        SetSpeed(Speed::Instant),
+        WaitFinished,
+        CheckDrawn(3),
+        CheckTurtle(0.0, 0.0, 0.0),
+        CheckConsoleExactly(&["done"]),
+        Say("ADR 0028: Single Step after a change replays, then steps"),
+        Run(SQUARE_SIDES, Speed::Animated(100.0)),
+        Wait(ms(1500)),
+        Pause,
+        WaitPaused,
+        Type(TRIANGLE_SIDES),
+        Wait(ms(100)),
+        SingleStep,
+        WaitPaused,
+        Wait(ms(50)),
+        CheckPaused(true),
+        CheckEditorHighlight(true),
+        CheckNothingAhead,
+        SetSpeed(Speed::Instant),
+        Resume,
+        WaitFinished,
+        CheckDrawn(3),
+        Say("ADR 0028: a change that doesn't parse leaves it paused"),
+        Run(SQUARE_SIDES, Speed::Animated(100.0)),
+        Wait(ms(1500)),
+        Pause,
+        WaitPaused,
+        Type(UNCLOSED),
+        Wait(ms(100)),
+        Resume,
+        Wait(ms(200)),
+        CheckPaused(true),
+        CheckEditorHighlight(false),
+        Screenshot("doesnt-parse"),
+        EditorKeys("secondary-z"),
+        Wait(ms(100)),
+        CheckEditorHighlight(true),
+        SetSpeed(Speed::Instant),
+        Resume,
+        WaitFinished,
+        CheckDrawn(4),
+        Say("ADR 0028: a change that ends sooner just finishes"),
+        Run(SQUARE_SIDES, Speed::Animated(100.0)),
+        Wait(ms(2500)),
+        Pause,
+        WaitPaused,
+        Type(ONE_SIDE),
+        Wait(ms(100)),
+        Resume,
+        WaitFinished,
+        CheckDrawn(1),
+        CheckConsoleExactly(&["done"]),
+        Screenshot("shorter-finishes"),
+        Say("ADR 0028: typing in the console ends a paused program"),
+        Run(FOREVER_LINES, Speed::Animated(100.0)),
+        Wait(ms(300)),
+        Pause,
+        WaitPaused,
+        Wait(ms(50)),
+        CheckPaused(true),
+        Console("PRINT \"hello"),
+        WaitFinished,
+        CheckPaused(false),
+        CheckConsole("hello"),
+        Screenshot("console-ends-a-paused-program"),
+        Say("Ending a run at Instant"),
         Run(FOREVER, Speed::Instant),
         Wait(ms(500)),
-        Stop,
+        EndRun,
         CheckStopsWithin(ms(50)),
-        Say("Stop with the interpreter blocked on a full channel"),
+        Say("Ending a run with the interpreter blocked on a full channel"),
         Run(FOREVER, Speed::Animated(20.0)),
         Wait(ms(500)),
-        Stop,
+        EndRun,
         CheckStopsWithin(ms(50)),
-        Say("Stop while paused at a line"),
+        Say("Ending a run while paused at a line"),
         Run(FOREVER_LINES, Speed::Animated(100.0)),
         Wait(ms(300)),
         Pause,
         Wait(ms(200)),
-        Stop,
+        EndRun,
         CheckStopsWithin(ms(50)),
         Say("A 131,070-move tree at Instant"),
         Run(TREE, Speed::Instant),
@@ -431,33 +549,33 @@ fn script() -> Vec<Step> {
         MeasureRenders,
         Wait(ms(3000)),
         CheckRenders(25.0),
-        Stop,
+        EndRun,
         Say("Phase 3: the metrics overlay"),
         ToggleMetrics,
         Run("REPEAT 36 [REPEAT 4 [FD 200 RT 90] RT 10]", level_speed(10)),
         Wait(ms(1200)),
         CheckOverlay(true),
         Screenshot("metrics"),
-        Stop,
+        EndRun,
         ToggleMetrics,
         CheckOverlay(false),
         Say("Phase 4: the counters and variables keep in step with the highlight"),
         Run(WATCHED, Speed::Animated(100.0)),
         Pause,
-        StepInstruction,
+        SingleStep,
         WaitPaused,
         CheckHighlight("MAKE \"sizes [40 80]"),
         CheckPanels(""),
-        StepInstruction,
+        SingleStep,
         WaitPaused,
         CheckPanels("sizes=[40 80]"),
-        StepInstruction,
+        SingleStep,
         WaitPaused,
         CheckHighlight("TILE ?"),
         CheckPanels("FOREACH 1 of 2* | sizes=[40 80]"),
-        StepInstruction,
+        SingleStep,
         WaitPaused,
-        StepInstruction,
+        SingleStep,
         WaitPaused,
         CheckHighlight("FD :size"),
         CheckPanels("FOREACH 1 of 2 | REPEAT 1 of 4* | sizes=[40 80] | TILE: size=40"),
@@ -475,7 +593,7 @@ fn script() -> Vec<Step> {
         Wait(ms(100)),
         CheckPanelsDrawn,
         Screenshot("panels-instant"),
-        Stop,
+        EndRun,
         CheckPanelsStart("n="),
         Wait(ms(100)),
         CheckPanelsDrawn,
@@ -623,7 +741,7 @@ fn script() -> Vec<Step> {
         SetSpeed(Speed::Animated(50.0)),
         Console("FOREVER [FD 1 RT 1]"),
         Wait(ms(500)),
-        Stop,
+        EndRun,
         UndoConsole,
         WaitFinished,
         CheckDrawn(3),
@@ -1119,12 +1237,10 @@ impl App {
                 }
                 Step::SetSpeed(speed) => self.set_speed(speed, window, cx),
                 Step::Pause => self.animator.as_mut().map_or((), |a| a.pause()),
-                Step::Resume => self.animator.as_mut().map_or((), |a| a.resume()),
-                Step::StepLine => self.animator.as_mut().map_or((), |a| a.step_line()),
-                Step::StepInstruction => {
-                    self.animator.as_mut().map_or((), |a| a.step_instruction())
-                }
-                Step::Stop => self.stop(cx),
+                // As the toolbar does, so a changed program replays.
+                Step::Resume => self.resume(cx),
+                Step::SingleStep => self.single_step(cx),
+                Step::EndRun => self.stop(cx),
                 Step::Screenshot(name) => self.screenshot(name),
                 Step::Track => self.autotest.as_mut().unwrap().track = Some(Vec::new()),
                 Step::CheckSpeeds(at, before, after) => {
@@ -1161,6 +1277,44 @@ impl App {
                         .as_ref()
                         .is_some_and(|a| a.partial(1.0).is_some());
                     self.check(moving, "the turtle is part-way through the move".into());
+                }
+                Step::CheckEditorHighlight(shown) => {
+                    let found = !self.highlight_ranges(cx).is_empty();
+                    self.check(
+                        found == shown,
+                        format!(
+                            "the editor's highlight is {}",
+                            if found { "shown" } else { "hidden" }
+                        ),
+                    );
+                }
+                Step::CheckEditable(editable) => {
+                    let readonly = self.editor_pane.read(cx).readonly();
+                    self.check(
+                        readonly != editable,
+                        format!(
+                            "the editor is {}",
+                            if readonly { "read-only" } else { "editable" }
+                        ),
+                    );
+                }
+                Step::CheckPaused(expected) => {
+                    let paused = self.paused();
+                    self.check(
+                        paused == expected,
+                        format!(
+                            "the run is {}",
+                            if paused { "paused" } else { "not paused" }
+                        ),
+                    );
+                }
+                Step::CheckConsoleExactly(expected) => {
+                    let lines: Vec<&str> = self.console.iter().map(|l| l.as_ref()).collect();
+                    self.check(lines == expected, format!("the console holds {lines:?}"));
+                }
+                Step::CheckNotMoving => {
+                    let moving = self.animator.as_ref().is_some_and(|a| a.in_progress());
+                    self.check(!moving, "nothing is left part-way".into());
                 }
                 Step::CheckNothingAhead => {
                     let (ahead, text) = (
@@ -1624,6 +1778,10 @@ impl App {
                     self.check(found, format!("the console shows {expected:?}"));
                 }
                 Step::MeasureRenders => {
+                    // A focused editor or console redraws to blink its caret,
+                    // which isn't what this counts: an earlier section may
+                    // have left one focused.
+                    window.blur(cx);
                     pendown_logo::metrics::set_enabled(true);
                     let start = (
                         self.snapshot(),

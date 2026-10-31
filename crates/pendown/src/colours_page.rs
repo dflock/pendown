@@ -725,7 +725,7 @@ impl ColoursPage {
 
     /// The current colour, its form, and Copy to editor, at the bottom of
     /// the page. Copy to editor is off while a program runs, since the
-    /// editor is read-only then (ADR 0006).
+    /// editor is read-only then, but not while it's paused (ADR 0028).
     pub fn bar(&self, running: bool, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let rgba = self.rgba();
@@ -733,7 +733,7 @@ impl ColoursPage {
             .primary()
             .label("Copy to editor")
             .disabled(running)
-            .when(running, |b| b.tooltip("Stop the program to change it"))
+            .when(running, |b| b.tooltip("Pause the program to change it"))
             .on_click(cx.listener(|this, _, window, cx| this.copy(window, cx)));
         v_flex()
             .flex_none()

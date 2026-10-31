@@ -30,7 +30,7 @@ The rest of the control commands needed a decision too: whether they're built in
 - **`#` and `REPCOUNT`** give the position in the data inside the template commands, as well as the count inside `REPEAT` and `FOREVER`.
 - **`THROW` is a new kind of exit from an instruction,** alongside `STOP`, `OUTPUT` and errors.
   - `CATCH` compares tags without regard to case.
-  - `CATCH "ERROR` catches errors and `THROW "ERROR`. It never catches Stop (ADR 0011).
+  - `CATCH "ERROR` catches errors and `THROW "ERROR`. It never catches Stop (ADR 0011). Since ADR 0028 there's no Stop button, and it never catches a run being ended by Run or a console entry.
   - `(THROW "ERROR message)` is an error at the call of the procedure containing it, as if that procedure were a primitive.
   - `THROW "TOPLEVEL` ends the program without an error. Any other uncaught `THROW` is an error.
 - **`ERROR`** outputs UCBLogo's four-member list, `[code message procedure line]`.

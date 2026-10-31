@@ -1,6 +1,6 @@
 # Editing while paused, and Resume and Single Step replaying
 
-Status: needs-triage
+Status: resolved
 Type: task
 Blocked by: 01, 04
 
@@ -18,3 +18,5 @@ Blocked by: 01, 04
 The scripted session pauses a program, changes a `REPEAT` count and an `FD` in the procedure that's running, resumes, and checks the drawing is the changed program's; checks the highlight goes on a change and comes back on undo; checks a change that doesn't parse leaves it paused with the error shown; and checks a change that makes the program shorter finishes as normal, with nothing new in the console and the toolbar back to Run. Screenshots of each.
 
 ## Comments
+
+2026-10-31: Done. `App::changed_while_paused` decides, and `App::replay` replays (it clears the console too, as Run does, since the replay prints again). `show_highlight` won't highlight editor text that differs from the run's, which handles hiding and bringing it back on undo in one place. The scripted session has four ADR 0028 sections. The script's `Type` and undo key presses take effect a moment later, so they need a short `Wait` before checking.

@@ -1,6 +1,6 @@
 # The GUI picks each Run's seed
 
-Status: needs-triage
+Status: resolved
 Type: task
 
 ## What
@@ -12,3 +12,5 @@ Type: task
 A test runs a program that draws with `RANDOM` twice with the same seed and gets the same marks, and Run still gives a different picture each time.
 
 ## Comments
+
+2026-10-31: Done. `Job::Program { text, seed }`, and the seed is kept on `Run` as `seed`, so the help panel's saved run keeps it too. `pendown_logo::fresh_seed()` picks one. Help examples still get a fresh seed each, through `run::start`.

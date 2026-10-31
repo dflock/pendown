@@ -1,6 +1,6 @@
 # Replaying a program to a number of instructions
 
-Status: needs-triage
+Status: resolved
 Type: task
 Blocked by: 02, 03
 
@@ -17,3 +17,5 @@ This is the machinery "run to here" will use later, so it takes a count, not any
 Animator tests: replaying a program to `n` ends with the same marks, turtle and highlight as playing it and pausing after `n` instructions; a program shorter than `n` ends, with the same marks as playing it to the end, and reports that it ended early; at a slow speed, the replay takes about as long as at Instant.
 
 ## Comments
+
+2026-10-31: Done. `Replay { to, then }`, passed to `Animator::replaying`, or `Session::replay` for a job. While replaying, the animator plays as at Instant, skips WAITs and dwells, stays in lockstep, and reports no highlight, watch or thinking. When it gets there it breaks out of the frame and takes `then` from the next one. `replaying_now()` and `ended_early()` tell the app. Six tests in `tests/animator.rs`, `mod replay`.

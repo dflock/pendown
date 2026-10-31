@@ -5189,7 +5189,10 @@ logo {
         FOR [i 1 5] [PRINT :i]
         """
         example title="Bigger and bigger squares" """
-        FOR [size 20 200 20] [SQUARE :size]
+        FOR [size 20 200 20] [
+          SETPC :size / 20
+          SQUARE :size
+        ]
         """
         example title="Counting down by twos" """
         FOR [n 10 0 -2] [PRINT :n]

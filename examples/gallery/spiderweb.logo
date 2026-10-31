@@ -1,0 +1,68 @@
+; A spider's web, with its spider hanging from a thread.
+
+; Kame goes to a place, with the pen up, facing up.
+TO GO :x :y
+  PU
+  HOME
+  RT 90 FD :x LT 90
+  FD :y
+END
+
+; One ring of the web: twelve threads, one between each pair of spokes.
+TO RING :radius
+  FD :radius
+  RT 105
+  REPEAT 12 [
+    FD :radius * 0.5176
+    RT 30
+  ]
+  LT 105
+  BK :radius
+END
+
+; The spider: a body, a head, eight legs and two red eyes.
+TO SPIDER
+  PD
+  SETPC "#9a8fb5
+  SETPENSIZE 5
+  REPEAT 4 [
+    LT 40 + REPCOUNT * 20
+    FD 70 LT 40 FD 55 BK 55 RT 40 BK 70
+    RT 40 + REPCOUNT * 20
+    RT 40 + REPCOUNT * 20
+    FD 70 RT 40 FD 55 BK 55 LT 40 BK 70
+    LT 40 + REPCOUNT * 20
+  ]
+  SETPENSIZE 3
+  SETFC "#2a2236
+  CIRCLE 46
+  BK 58
+  CIRCLE 24
+  PU
+  SETFC "red
+  BK 8 LT 90 FD 10 RT 90
+  CIRCLE 6
+  LT 90 BK 20 RT 90
+  CIRCLE 6
+END
+
+SETBG "#120d1c
+SETPC "#d8d8e8
+SETPENSIZE 2
+
+; The spokes, then the rings.
+PD
+REPEAT 12 [
+  FD 430
+  BK 430
+  RT 30
+]
+REPEAT 10 [RING REPCOUNT * 40]
+
+; The spider, on its thread.
+GO 230 500
+PD
+SETPENSIZE 2
+BK 500
+PU BK 46
+SPIDER

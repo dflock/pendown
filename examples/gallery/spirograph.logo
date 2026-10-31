@@ -1,0 +1,17 @@
+; A spirograph: circles around a centre, in the colours of a rainbow.
+
+MAKE "colours [red orange gold green deepskyblue blueviolet]
+
+TO RING :radius
+  FD 170
+  CIRCLE :radius
+  BK 170
+END
+
+SETBG "black
+SETPENSIZE 2
+REPEAT 36 [
+  SETPC ITEM 1 + REMAINDER REPCOUNT 6 :colours
+  RING 220
+  RT 10
+]

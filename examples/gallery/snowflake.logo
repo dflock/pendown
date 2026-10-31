@@ -1,0 +1,30 @@
+; A snowflake: each side is a smaller snowflake side, bent in the middle.
+
+TO SIDE :length :depth
+  IF :depth = 0 [
+    FD :length
+    STOP
+  ]
+  SIDE :length / 3 :depth - 1
+  LT 60
+  SIDE :length / 3 :depth - 1
+  RT 120
+  SIDE :length / 3 :depth - 1
+  LT 60
+  SIDE :length / 3 :depth - 1
+END
+
+TO SNOWFLAKE :length :depth
+  REPEAT 3 [
+    SIDE :length :depth
+    RT 120
+  ]
+END
+
+SETBG "midnightblue
+SETPENSIZE 3
+
+; Start at the bottom left, so the snowflake is in the middle.
+PU LT 90 FD 202 RT 90 BK 350 PD
+SETPC "lightblue
+SNOWFLAKE 700 4

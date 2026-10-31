@@ -1,0 +1,31 @@
+; A tree in blossom: a trunk with two smaller trees on top, and a flower
+; at the end of every twig.
+
+TO TREE :size
+  IF :size < 12 [
+    SETFC "hotpink
+    CIRCLE 9
+    STOP
+  ]
+  SETPENSIZE :size / 8
+  FD :size
+  LT 25
+  TREE :size * 0.72
+  RT 50
+  TREE :size * 0.72
+  LT 25
+  SETPENSIZE :size / 8
+  BK :size
+END
+
+SETBG "lightcyan
+
+; The grass, along the bottom.
+PU BK 400
+SETFC "forestgreen
+RECTANGLE 1000 200
+
+; The tree, standing on it.
+FD 100 PD
+SETPC "saddlebrown
+TREE 210

@@ -1,0 +1,51 @@
+; A jack-o'-lantern, glowing in the dark.
+
+; Kame goes to a place, with the pen up, facing up.
+TO GO :x :y
+  PU
+  HOME
+  RT 90 FD :x LT 90
+  FD :y
+END
+
+; A diamond, for an eye or a nose: a square turned on its corner.
+TO DIAMOND :x :y :size
+  GO :x :y
+  RT 45
+  SQUARE :size
+END
+
+SETBG "#1a0f24
+
+; The stem.
+SETFC "#4f7a28
+GO 10 200
+RT 10
+RECTANGLE 40 110
+
+; The pumpkin: five ribs, the outside ones first, each outlined.
+SETPC "#a84300
+SETPENSIZE 4
+SETFC "#e8700a
+GO -150 0 PD ELLIPSE 120 170
+GO 150 0 PD ELLIPSE 120 170
+SETFC "#f5841c
+GO -75 0 PD ELLIPSE 120 185
+GO 75 0 PD ELLIPSE 120 185
+SETFC "#ff9326
+GO 0 0 PD ELLIPSE 110 190
+
+; Its face, lit from inside.
+PU
+SETFC "#ffd23f
+DIAMOND -75 50 70
+DIAMOND 75 50 70
+DIAMOND 0 -10 36
+GO 0 -85
+ELLIPSE 130 45
+; Two teeth.
+SETFC "#ff9326
+GO -40 -55
+SQUARE 26
+GO 40 -115
+SQUARE 26

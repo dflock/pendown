@@ -1,0 +1,67 @@
+// The Gallery tab (.scratch/gallery/): sections of examples to run or load
+// into the editor, in this order. Each entry points at an example where it
+// already lives, so nothing is copied:
+//   help "<command key>" "<example title>"   a help example in pendown-logo.kdl
+//   lesson <n> program <m> title="..."       a lesson's program, counting from 1
+//   file "<path>" title="..."                a .logo file, built into the app
+// A test checks that every entry still points at a real example.
+// DRAFT for approval (issue 04).
+
+section "Made for the gallery" {
+  file "examples/gallery/snowflake.logo" title="A snowflake"
+  file "examples/gallery/spirograph.logo" title="A spirograph"
+  file "examples/gallery/blossom.logo" title="A tree in blossom"
+  file "examples/gallery/city.logo" title="A city at night"
+  file "examples/gallery/garden.logo" title="A garden at night"
+}
+
+section "Halloween" {
+  file "examples/gallery/spiderweb.logo" title="A spider's web"
+  file "examples/gallery/ghost.logo" title="A friendly ghost"
+  file "examples/gallery/lightning.logo" title="A storm"
+  file "examples/gallery/pumpkin.logo" title="A jack-o'-lantern"
+  file "examples/gallery/cauldron.logo" title="A witch's cauldron"
+}
+
+section "Flowers and stars" {
+  help "repeat" "A flower of squares"
+  help "ellipse" "A flower of ovals"
+  help "arc" "Petals"
+  lesson 3 program 3 title="A flower of boxes"
+  lesson 2 program 4 title="Squares round a centre"
+  help "square" "Turning squares"
+  lesson 7 program 2 title="A gold star"
+}
+
+section "Spirals" {
+  help "repcount" "A spiral"
+  help "forever" "Until it's big enough"
+  help "repeat" "Getting bigger"
+  help "for" "Bigger and bigger squares"
+  lesson 6 program 1 title="A spiral that calls itself"
+}
+
+section "Colour" {
+  help "setpencolor" "Rainbow"
+  lesson 7 program 3 title="Rainbow hexagons"
+  help "setpencolor" "Every palette colour"
+  help "pick" "A random colour each time"
+  help "ifelse" "Two colours"
+  lesson 7 program 5 title="A target"
+  help "circle" "Filled circles"
+  help "setfillcolor" "See-through"
+}
+
+section "Shapes inside shapes" {
+  help "to" "A procedure that calls itself"
+  lesson 6 program 2 title="Squares at the corners"
+  lesson 6 program 3 title="A tree"
+  lesson 4 program 2 title="A house"
+}
+
+section "Circles, waves and chance" {
+  help "circle" "Rings"
+  help "sin" "Points on a circle"
+  help "sin" "A sine wave"
+  help "random" "Scattered stars"
+}

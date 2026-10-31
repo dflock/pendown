@@ -22,9 +22,11 @@ pub enum Block {
     /// A note set apart, such as the tutorial's "Try this".
     Note(Vec<Inline>),
     /// A fenced code block: a program, with the language after the fence,
-    /// if any.
+    /// if any, and a name after that (such as ```` ```logo tree ````), so the
+    /// gallery can point at it. Markdown viewers read only the language.
     Code {
         language: String,
+        name: Option<String>,
         code: String,
     },
 }
@@ -101,7 +103,7 @@ pub fn parse(text: &str) -> Vec<Block> {
     };
     while let Some(line) = lines.next() {
         let trimmed = line.trim();
-        if let Some(language) = trimmed.strip_prefix("```") {
+        if let Some(info) = trimmed.strip_prefix("```") {
             end_paragraph(&mut paragraph, &mut blocks);
             let mut code = Vec::new();
             for line in lines.by_ref() {
@@ -110,8 +112,10 @@ pub fn parse(text: &str) -> Vec<Block> {
                 }
                 code.push(line);
             }
+            let mut words = info.split_whitespace();
             blocks.push(Block::Code {
-                language: language.trim().to_string(),
+                language: words.next().unwrap_or_default().to_string(),
+                name: words.next().map(str::to_string),
                 code: code.join("\n"),
             });
         } else if trimmed.is_empty() {
@@ -263,10 +267,23 @@ mod tests {
                 Block::Note(vec![text("Try this")]),
                 Block::Code {
                     language: "logo".into(),
+                    name: None,
                     code: "FD 10\nRT 90".into()
                 },
                 Block::Paragraph(vec![text("After.")]),
             ]
+        );
+    }
+
+    #[test]
+    fn a_code_block_can_be_named_after_its_language() {
+        assert_eq!(
+            parse("```logo tree\nTREE 120\n```"),
+            [Block::Code {
+                language: "logo".into(),
+                name: Some("tree".into()),
+                code: "TREE 120".into()
+            }]
         );
     }
 

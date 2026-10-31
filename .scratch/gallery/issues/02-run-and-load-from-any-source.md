@@ -1,6 +1,6 @@
 # Run and Load from any source
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 01
 
@@ -18,3 +18,5 @@ The help panel can run a help example or a lesson's program on the canvas (`run_
 - A unit test, or the scripted session, loads a file source into the editor and runs one on the canvas.
 
 ## Comments
+
+2026-10-31: Done. `run_source` already took any `Source`; `After::Load` now takes a `Source`. The banner says “A snowflake”, from the gallery. The scripted session runs and loads gallery entries from all three sources.

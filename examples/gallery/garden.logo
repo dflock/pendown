@@ -54,3 +54,6 @@ REPEAT 12 [
   FD 230
   CIRCLE 7
 ]
+
+; Kame hides, so the picture is all there is to see.
+HT

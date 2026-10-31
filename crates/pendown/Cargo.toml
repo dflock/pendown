@@ -8,6 +8,8 @@ publish.workspace = true
 [dependencies]
 gpui-kit.workspace = true
 image.workspace = true
+# The gallery's index, gallery.kdl (.scratch/gallery/).
+kdl.workspace = true
 # Draws the help panel's pictures of examples (phase 5).
 pendown-cli.workspace = true
 pendown-logo.workspace = true

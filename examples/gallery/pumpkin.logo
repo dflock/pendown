@@ -49,3 +49,6 @@ GO -40 -55
 SQUARE 26
 GO 40 -115
 SQUARE 26
+
+; Kame hides, so the picture is all there is to see.
+HT

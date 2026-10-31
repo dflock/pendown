@@ -15,3 +15,6 @@ REPEAT 36 [
   RING 220
   RT 10
 ]
+
+; Kame hides, so the picture is all there is to see.
+HT

@@ -69,3 +69,6 @@ GO 270 -380
 PD
 SETPC "#0b0c16
 TREE 120
+
+; Kame hides, so the picture is all there is to see.
+HT

@@ -1,6 +1,6 @@
 # `gallery.kdl`: the index, looking it up, and the test
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 
 ## What
@@ -11,13 +11,13 @@ A file at the repository root, `gallery.kdl`, beside `pendown-logo.kdl`, that li
 section "Flowers and spirals" {
   help "repeat" "A flower of squares"
   help "repcount" "A spiral"
-  lesson 6 program 3 title="A tree"
+  lesson 6 "tree" title="A tree"
   file "examples/gallery/garden.logo" title="A garden at night"
 }
 ```
 
 - `help "<command key>" "<example title>"`: a help example, by its command's key in `pendown-logo.kdl` and its title.
-- `lesson <n> program <m> title="..."`: a lesson's program, counting from 1, as the pictures test names them (`tutorial-6-3`).
+- `lesson <n> "<name>" title="..."`: a lesson's program, by the name after its fence's language (` ```logo tree `).
 - `file "<path>" title="..."`: a `.logo` file, by its path from the repository root.
 
 In `pendown` (a `gallery` module, beside `tutorial.rs`):
@@ -34,3 +34,7 @@ In `pendown` (a `gallery` module, beside `tutorial.rs`):
 - The gallery works from the binary alone, run from a folder without the repository.
 
 ## Comments
+
+2026-10-31: Done. `pendown::gallery` parses `gallery.kdl` (built in), with `gallery::FILES` holding the ten programs by `include_str!`; a test checks that list against `examples/gallery/` and that each is used. `Source` moved to `pendown::source`, with `File(usize)`. Five unit tests: every entry resolves, none is in twice, the files, a broken entry says why, and the labels.
+
+2026-10-31: Lesson programs are now by name, not number: `lesson 6 "tree"`, from ` ```logo tree ` in the lesson (the markup reads a name after a fence's language). Adding a program to a lesson no longer moves an entry.

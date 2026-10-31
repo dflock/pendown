@@ -1,6 +1,6 @@
 # The tutorial, README and the scripted session
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 03, 04
 
@@ -17,3 +17,5 @@ Blocked by: 03, 04
 - The full scripted session passes.
 
 ## Comments
+
+2026-10-31: Done: lesson 7's What next?, the README, ADR 0030, and a Gallery section in the scripted session.

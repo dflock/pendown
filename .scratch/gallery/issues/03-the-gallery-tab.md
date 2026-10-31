@@ -1,6 +1,6 @@
 # The Gallery tab
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 01, 02
 
@@ -27,3 +27,5 @@ A third tab in the side panel, after Help and Tutorial (`Tab::Gallery`), as the 
 ## Comments
 
 2026-10-31: Mockup: https://claude.ai/artifact/24LiwBQn1efdn9BuSf5jbk. It uses the real pictures from `crates/pendown/tests/help-pictures/`. The user chose the grid, two a row, over a list of one a row.
+
+2026-10-31: Done. Cards are 160 px pictures in a wrapping row: two a row at the panel's usual width, one when it's narrow. The pictures are the help panel's SVGs, rendered at the card's size by `svg_image`, so they're sharp without drawing them again at a different size. Load and Run stay on while the user's program runs, as the lessons' buttons do: both stop it first. (The help panel turns buttons off only on the Colours page.) The scripted session checks all 38 pictures are drawn, Run and Back to my drawing, Load, the scroll kept across tabs, and the from-links.

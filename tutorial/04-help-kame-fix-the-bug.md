@@ -46,7 +46,7 @@ Kame's bug drew something else instead: a box with a tent inside. That's a pictu
 
 Here's one way. There are others, and yours might be different.
 
-```logo
+```logo house
 TO BOX
   REPEAT 4 [FD 100 RT 90]
 END

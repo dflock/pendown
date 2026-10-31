@@ -66,3 +66,6 @@ SETPENSIZE 2
 BK 500
 PU BK 46
 SPIDER
+
+; Kame hides, so the picture is all there is to see.
+HT

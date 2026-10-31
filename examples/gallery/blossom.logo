@@ -29,3 +29,6 @@ RECTANGLE 1000 200
 FD 100 PD
 SETPC "saddlebrown
 TREE 210
+
+; Kame hides, so the picture is all there is to see.
+HT

@@ -28,3 +28,6 @@ SETPENSIZE 3
 PU LT 90 FD 202 RT 90 BK 350 PD
 SETPC "lightblue
 SNOWFLAKE 700 4
+
+; Kame hides, so the picture is all there is to see.
+HT

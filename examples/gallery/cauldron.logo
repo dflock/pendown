@@ -45,3 +45,6 @@ GO 120 230 CIRCLE 16
 GO -60 270 CIRCLE 14
 GO 20 320 CIRCLE 10
 GO 90 360 CIRCLE 7
+
+; Kame hides, so the picture is all there is to see.
+HT

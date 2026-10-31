@@ -22,7 +22,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{assets::IconName, prelude::FluentBuilder as _, *};
 use pendown::{
-    animator::{Animator, MAX_FRAME_GAP, Mode, Speed, Thinking},
+    animator::{Animator, MAX_FRAME_GAP, Mode, Replay, Speed, Thinking},
     console::{ConsoleInput, Ending, Submit, defines, label},
     document::Document,
     errors,
@@ -183,7 +183,7 @@ pub struct App {
     console_output: Entity<TextareaState>,
     console_input: Entity<InputState>,
     /// The editor and console, drawn as cached views (issue 08).
-    editor_pane: Entity<EditorPane>,
+    pub(crate) editor_pane: Entity<EditorPane>,
     console_pane: Entity<ConsolePane>,
     toolbar_pane: Entity<ToolbarPane>,
     /// What the counters and variables panels show (phase 4).
@@ -284,7 +284,7 @@ impl App {
             // Parse errors show while typing (ADRs 0001 and 0005).
             cx.subscribe(&editor, |this, _, event: &InputEvent, cx| {
                 if let InputEvent::Change = event
-                    && !this.running()
+                    && (!this.running() || this.paused())
                 {
                     this.check_program(cx);
                 }
@@ -427,6 +427,65 @@ impl App {
         self.animator.as_ref().is_some_and(|a| !a.finished())
     }
 
+    /// Paused, with something left to run: the editor can be changed
+    /// (ADR 0028).
+    pub(crate) fn paused(&self) -> bool {
+        self.animator
+            .as_ref()
+            .is_some_and(|a| a.mode() == Mode::Paused && !a.finished())
+    }
+
+    /// The editor's text isn't the paused program's any more, so Resume
+    /// and Single Step replay it (ADR 0028). Only the editor's program
+    /// replays: not a help example or a console entry.
+    fn changed_while_paused(&self, cx: &gpui_kit::App) -> bool {
+        self.paused()
+            && self.example.is_none()
+            && self.run.as_ref().is_some_and(|r| r.seed.is_some())
+            && self.editor.read(cx).value().as_ref() != self.run_text
+    }
+
+    /// Replays the editor's changed program to as many instructions as the
+    /// paused run had shown, with its seed, then carries on as `then` says
+    /// (ADR 0028). If it doesn't parse, it shows the errors and stays
+    /// paused.
+    fn replay(&mut self, then: Mode, cx: &mut Context<Self>) {
+        let text = self.editor.read(cx).value().to_string();
+        let errors = pendown_logo::syntax::check(&text);
+        if !errors.is_empty() {
+            for e in &errors {
+                let where_ = e
+                    .span
+                    .map_or(String::new(), |s| format!("Line {}: ", s.line + 1));
+                self.print(format!("{where_}{}", e.message));
+            }
+            self.check_program(cx);
+            return;
+        }
+        let (Some(animator), Some(seed)) = (
+            self.animator.as_mut(),
+            self.run.as_ref().and_then(|r| r.seed),
+        ) else {
+            return;
+        };
+        let to = animator.instructions_shown;
+        animator.stop();
+        self.report();
+        // From a clean slate, as Run does: the drawing, and what the
+        // program printed, are the changed program's.
+        self.run_text = text.clone();
+        self.canvas.borrow_mut().drawing.reset();
+        self.console.clear();
+        self.console_dirty = true;
+        self.set_diagnostics(Vec::new(), cx);
+        let job = Job::Program { text, seed };
+        let replay = Some(Replay { to, then });
+        let (animator, run) = self
+            .session
+            .replay(job, self.speed, DEFAULT_CHANNEL, replay);
+        self.play(animator, run, cx);
+    }
+
     /// Run (ADR 0006): stop any running program, clear the drawing, and
     /// start the editor's program from a clean slate.
     pub(crate) fn start(&mut self, channel: Channel, cx: &mut Context<Self>) {
@@ -450,7 +509,9 @@ impl App {
         self.set_diagnostics(Vec::new(), cx);
         // Run clears the variables (ADR 0006).
         self.show_watch(cx, |watched| watched.set(None));
-        self.start_job(Job::Program(text), channel, cx);
+        // A fresh seed, kept with the run (pause-and-edit issue 03).
+        let seed = pendown_logo::fresh_seed();
+        self.start_job(Job::Program { text, seed }, channel, cx);
     }
 
     /// Runs a console entry against whatever the last run left (ADR 0006).
@@ -722,9 +783,12 @@ impl App {
     }
 
     fn submit_console(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.running() {
+        if self.running() && !self.paused() {
             return;
         }
+        // An entry ends a paused program, as Stop did, and runs against what
+        // it left (ADR 0028).
+        self.stop(cx);
         let line = self.console_input.read(cx).value().to_string();
         self.console_input
             .update(cx, |input, cx| input.set_value("", window, cx));
@@ -910,14 +974,25 @@ impl App {
         position(&self.run_text, offset)
     }
 
+    /// For the scripted session: where the editor's highlight is.
+    pub(crate) fn highlight_ranges(&self, cx: &gpui_kit::App) -> Vec<std::ops::Range<usize>> {
+        self.highlight.get_ranges(cx)
+    }
+
     pub(crate) fn clear_editor_highlight(&mut self, cx: &mut Context<Self>) {
         self.highlight.set(vec![], cx);
     }
 
     /// Shows the program's parse errors as it's typed, without running it.
     pub(crate) fn check_program(&mut self, cx: &mut Context<Self>) {
-        // The last run's highlight no longer points at the right text.
-        self.highlight.set(vec![], cx);
+        if self.paused() {
+            // It goes while the text differs, and comes back when it's the
+            // same again.
+            self.show_highlight(cx);
+        } else {
+            // The last run's highlight no longer points at the right text.
+            self.highlight.set(vec![], cx);
+        }
         let text = self.editor.read(cx).value().to_string();
         let diagnostics = pendown_logo::syntax::check(&text)
             .into_iter()
@@ -978,12 +1053,15 @@ impl App {
             self.show_example_highlight(cx);
             return;
         }
-        // Console entries aren't in the editor, so they aren't highlighted there.
+        // Console entries aren't in the editor, so they aren't highlighted
+        // there, and once the editor's changed, it would point at the wrong
+        // text (ADR 0028).
+        let same_text = self.editor.read(cx).value().as_ref() == self.run_text;
         let Some(span) = self
             .animator
             .as_ref()
             .and_then(|a| a.highlight)
-            .filter(|s| s.source == SourceId::Editor)
+            .filter(|s| s.source == SourceId::Editor && same_text)
         else {
             self.highlight.set(vec![], cx);
             return;
@@ -1084,6 +1162,12 @@ impl App {
         }
         let animator = self.animator.as_ref().expect("checked above");
         if animator.finished() && self.finished_at.is_none() && !animator.stopped {
+            if animator.ended_early() {
+                // A replay that never got there showed nothing on the way.
+                let watch = animator.watch.clone();
+                self.show_watch(cx, |watched| watched.set(watch));
+                self.show_highlight(cx);
+            }
             self.finished_at = Some(now);
             self.example_finished(cx);
             self.report();
@@ -1151,27 +1235,37 @@ impl App {
         )
     }
 
-    /// Step, or Step instruction.
-    pub(crate) fn step(&mut self, instruction: bool, cx: &mut Context<Self>) {
+    /// Single Step: to the next instruction.
+    pub(crate) fn single_step(&mut self, cx: &mut Context<Self>) {
         self.stop_driving(cx);
-        if let Some(a) = &mut self.animator {
-            if instruction {
-                a.step_instruction()
-            } else {
-                a.step_line()
-            }
+        if self.changed_while_paused(cx) {
+            self.replay(Mode::StepInstruction, cx);
+        } else if let Some(a) = &mut self.animator {
+            a.single_step()
         }
         cx.notify();
     }
 
     pub(crate) fn toggle_pause(&mut self, cx: &mut Context<Self>) {
-        self.stop_driving(cx);
-        if let Some(a) = &mut self.animator {
-            if a.mode() == Mode::Paused {
-                a.resume()
-            } else {
+        if self.paused() {
+            self.resume(cx);
+        } else {
+            self.stop_driving(cx);
+            if let Some(a) = &mut self.animator {
                 a.pause()
             }
+            cx.notify();
+        }
+    }
+
+    /// Resume: carries on, or replays the program if it's been changed
+    /// (ADR 0028).
+    pub(crate) fn resume(&mut self, cx: &mut Context<Self>) {
+        self.stop_driving(cx);
+        if self.changed_while_paused(cx) {
+            self.replay(Mode::Running, cx);
+        } else if let Some(a) = &mut self.animator {
+            a.resume()
         }
         cx.notify();
     }
@@ -1204,12 +1298,14 @@ impl App {
 
         let theme = cx.theme().clone();
         let running = self.running();
+        // Paused, the program can be changed (ADR 0028).
+        let editable = !running || self.paused();
         self.editor_pane
-            .update(cx, |pane, cx| pane.set_readonly(running, cx));
+            .update(cx, |pane, cx| pane.set_readonly(!editable, cx));
         self.console_pane
-            .update(cx, |pane, cx| pane.set_disabled(running, cx));
+            .update(cx, |pane, cx| pane.set_disabled(!editable, cx));
         self.help_panel
-            .update(cx, |panel, cx| panel.set_program_running(running, cx));
+            .update(cx, |panel, cx| panel.set_program_running(!editable, cx));
         let paused = self
             .animator
             .as_ref()

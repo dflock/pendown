@@ -1,5 +1,5 @@
 //! The animator (ADR 0011): plays the interpreter's events at the chosen
-//! speed, and implements Pause, Step and Stop (ADR 0012). It has no gpui
+//! speed, and implements Pause, Single Step and Stop (ADR 0012). It has no gpui
 //! code, so `tests/animator.rs` tests it with a real interpreter thread and
 //! no window.
 
@@ -14,7 +14,7 @@ use std::{
 };
 
 use pendown_logo::arc_point;
-use pendown_logo::{Control, Event, Pen, Point, Span, SyncPoint, Watch};
+use pendown_logo::{Control, Event, Pen, Point, Span, Watch};
 use pendown_render::{Mark, Segment};
 
 use crate::metrics::AnimatorMetrics;
@@ -90,10 +90,20 @@ pub struct Thinking {
 pub enum Mode {
     Running,
     Paused,
-    /// Run to the start of the next line, then pause.
-    StepLine,
-    /// Run to the next instruction, then pause.
+    /// Single Step: run to the next instruction, then pause.
     StepInstruction,
+    /// Pause was pressed: finish the current instruction at once, then
+    /// pause before the next.
+    Pausing,
+}
+
+/// A replay (pause-and-edit issue 04): play out of sight, as at Instant
+/// but in lockstep, until `to` instructions have been shown, then carry on
+/// in `then`'s mode at the slider's speed.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Replay {
+    pub to: u64,
+    pub then: Mode,
 }
 
 enum Current {
@@ -152,11 +162,10 @@ pub struct Animator {
     rx: Option<Receiver<Vec<Event>>>,
     queue: VecDeque<Event>,
     current: Option<Current>,
-    /// A `Sync` the animator is holding: the interpreter waits until it's
-    /// released.
-    held: Option<SyncPoint>,
     mode: Mode,
     speed: Speed,
+    /// Replaying, until it gets there.
+    replay: Option<Replay>,
     control: Arc<Control>,
     /// How long Instant mode takes events for each frame.
     pub instant_slice: Duration,
@@ -170,11 +179,6 @@ pub struct Animator {
     pub watch: Option<Arc<Watch>>,
     /// The last instruction hasn't moved or turned the turtle yet.
     idle_instruction: bool,
-    /// The last event taken was an `Instruction` that starts a line, so a
-    /// `Sync` straight after it belongs to that line.
-    after_line_start: bool,
-    /// Instructions shown since the current step began.
-    shown_this_step: u64,
     /// Line starts shown, to compare with `Control::lines_started`.
     pub lines_shown: u64,
     pub instructions_shown: u64,
@@ -190,13 +194,26 @@ pub struct Animator {
 
 impl Animator {
     pub fn new(rx: Receiver<Vec<Event>>, control: Arc<Control>, speed: Speed) -> Animator {
+        Animator::replaying(rx, control, speed, None)
+    }
+
+    /// An animator that replays its program up to a point first, if
+    /// `replay` says so. It's set before the job starts, so the interpreter
+    /// is in lockstep from its first line.
+    pub fn replaying(
+        rx: Receiver<Vec<Event>>,
+        control: Arc<Control>,
+        speed: Speed,
+        replay: Option<Replay>,
+    ) -> Animator {
+        let replay = replay.filter(|r| r.to > 0);
         let animator = Animator {
             rx: Some(rx),
             queue: VecDeque::new(),
             current: None,
-            held: None,
             mode: Mode::Running,
             speed,
+            replay,
             control,
             instant_slice: INSTANT_SLICE,
             pos: Point { x: 0.0, y: 0.0 },
@@ -205,8 +222,6 @@ impl Animator {
             highlight: None,
             watch: None,
             idle_instruction: false,
-            after_line_start: false,
-            shown_this_step: 0,
             lines_shown: 0,
             instructions_shown: 0,
             thought: None,
@@ -221,6 +236,18 @@ impl Animator {
             .store(crate::speed::speed_level(speed), Ordering::Relaxed);
         animator.update_lockstep();
         animator
+    }
+
+    /// Whether a replay is still on its way to where it's going: nothing is
+    /// shown until it gets there.
+    pub fn replaying_now(&self) -> bool {
+        self.replay.is_some()
+    }
+
+    /// The program ended, or stopped with an error, before a replay got
+    /// where it was going.
+    pub fn ended_early(&self) -> bool {
+        self.replay.is_some() && self.finished()
     }
 
     pub fn mode(&self) -> Mode {
@@ -241,7 +268,7 @@ impl Animator {
         !self.finished()
             && matches!(
                 self.mode,
-                Mode::Running | Mode::StepLine | Mode::StepInstruction
+                Mode::Running | Mode::StepInstruction | Mode::Pausing
             )
     }
 
@@ -310,7 +337,7 @@ impl Animator {
     /// A move or turn starts: it's what Kame thinks about now, and the last
     /// thought starts to fade.
     fn think(&mut self, thought: Thought) {
-        if self.speed == Speed::Instant {
+        if self.speed == Speed::Instant || self.replay.is_some() {
             return;
         }
         if let Some(last) = self.thought.replace(thought) {
@@ -353,7 +380,8 @@ impl Animator {
     /// animated speeds, so it never runs a line before the highlight gets
     /// there. Only Instant, running freely, lets it run ahead.
     fn update_lockstep(&self) {
-        let free = self.mode == Mode::Running && self.speed == Speed::Instant;
+        let free =
+            self.mode == Mode::Running && self.speed == Speed::Instant && self.replay.is_none();
         self.control.lockstep.store(!free, Ordering::Relaxed);
     }
 
@@ -366,43 +394,36 @@ impl Animator {
         self.update_lockstep();
     }
 
+    /// Pause: the next frame finishes the instruction being drawn, at once,
+    /// so Kame is never left part-way along a move, and pauses before the
+    /// next one (pause-and-edit issue 02).
     pub fn pause(&mut self) {
-        self.mode = Mode::Paused;
-        self.update_lockstep();
+        if self.mode != Mode::Paused {
+            self.mode = Mode::Pausing;
+            self.update_lockstep();
+        }
     }
 
+    /// Paused, the animator doesn't take the next line's `Sync`, so the
+    /// interpreter waits there until Resume or Single Step takes it.
     pub fn resume(&mut self) {
         self.mode = Mode::Running;
         self.update_lockstep();
-        if let Some(sync) = self.held.take() {
-            sync.reply();
-        }
     }
 
-    pub fn step_line(&mut self) {
-        self.begin_step(Mode::StepLine);
-    }
-
-    pub fn step_instruction(&mut self) {
-        self.begin_step(Mode::StepInstruction);
-    }
-
-    fn begin_step(&mut self, mode: Mode) {
-        self.mode = mode;
-        self.shown_this_step = 0;
+    /// Single Step: run to the next instruction, inside brackets and into
+    /// procedures, then pause.
+    pub fn single_step(&mut self) {
+        self.mode = Mode::StepInstruction;
         self.update_lockstep();
-        if let Some(sync) = self.held.take() {
-            sync.reply();
-        }
     }
 
     /// Stop (ADR 0011): set the cancel flag, and drop the channel and any
-    /// held `Sync`, which wakes the interpreter wherever it's blocked.
+    /// `Sync` in it, which wakes the interpreter wherever it's blocked.
     pub fn stop(&mut self) {
         self.control.cancel.store(true, Ordering::Relaxed);
         self.rx = None;
         self.queue.clear();
-        self.held = None;
         self.current = None;
         self.stopped = true;
     }
@@ -425,7 +446,11 @@ impl Animator {
     fn play(&mut self, dt: Duration, max_marks: usize) -> Frame {
         let started = Instant::now();
         let mut out = Frame::default();
-        let instant = self.speed == Speed::Instant;
+        // A replay plays as Instant does, out of sight.
+        let replaying = self.replay.is_some();
+        let instant = self.speed == Speed::Instant || replaying;
+        // Running up to an instruction: Single Step, or Pause finishing one.
+        let to_instruction = matches!(self.mode, Mode::StepInstruction | Mode::Pausing);
         let slice_end = started + self.instant_slice;
         let sync_wait_end = started + SYNC_WAIT;
         // Animation time left this frame, in seconds. A long frame (the
@@ -466,7 +491,7 @@ impl Animator {
             out.events += 1;
             match event {
                 Event::Instruction { span, starts_line } => {
-                    if self.idle_instruction && !instant && self.mode != Mode::StepInstruction {
+                    if self.idle_instruction && !instant && !to_instruction {
                         // Show the instruction that did nothing for a moment,
                         // then come back to this one.
                         self.idle_instruction = false;
@@ -477,15 +502,25 @@ impl Animator {
                         continue;
                     }
                     self.highlight = Some(span);
-                    out.highlight_changed = true;
+                    out.highlight_changed = !replaying;
                     self.idle_instruction = true;
-                    self.after_line_start = starts_line;
                     self.instructions_shown += 1;
-                    self.shown_this_step += 1;
                     if starts_line {
                         self.lines_shown += 1;
                     }
-                    if self.mode == Mode::StepInstruction {
+                    if let Some(replay) = self.replay
+                        && self.instructions_shown >= replay.to
+                    {
+                        // There: show it all, and carry on as asked from the
+                        // next frame, at the slider's speed.
+                        self.replay = None;
+                        self.mode = replay.then;
+                        self.update_lockstep();
+                        out.highlight_changed = true;
+                        out.watch_changed = true;
+                        break;
+                    }
+                    if to_instruction {
                         self.mode = Mode::Paused;
                         self.update_lockstep();
                     }
@@ -581,7 +616,7 @@ impl Animator {
                 Event::Watch(watch) => {
                     // It belongs to the next instruction, so it waits for
                     // the dwell on one that did nothing, as that does.
-                    if self.idle_instruction && !instant && self.mode != Mode::StepInstruction {
+                    if self.idle_instruction && !instant && !to_instruction {
                         self.idle_instruction = false;
                         self.queue.push_front(Event::Watch(watch));
                         out.events -= 1;
@@ -589,7 +624,7 @@ impl Animator {
                         continue;
                     }
                     self.watch = Some(watch);
-                    out.watch_changed = true;
+                    out.watch_changed = !replaying;
                     continue;
                 }
                 Event::Print(text) => out.printed.push(text),
@@ -612,21 +647,10 @@ impl Animator {
                     out.speed = Some(speed);
                 }
                 Event::Sync(sync) => {
-                    // A Sync straight after the line start the step began
-                    // on belongs to that line, so Step runs it. Any other
-                    // Sync is the start of the next line.
-                    let own_line = self.after_line_start && self.shown_this_step == 0;
-                    if self.mode == Mode::StepLine && !own_line {
-                        self.held = Some(sync);
-                        self.mode = Mode::Paused;
-                        self.update_lockstep();
-                    } else {
-                        sync.reply();
-                        replied = true;
-                    }
+                    sync.reply();
+                    replied = true;
                 }
             }
-            self.after_line_start = false;
         }
         out
     }
@@ -660,9 +684,12 @@ impl Animator {
     /// Plays the current move, turn or dwell for as much of `budget` as it
     /// needs. Returns false if the frame's time ran out first.
     fn advance(&mut self, current: Current, budget: &mut f64, out: &mut Frame) -> bool {
+        // Pause finishes the instruction at once, and a replay plays out of
+        // sight, so neither waits for the slider's speed.
+        let at_once = self.mode == Mode::Pausing || self.replay.is_some();
         let rate = match self.speed {
-            Speed::Instant => None,
-            Speed::Animated(steps) => Some(steps),
+            Speed::Animated(steps) if !at_once => Some(steps),
+            _ => None,
         };
         // How far to go now, in steps or degrees, out of `remaining`, at
         // `rate` per second: all of it in Instant mode.
@@ -753,9 +780,9 @@ impl Animator {
                 false
             }
             // Real time, whatever the speed: a program that says WAIT
-            // means it, even at Instant.
+            // means it, even at Instant. Pause ends it, and a replay skips it.
             Current::Wait { left } => {
-                if *budget >= left {
+                if at_once || *budget >= left {
                     *budget -= left;
                     return true;
                 }
@@ -767,7 +794,7 @@ impl Animator {
             }
             Current::Dwell { left } => {
                 let done = progress(left, Some(1.0));
-                if done >= left {
+                if at_once || done >= left {
                     return true;
                 }
                 self.current = Some(Current::Dwell { left: left - done });

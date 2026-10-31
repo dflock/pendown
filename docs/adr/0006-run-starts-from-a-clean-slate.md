@@ -21,7 +21,7 @@ So the same code always draws the same picture, apart from `RANDOM`.
 
 **The console**, when no program is running, runs instructions against whatever the last run left: its procedures, variables, turtle and drawing. After running a program you can try `SQUARE 50` at the console. `TO` typed at the console works, but the next Run clears it. The console can offer "Copy to editor" for those definitions.
 
-**The editor is read-only while a program is running or paused.** Stop unlocks it. This keeps spans and the instruction highlight accurate without having to map them through edits.
+**The editor is read-only while a program is running or paused.** Stop unlocks it. This keeps spans and the instruction highlight accurate without having to map them through edits. (Changed by ADR 0028: the editor can be changed while paused, and Resume replays the changed program. There's no Stop.)
 
 **Files:** one program per file, plain UTF-8 text with a `.logo` extension, with Open and Save. No imports in phase 1.
 

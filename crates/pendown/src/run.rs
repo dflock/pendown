@@ -11,7 +11,7 @@ use std::{
 
 use pendown_logo::{BatchSender, Control, Event, EventSink, Halted, Interpreter, RunError};
 
-use crate::animator::{Animator, Speed};
+use crate::animator::{Animator, Replay, Speed};
 
 /// The interpreter's stack (ADR 0007).
 pub const STACK: usize = 256 * 1024 * 1024;
@@ -35,8 +35,9 @@ pub const DEFAULT_CHANNEL: Channel = Channel {
 /// What the interpreter runs.
 #[derive(Clone, Debug)]
 pub enum Job {
-    /// The Run button: a clean slate, then the whole program.
-    Program(String),
+    /// The Run button: a clean slate, then the whole program, with `seed`
+    /// for `RANDOM`.
+    Program { text: String, seed: u64 },
     /// A console entry, against what the last run left.
     Console(String),
     /// Undo at the console (ADR 0025): Kame back as the last entry found it.
@@ -50,6 +51,9 @@ pub enum Job {
 pub struct Run {
     pub control: Arc<Control>,
     pub started: Instant,
+    /// The seed `RANDOM` started from, for a program: running it again with
+    /// this seed does the same.
+    pub seed: Option<u64>,
     /// How the job ended, once it has.
     pub result: Arc<Mutex<Option<Result<(), RunError>>>>,
     /// When it ended, for measuring how long Stop takes.
@@ -114,7 +118,10 @@ impl Session {
                     .measured(command.control.clone());
                     it.set_output(Box::new(sink), command.control);
                     let result = match &command.job {
-                        Job::Program(text) => it.run_program(text),
+                        Job::Program { text, seed } => {
+                            it.set_seed(Some(*seed));
+                            it.run_program(text)
+                        }
                         Job::Console(text) => it.run_console(text),
                         Job::Undo => it.undo_console(),
                         Job::Define(text) => it.define_console(text),
@@ -134,16 +141,32 @@ impl Session {
     /// Starts a job, and returns the animator that plays its events. A job
     /// started while another runs waits for it, so stop that one first.
     pub fn start(&self, job: Job, speed: Speed, channel: Channel) -> (Animator, Run) {
+        self.replay(job, speed, channel, None)
+    }
+
+    /// Starts a job that replays out of sight up to a point first, if
+    /// `replay` says so (pause-and-edit issue 04).
+    pub fn replay(
+        &self,
+        job: Job,
+        speed: Speed,
+        channel: Channel,
+        replay: Option<Replay>,
+    ) -> (Animator, Run) {
         let control = Arc::new(Control::default());
         let (events, rx) = mpsc::sync_channel::<Vec<Event>>(channel.capacity);
         let run = Run {
             control: control.clone(),
             started: Instant::now(),
+            seed: match &job {
+                Job::Program { seed, .. } => Some(*seed),
+                _ => None,
+            },
             result: Arc::default(),
             exited: Arc::default(),
         };
         // The animator sets the lockstep flag and the speed before the job starts.
-        let animator = Animator::new(rx, control.clone(), speed);
+        let animator = Animator::replaying(rx, control.clone(), speed, replay);
         let command = Command {
             job,
             events,
@@ -159,7 +182,11 @@ impl Session {
     }
 }
 
-/// Runs one program on a session of its own.
+/// Runs one program on a session of its own, with a fresh seed.
 pub fn start(source: String, speed: Speed, channel: Channel) -> (Animator, Run) {
-    Session::new().start(Job::Program(source), speed, channel)
+    let job = Job::Program {
+        text: source,
+        seed: pendown_logo::fresh_seed(),
+    };
+    Session::new().start(job, speed, channel)
 }

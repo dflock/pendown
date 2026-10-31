@@ -38,6 +38,12 @@ pub use span::{SourceId, Span};
 pub use value::Value;
 pub use watch::Watch;
 
+/// A seed for `RANDOM` that's different every time, for the GUI to pick for
+/// each Run and keep, so it can run the program again with the same seed.
+pub fn fresh_seed() -> u64 {
+    random::Random::fresh_seed()
+}
+
 /// Every built-in command's names, the first being the one the manual uses
 /// first, for checking against `pendown-logo.kdl`.
 pub fn command_names() -> impl Iterator<Item = &'static [&'static str]> {

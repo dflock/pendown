@@ -17,7 +17,7 @@ pub enum Ending {
     Ran,
     /// It stopped with this error.
     Error(String),
-    /// Stop was pressed.
+    /// It was ended: by Run, or by another entry while it was paused.
     Stopped,
 }
 

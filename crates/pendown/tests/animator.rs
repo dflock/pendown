@@ -172,16 +172,17 @@ fn until_paused(animator: &mut Animator) -> String {
     printed
 }
 
-/// Question 3: Step stops at the start of each line, and the interpreter
-/// has never started a line the highlight hasn't reached.
+/// Question 3: Single Step stops at each instruction, and the interpreter
+/// has never started a line the highlight hasn't reached. With one
+/// instruction a line, that's a line at a time.
 #[test]
-fn step_runs_one_line_and_nothing_ahead() {
+fn single_step_runs_one_instruction_and_nothing_ahead() {
     let src = STEPPER;
     let (mut animator, run) = start(src, Speed::Animated(1000.0));
     animator.pause();
     let mut steps = Vec::new();
     while !animator.finished() && steps.len() < 20 {
-        animator.step_line();
+        animator.single_step();
         let printed = until_paused(&mut animator);
         // Give the interpreter every chance to run ahead, if it could.
         thread::sleep(Duration::from_millis(20));
@@ -218,13 +219,13 @@ fn step_runs_one_line_and_nothing_ahead() {
 }
 
 #[test]
-fn step_instruction_goes_inside_a_line() {
+fn single_step_goes_inside_a_line() {
     let src = "REPEAT 2 [FD 10 RT 90]\nPRINT \"done";
     let (mut animator, _run) = start(src, Speed::Animated(1000.0));
     animator.pause();
     let mut order = Vec::new();
     for _ in 0..7 {
-        animator.step_instruction();
+        animator.single_step();
         until_paused(&mut animator);
         order.push(highlighted(src, &animator).to_string());
     }
@@ -269,7 +270,7 @@ fn the_panels_keep_in_step_with_the_highlight() {
     animator.pause();
     let mut seen = Vec::new();
     for _ in 0..8 {
-        animator.step_instruction();
+        animator.single_step();
         until_paused(&mut animator);
         thread::sleep(Duration::from_millis(5));
         seen.push(format!(
@@ -318,20 +319,6 @@ fn the_panels_follow_a_running_program() {
     );
 }
 
-#[test]
-fn step_line_runs_a_whole_repeat() {
-    let src = "REPEAT 4 [FD 10 RT 90]\nPRINT \"done";
-    let (mut animator, _run) = start(src, Speed::Animated(1000.0));
-    animator.pause();
-    animator.step_line();
-    until_paused(&mut animator);
-    assert_eq!(highlighted(src, &animator), "REPEAT 4 [FD 10 RT 90]");
-    animator.step_line();
-    until_paused(&mut animator);
-    assert_eq!(highlighted(src, &animator), "PRINT \"done");
-    assert_eq!(animator.heading.round(), 0.0, "all four turns played");
-}
-
 /// Pausing at a slow speed is exact too: the interpreter waits at the next
 /// line start.
 #[test]
@@ -345,15 +332,75 @@ fn pause_while_running_is_exact_at_animated_speeds() {
     thread::sleep(Duration::from_millis(50));
     let ahead = animator.lines_ahead();
     assert!((0..=1).contains(&ahead), "{ahead} lines ahead");
-    // Step finishes the current line and stops at the next.
-    animator.step_line();
+    // Single Step plays up to the next instruction, which is the next line.
+    animator.single_step();
     until_paused(&mut animator);
     thread::sleep(Duration::from_millis(20));
     assert_eq!(animator.lines_ahead(), 0);
 }
 
+/// Pause mid-move finishes the move at once, in the next frame, and pauses
+/// with the highlight on the next instruction, before it runs.
+#[test]
+fn pause_finishes_the_move_at_once() {
+    let src = "FD 100\nRT 90\nFD 100";
+    let (mut animator, _run) = start(src, Speed::Animated(10.0));
+    until_started(&mut animator);
+    frame(&mut animator, FRAME);
+    assert!(animator.pos.y < 50.0, "part-way along: {:?}", animator.pos);
+    animator.pause();
+    let out = frame(&mut animator, FRAME);
+    assert_eq!(animator.mode(), Mode::Paused);
+    assert_eq!(out.marks.len(), 1, "the whole line is drawn");
+    assert_eq!(animator.pos.y.round(), 100.0);
+    assert!(!animator.in_progress());
+    assert_eq!(highlighted(src, &animator), "RT 90");
+    assert_eq!(animator.heading, 0.0, "RT 90 hasn't run");
+    // Paused, nothing moves, however long it's left.
+    for _ in 0..20 {
+        assert!(frame(&mut animator, FRAME).marks.is_empty());
+    }
+    assert_eq!(animator.heading, 0.0);
+}
+
+/// An arc too, and a turn: Kame is never left part-way.
+#[test]
+fn pause_finishes_an_arc_and_a_turn() {
+    let src = "ARC 180 50\nRT 180\nFD 10";
+    let (mut animator, _run) = start(src, Speed::Animated(10.0));
+    until_started(&mut animator);
+    animator.pause();
+    let out = frame(&mut animator, FRAME);
+    assert_eq!(out.marks.len(), 1, "the whole arc");
+    assert_eq!(highlighted(src, &animator), "RT 180");
+    animator.single_step();
+    until_started(&mut animator);
+    animator.pause();
+    frame(&mut animator, FRAME);
+    assert_eq!(highlighted(src, &animator), "FD 10");
+    assert_eq!(
+        animator.heading.round(),
+        0.0,
+        "the whole of RT 180 after the arc's 180"
+    );
+}
+
+/// At Instant, Pause stops at the next instruction too.
+#[test]
+fn pause_at_instant_stops_before_an_instruction() {
+    let src = "REPEAT 100000 [\n  FD 1\n  RT 1\n]";
+    let (mut animator, _run) = start(src, Speed::Instant);
+    frame(&mut animator, FRAME);
+    animator.pause();
+    frame(&mut animator, FRAME);
+    assert_eq!(animator.mode(), Mode::Paused);
+    assert!(!animator.in_progress());
+    let at = highlighted(src, &animator);
+    assert!(at == "FD 1" || at == "RT 1", "{at:?}");
+}
+
 /// At Instant the interpreter runs ahead freely, so a pause leaves it
-/// ahead. The first Step plays what it already ran, then lockstep resumes.
+/// ahead. Single Steps play what it already ran, then lockstep resumes.
 #[test]
 fn pause_from_instant_catches_up_on_the_first_step() {
     let src = "REPEAT 100000 [\n  FD 1\n  RT 1\n]";
@@ -365,8 +412,10 @@ fn pause_from_instant_catches_up_on_the_first_step() {
     assert!(ahead > 10, "{ahead} lines ahead after pausing from Instant");
     eprintln!("paused from Instant {ahead} lines ahead");
     animator.set_speed(Speed::Animated(100_000.0));
-    animator.step_line();
-    until_paused(&mut animator);
+    for _ in 0..=2 * ahead {
+        animator.single_step();
+        until_paused(&mut animator);
+    }
     thread::sleep(Duration::from_millis(20));
     assert_eq!(animator.lines_ahead(), 0);
 }
@@ -398,16 +447,16 @@ fn stop_while_blocked_on_a_full_channel() {
 }
 
 #[test]
-fn stop_while_waiting_at_a_held_line() {
+fn stop_while_waiting_at_a_paused_line() {
     let (mut animator, run) = start(STEPPER, Speed::Animated(100.0));
     animator.pause();
-    animator.step_line();
+    animator.single_step();
     until_paused(&mut animator);
     thread::sleep(Duration::from_millis(50));
     animator.stop();
     let took = wait_for_exit(&run);
     assert_eq!(run.result(), Some(Err(RunError::Halted)));
-    eprintln!("Stop at a held line: {took:?}");
+    eprintln!("Stop at a paused line: {took:?}");
 }
 
 /// Question 2, without the drawing: Instant gets through a big fractal.
@@ -566,7 +615,9 @@ fn pause_and_stop_during_a_wait() {
     for _ in 0..200 {
         animator.frame(FRAME, usize::MAX);
     }
-    assert!(!animator.finished(), "paused, the wait doesn't count down");
+    // Pause ends the wait, and pauses before the next instruction.
+    assert!(!animator.finished(), "paused before FD 10");
+    assert_eq!(highlighted("WAIT 60\nFD 10", &animator), "FD 10");
     animator.stop();
     assert!(animator.finished(), "Stop ends the playback");
     // At Instant the interpreter didn't wait: it had already finished, and
@@ -724,9 +775,13 @@ mod budgets {
 
     #[test]
     fn paused_and_finished_runs_want_no_frames() {
-        let (mut animator, _run) = start("FD 100", Speed::Animated(20.0));
+        let (mut animator, _run) = start("FD 100\nFD 100", Speed::Animated(20.0));
         frame(&mut animator, FRAME);
+        // Pause takes one more frame, to finish the move.
         animator.pause();
+        assert!(animator.wants_frames());
+        frame(&mut animator, FRAME);
+        assert_eq!(animator.mode(), Mode::Paused);
         assert!(!animator.wants_frames());
         let out = animator.frame(FRAME, usize::MAX);
         assert_eq!(
@@ -866,4 +921,227 @@ fn more_than_a_whole_turn_and_turning_left() {
 fn nothing_to_think_about_at_instant() {
     let seen = thoughts("FD 50 RT 90 FD 50", Speed::Instant);
     assert!(seen.iter().all(|t| *t == Thinking::default()), "{seen:?}");
+}
+
+mod replay {
+    //! Pause-and-edit issue 04: replaying a program out of sight to a number
+    //! of instructions, then carrying on.
+
+    use super::*;
+    use pendown::{
+        animator::Replay,
+        run::{Job, Session},
+    };
+    use pendown_render::Mark;
+
+    const SPIRAL: &str = "MAKE \"n 0
+REPEAT 30 [
+  MAKE \"n :n + 1
+  FD :n + RANDOM 10
+  RT 30 + RANDOM 30
+]
+PRINT :n";
+
+    fn job(text: &str) -> Job {
+        Job::Program {
+            text: text.into(),
+            seed: 5,
+        }
+    }
+
+    /// What the canvas would show: the marks, Kame, the highlight and the
+    /// panels.
+    #[derive(Debug, PartialEq)]
+    struct Seen {
+        marks: Vec<Mark>,
+        pos: (i64, i64),
+        heading: i64,
+        highlight: String,
+        watched: String,
+        shown: u64,
+    }
+
+    fn seen(src: &str, animator: &Animator, marks: Vec<Mark>) -> Seen {
+        Seen {
+            marks,
+            pos: (
+                (animator.pos.x * 1000.0).round() as i64,
+                (animator.pos.y * 1000.0).round() as i64,
+            ),
+            heading: (animator.heading * 1000.0).round() as i64,
+            highlight: highlighted(src, animator).to_string(),
+            watched: watched(animator),
+            shown: animator.instructions_shown,
+        }
+    }
+
+    /// Plays frames until paused or finished, keeping the marks.
+    fn play_to_pause(animator: &mut Animator, marks: &mut Vec<Mark>) -> usize {
+        let mut frames = 0;
+        while animator.mode() != Mode::Paused && !animator.finished() {
+            marks.extend(frame(animator, FRAME).marks);
+            frames += 1;
+            assert!(frames < 100_000, "it never paused");
+        }
+        frames
+    }
+
+    /// Pauses at the start, then Single Steps until `n` instructions have
+    /// been shown.
+    fn stepped_to(src: &str, n: u64) -> Seen {
+        let (mut animator, _run) =
+            Session::new().start(job(src), Speed::Animated(5000.0), DEFAULT_CHANNEL);
+        let mut marks = Vec::new();
+        animator.pause();
+        play_to_pause(&mut animator, &mut marks);
+        while animator.instructions_shown < n {
+            animator.single_step();
+            play_to_pause(&mut animator, &mut marks);
+        }
+        thread::sleep(Duration::from_millis(5));
+        seen(src, &animator, marks)
+    }
+
+    #[test]
+    fn a_replay_ends_where_stepping_would() {
+        for n in [1, 2, 5, 17, 40, 91] {
+            let (mut animator, _run) = Session::new().replay(
+                job(SPIRAL),
+                Speed::Animated(10.0),
+                DEFAULT_CHANNEL,
+                Some(Replay {
+                    to: n,
+                    then: Mode::Paused,
+                }),
+            );
+            let mut marks = Vec::new();
+            play_to_pause(&mut animator, &mut marks);
+            assert!(!animator.replaying_now() && !animator.ended_early());
+            thread::sleep(Duration::from_millis(5));
+            assert_eq!(animator.lines_ahead(), 0, "nothing run ahead at {n}");
+            assert_eq!(
+                seen(SPIRAL, &animator, marks),
+                stepped_to(SPIRAL, n),
+                "at {n}"
+            );
+        }
+    }
+
+    #[test]
+    fn nothing_is_shown_until_it_gets_there() {
+        let (mut animator, _run) = Session::new().replay(
+            job(SPIRAL),
+            Speed::Animated(10.0),
+            DEFAULT_CHANNEL,
+            Some(Replay {
+                to: 60,
+                then: Mode::Paused,
+            }),
+        );
+        animator.instant_slice = Duration::from_micros(50);
+        let mut last = None;
+        while animator.replaying_now() {
+            let out = frame(&mut animator, FRAME);
+            assert!(animator.thinking().current.is_none());
+            last = Some((out.highlight_changed, out.watch_changed));
+            if animator.replaying_now() {
+                assert!(!out.highlight_changed && !out.watch_changed);
+            }
+        }
+        assert_eq!(last, Some((true, true)), "it all shows when it gets there");
+    }
+
+    #[test]
+    fn then_it_carries_on_at_the_sliders_speed() {
+        let src = "FD 10\nFD 10\nFD 100\nFD 10";
+        let (mut animator, _run) = Session::new().replay(
+            job(src),
+            Speed::Animated(10.0),
+            DEFAULT_CHANNEL,
+            Some(Replay {
+                to: 3,
+                then: Mode::Running,
+            }),
+        );
+        let mut marks = Vec::new();
+        while animator.replaying_now() {
+            marks.extend(frame(&mut animator, FRAME).marks);
+        }
+        assert_eq!(marks.len(), 2);
+        assert_eq!(highlighted(src, &animator), "FD 100");
+        until_started(&mut animator);
+        frame(&mut animator, FRAME);
+        assert!(animator.in_progress(), "FD 100 plays at 10 steps a second");
+        assert!(animator.pos.y > 20.0 && animator.pos.y < 30.0);
+    }
+
+    #[test]
+    fn or_takes_a_single_step() {
+        let src = "FD 10\nRT 90\nFD 10\nFD 10";
+        let (mut animator, _run) = Session::new().replay(
+            job(src),
+            Speed::Animated(1000.0),
+            DEFAULT_CHANNEL,
+            Some(Replay {
+                to: 2,
+                then: Mode::StepInstruction,
+            }),
+        );
+        let mut marks = Vec::new();
+        while animator.replaying_now() {
+            marks.extend(frame(&mut animator, FRAME).marks);
+        }
+        assert_eq!(highlighted(src, &animator), "RT 90");
+        play_to_pause(&mut animator, &mut marks);
+        assert_eq!(highlighted(src, &animator), "FD 10");
+        assert_eq!(animator.instructions_shown, 3);
+        assert_eq!(animator.heading.round(), 90.0);
+    }
+
+    #[test]
+    fn a_shorter_program_just_ends() {
+        let src = "REPEAT 3 [FD 10 RT 120]";
+        let (mut animator, run) = Session::new().replay(
+            job(src),
+            Speed::Animated(10.0),
+            DEFAULT_CHANNEL,
+            Some(Replay {
+                to: 1000,
+                then: Mode::Paused,
+            }),
+        );
+        let mut marks = Vec::new();
+        play_to_pause(&mut animator, &mut marks);
+        assert!(animator.finished());
+        assert!(animator.ended_early());
+        assert_eq!(marks.len(), 3, "all of it, as playing it to the end");
+        while run.result().is_none() {
+            thread::sleep(Duration::from_micros(200));
+        }
+        assert_eq!(run.result(), Some(Ok(())));
+    }
+
+    /// At speed 1, a replay takes about as long as at Instant: it doesn't
+    /// wait for the slider.
+    #[test]
+    fn a_replay_doesnt_wait_for_the_slider() {
+        let src = "REPEAT 200 [\n  FD 10\n  RT 10\n  WAIT 1\n]";
+        let frames = |speed| {
+            let (mut animator, _run) = Session::new().replay(
+                job(src),
+                speed,
+                DEFAULT_CHANNEL,
+                Some(Replay {
+                    to: 790,
+                    then: Mode::Paused,
+                }),
+            );
+            play_to_pause(&mut animator, &mut Vec::new())
+        };
+        let (slow, instant) = (frames(Speed::Animated(5.0)), frames(Speed::Instant));
+        assert!(
+            slow <= instant + 5 && slow < 30,
+            "{slow} frames, {instant} at Instant"
+        );
+    }
 }

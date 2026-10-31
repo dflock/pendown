@@ -20,7 +20,7 @@ On modern hardware Logo draws everything instantly. A headline feature of the pl
 - **An instruction that moves nothing** keeps the highlight for the time of 10 steps, at most 0.25 s, so it can be seen at slow speeds.
 - **`WAIT`** is honoured at every speed, including Instant.
 - **`SETSPEED n` / `SPEED`** are our own extension: a `SetSpeed` event changes the speed at exactly that point in the program.
-- **Stop** sets a cancel flag that the interpreter checks on every evaluation step, and drops the channel so a blocked interpreter wakes up. Programs can't `CATCH` it.
+- **Stop** sets a cancel flag that the interpreter checks on every evaluation step, and drops the channel so a blocked interpreter wakes up. Programs can't `CATCH` it. (ADR 0028 took away the Stop button: Run, or a console entry while paused, ends a run the same way.)
 
 ## Consequences
 

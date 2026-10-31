@@ -37,7 +37,12 @@ impl EditorPane {
         }
     }
 
-    /// The editor is read-only while a program runs.
+    pub fn readonly(&self) -> bool {
+        self.readonly
+    }
+
+    /// The editor is read-only while a program runs, but not while it's
+    /// paused (ADR 0028).
     pub fn set_readonly(&mut self, readonly: bool, cx: &mut Context<Self>) {
         if self.readonly != readonly {
             self.readonly = readonly;
@@ -81,7 +86,8 @@ impl ConsolePane {
         }
     }
 
-    /// The input line is disabled while a program runs.
+    /// The input line is disabled while a program runs, but not while it's
+    /// paused: an entry then ends it (ADR 0028).
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         if self.disabled != disabled {
             self.disabled = disabled;
@@ -280,26 +286,13 @@ impl Render for ToolbarPane {
                 .disabled(!running),
             )
             .child(
-                self.button("step", IconName::StepForward, "Step line", |this, _, cx| {
-                    this.step(false, cx)
-                })
-                .disabled(!paused),
-            )
-            .child(
                 self.button(
-                    "step-instruction",
+                    "step",
                     IconName::Footprints,
-                    "Step instruction",
-                    |this, _, cx| this.step(true, cx),
+                    "Single Step",
+                    |this, _, cx| this.single_step(cx),
                 )
                 .disabled(!paused),
-            )
-            .child(
-                self.button("stop", IconName::Square, "Stop", |this, _, cx| {
-                    this.stop(cx)
-                })
-                .danger()
-                .disabled(!running),
             )
             // Nothing shrinks, so the slider keeps its place and size as
             // the speed's description changes length.

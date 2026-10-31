@@ -234,3 +234,23 @@ fn random_with_a_seed() {
     let program = "REPEAT 200 [PU SETXY (RANDOM -500 500) (RANDOM -500 500) PD SETPC RANDOM 16 CIRCLE RANDOM 60]";
     check("random", program, 300, 300);
 }
+
+/// The gallery's showcase programs, in `examples/gallery/`
+/// (`.scratch/gallery/` issue 04). Each runs without errors and draws its
+/// saved picture, `gallery-NAME.png`.
+#[test]
+fn gallery_programs() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/gallery");
+    let mut programs: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|e| e == "logo"))
+        .collect();
+    programs.sort();
+    assert!(!programs.is_empty());
+    for path in programs {
+        let stem = path.file_stem().unwrap().to_string_lossy();
+        let program = std::fs::read_to_string(&path).unwrap();
+        check(&format!("gallery-{stem}"), &program, 400, 400);
+    }
+}

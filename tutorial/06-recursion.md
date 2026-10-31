@@ -4,7 +4,7 @@ A procedure can use any word Kame knows, and that includes itself. A procedure t
 
 This one draws a line, turns, and then calls itself with a longer line. Without anything to stop it, it would go on for ever, so [IF] stops it when the line gets long enough. [STOP] ends the procedure.
 
-```logo
+```logo spiral
 TO SPIRAL :length
   IF :length > 200 [STOP]
   FD :length
@@ -23,7 +23,7 @@ Step through it and look at the variables panel. Each call of `SPIRAL` has its o
 
 Recursion can draw something that contains smaller copies of itself. This square draws a smaller square at each of its corners, which draws smaller ones at its corners, until they're too small to bother with.
 
-```logo
+```logo corners
 TO CORNERS :size
   IF :size < 10 [STOP]
   REPEAT 4 [
@@ -40,7 +40,7 @@ CORNERS 200
 
 A tree is a trunk with two smaller trees on top. `TREE` draws its trunk, turns left and draws a smaller tree, turns right and draws another, then walks back down its trunk to where it started.
 
-```logo
+```logo tree
 TO TREE :size
   IF :size < 5 [STOP]
   FD :size

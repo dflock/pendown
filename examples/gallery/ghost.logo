@@ -1,0 +1,48 @@
+; A friendly ghost, floating past the moon.
+
+; Kame goes to a place, with the pen up, facing up.
+TO GO :x :y
+  PU
+  HOME
+  RT 90 FD :x LT 90
+  FD :y
+END
+
+SETBG "#1b1030
+
+; The moon, behind.
+GO 230 260
+SETFC "#fff3b0
+CIRCLE 130
+
+; The ghost: a round head, a body, and a wavy bottom.
+SETFC "white
+GO 0 80
+CIRCLE 150
+GO 0 -40
+RECTANGLE 300 240
+GO -112 -160
+REPEAT 4 [
+  CIRCLE 38
+  RT 90 FD 75 LT 90
+]
+
+; Its arms, waving.
+GO -170 0
+RT 50
+ELLIPSE 30 80
+GO 170 0
+LT 50
+ELLIPSE 30 80
+
+; Its eyes and mouth.
+SETFC "#1b1030
+GO -55 110
+ELLIPSE 22 38
+GO 55 110
+ELLIPSE 22 38
+GO 0 20
+ELLIPSE 34 44
+
+; Kame hides, so the picture is all there is to see.
+HT

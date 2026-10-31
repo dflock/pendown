@@ -30,7 +30,7 @@ REPEAT 360 [FD 2 RT 1]
 
 The list can hold more than one instruction, and it can hold another `REPEAT`. Here Kame draws a square, turns a little, and does it again, eight times.
 
-```logo
+```logo squares-round-a-centre
 REPEAT 8 [
   REPEAT 4 [FD 100 RT 90]
   RT 45

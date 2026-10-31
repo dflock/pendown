@@ -293,6 +293,22 @@ enum Step {
     LoadLesson(usize, usize),
     /// Run on a lesson's program.
     RunLesson(usize, usize),
+    /// Open the side panel at the Gallery tab.
+    Gallery,
+    /// Every gallery picture is drawn.
+    CheckGalleryDrawn,
+    /// Press Run, Load or the "from" link on the gallery card with this
+    /// title.
+    RunGallery(&'static str),
+    LoadGallery(&'static str),
+    GalleryFrom(&'static str),
+    /// The banner over the canvas says this.
+    CheckShowing(&'static str),
+    /// Scroll the Gallery this far down, and check it's still there.
+    ScrollGallery(f32),
+    CheckGalleryScroll(f32),
+    /// The panel shows this tab.
+    CheckTab(&'static str),
     /// The metrics overlay is shown, with numbers in it, or isn't.
     CheckOverlay(bool),
     Quit,
@@ -848,6 +864,47 @@ fn script() -> Vec<Step> {
         CheckDrawn(7),
         Screenshot("tutorial-bug-run"),
         BackToMyDrawing,
+        CloseHelp,
+        Say("Gallery: examples from the help, the lessons and its own, to run or load"),
+        Run(crate::app::WELCOME, Speed::Instant),
+        WaitFinished,
+        Gallery,
+        Wait(ms(3000)),
+        CheckGalleryDrawn,
+        Screenshot("gallery"),
+        SetSpeed(Speed::Instant),
+        RunGallery("A spider's web"),
+        WaitFinished,
+        CheckShowing("“A spider's web”, from the gallery"),
+        ScrollGallery(560.0),
+        Wait(ms(200)),
+        Screenshot("gallery-run"),
+        ScrollGallery(0.0),
+        BackToMyDrawing,
+        CheckDrawn(48),
+        RunGallery("Bigger and bigger squares"),
+        WaitFinished,
+        CheckShowing("“Bigger and bigger squares”, from FOR"),
+        CheckDrawn(10),
+        BackToMyDrawing,
+        LoadGallery("A tree"),
+        CheckEditor(
+            "TO TREE :size\n  IF :size < 5 [STOP]\n  FD :size\n  LT 30\n  TREE :size * 0.7\n  RT 60\n  TREE :size * 0.7\n  LT 30\n  BK :size\nEND\n\nPU BK 200 PD\nTREE 120",
+        ),
+        CheckTitle("Untitled — Pendown"),
+        LoadGallery("A friendly ghost"),
+        CheckTitle("Untitled — Pendown"),
+        ScrollGallery(600.0),
+        Lesson(0),
+        Gallery,
+        Wait(ms(100)),
+        CheckGalleryScroll(600.0),
+        GalleryFrom("A tree"),
+        CheckTab("Tutorial"),
+        Gallery,
+        GalleryFrom("A flower of squares"),
+        CheckTab("Help"),
+        CheckHelpPage("REPEAT"),
         CloseHelp,
         Say("Console undo: an oops at the console, taken back"),
         Run("", Speed::Instant),
@@ -1903,11 +1960,70 @@ impl App {
                         cx.notify();
                     });
                 }
-                Step::LoadLesson(lesson, program) => {
-                    self.proceed(crate::files::After::Load { lesson, program }, window, cx)
-                }
+                Step::LoadLesson(lesson, program) => self.proceed(
+                    crate::files::After::Load(crate::help_panel::Source::Lesson {
+                        lesson,
+                        program,
+                    }),
+                    window,
+                    cx,
+                ),
                 Step::RunLesson(lesson, program) => {
                     self.run_source(crate::help_panel::Source::Lesson { lesson, program }, cx)
+                }
+                Step::Gallery => {
+                    if !self.help_open {
+                        self.toggle_help(cx);
+                    }
+                    self.help_panel.update(cx, |p, cx| {
+                        p.tab = crate::help_panel::Tab::Gallery;
+                        cx.notify();
+                    });
+                }
+                Step::CheckGalleryDrawn => {
+                    let (drawn, all) = self.help_panel.read(cx).gallery_pictures_drawn();
+                    self.check(
+                        drawn == all,
+                        format!("{drawn} of {all} gallery pictures drawn"),
+                    );
+                }
+                Step::RunGallery(title) => {
+                    let source = gallery_entry(title).source;
+                    self.run_source(source, cx);
+                }
+                Step::LoadGallery(title) => {
+                    let source = gallery_entry(title).source;
+                    self.proceed(crate::files::After::Load(source), window, cx);
+                }
+                Step::GalleryFrom(title) => {
+                    let from = gallery_entry(title).from();
+                    self.help_panel
+                        .update(cx, |p, cx| p.open_from(from, window, cx));
+                }
+                Step::CheckShowing(expected) => {
+                    let showing = self
+                        .example
+                        .as_ref()
+                        .map(|e| e.source.describe())
+                        .unwrap_or_default();
+                    self.check(showing == expected, format!("the banner says {showing:?}"));
+                }
+                Step::ScrollGallery(y) => {
+                    self.help_panel.update(cx, |p, cx| {
+                        p.gallery_scroll.set_offset(point(px(0.), px(-y)));
+                        cx.notify();
+                    });
+                }
+                Step::CheckGalleryScroll(y) => {
+                    let found = -f32::from(self.help_panel.read(cx).gallery_scroll.offset().y);
+                    self.check(
+                        (found - y).abs() < 1.0,
+                        format!("the Gallery is scrolled {found:.0} down"),
+                    );
+                }
+                Step::CheckTab(expected) => {
+                    let tab = format!("{:?}", self.help_panel.read(cx).tab);
+                    self.check(tab == expected, format!("the panel shows {tab}"));
                 }
                 Step::CloseHelp => {
                     if self.help_open {
@@ -2190,4 +2306,13 @@ impl App {
             }
         ));
     }
+}
+
+/// The gallery's entry with this title.
+fn gallery_entry(title: &str) -> &'static pendown::gallery::Entry {
+    pendown::gallery::gallery()
+        .iter()
+        .flat_map(|s| &s.entries)
+        .find(|e| e.title == title)
+        .expect("a gallery entry")
 }

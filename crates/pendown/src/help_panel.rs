@@ -30,6 +30,8 @@ use crate::{app::App as PendownWindow, colours_page::ColoursPage};
 pub enum Tab {
     Help,
     Tutorial,
+    /// Examples to run or load, with their pictures (`.scratch/gallery/`).
+    Gallery,
 }
 
 /// A help page.
@@ -50,45 +52,9 @@ pub enum Picture {
     Failed(String),
 }
 
-/// A program in the panel that runs on the canvas: a help example, or a
-/// tutorial lesson's.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Source {
-    Example { command: usize, example: usize },
-    Lesson { lesson: usize, program: usize },
-}
-
-impl Source {
-    pub fn code(&self) -> String {
-        match *self {
-            Source::Example { command, example } => {
-                reference().commands[command].examples[example].code.clone()
-            }
-            Source::Lesson { lesson, program } => pendown::tutorial::lessons()[lesson]
-                .programs()
-                .nth(program)
-                .unwrap_or_default()
-                .to_string(),
-        }
-    }
-
-    /// What the banner over the canvas says it is.
-    fn describe(&self) -> String {
-        match *self {
-            Source::Example { command, example } => {
-                let command = &reference().commands[command];
-                match &command.examples[example].title {
-                    Some(title) => format!("“{title}”, from {}", command.title),
-                    None => format!("From {}", command.title),
-                }
-            }
-            Source::Lesson { lesson, .. } => format!(
-                "From the lesson “{}”",
-                pendown::tutorial::lessons()[lesson].title
-            ),
-        }
-    }
-}
+/// A program in the panel that runs on the canvas: a help example, a
+/// lesson's program, or one of the gallery's.
+pub use pendown::source::Source;
 
 /// The program that's running, highlighted in the panel (issue 06).
 #[derive(Clone, Debug, PartialEq)]
@@ -127,6 +93,8 @@ pub struct HelpPanel {
     program_running: bool,
     /// Scrolls the help page, for the scripted session.
     pub page_scroll: ScrollHandle,
+    /// The Gallery's, kept as you switch tabs.
+    pub gallery_scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -188,6 +156,7 @@ impl HelpPanel {
             colours: None,
             program_running: false,
             page_scroll: ScrollHandle::new(),
+            gallery_scroll: ScrollHandle::new(),
             _subscriptions: subscriptions,
         }
     }
@@ -1258,6 +1227,14 @@ impl Render for HelpPanel {
                     }),
                 ),
             )
+            .child(
+                tab("tab-gallery", "Gallery", self.tab == Tab::Gallery, cx).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.tab = Tab::Gallery;
+                        cx.notify();
+                    },
+                )),
+            )
             .child(div().flex_1())
             .child(
                 Button::new("close-help")
@@ -1273,6 +1250,7 @@ impl Render for HelpPanel {
         let body = match self.tab {
             Tab::Help => self.render_help(&query, window, cx),
             Tab::Tutorial => self.render_tutorial(window, cx),
+            Tab::Gallery => self.render_gallery(cx),
         };
         v_flex()
             .size_full()
@@ -1510,7 +1488,7 @@ impl HelpPanel {
         let mut p = 0;
         for (b, block) in lesson.blocks.iter().enumerate() {
             match block {
-                Block::Code { language, code } if language == pendown::tutorial::PICTURE => {
+                Block::Code { language, code, .. } if language == pendown::tutorial::PICTURE => {
                     body.push(self.lesson_picture(code, cx));
                 }
                 Block::Code { code, .. } => {
@@ -1661,7 +1639,11 @@ impl HelpPanel {
                             .on_click(move |_, window, cx| {
                                 app_load
                                     .update(cx, |this, cx| {
-                                        this.load_into_editor(lesson, program, window, cx)
+                                        this.load_into_editor(
+                                            Source::Lesson { lesson, program },
+                                            window,
+                                            cx,
+                                        )
                                     })
                                     .ok();
                             }),
@@ -1708,12 +1690,11 @@ impl PendownWindow {
     /// once any unsaved changes have been dealt with, as New does.
     pub(crate) fn load_into_editor(
         &mut self,
-        lesson: usize,
-        program: usize,
+        source: Source,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.then(crate::files::After::Load { lesson, program }, window, cx);
+        self.then(crate::files::After::Load(source), window, cx);
     }
 
     /// Opens the panel on a page, as the console's Help button does.
@@ -1955,4 +1936,189 @@ pub struct Saved {
 pub struct ExampleRun {
     pub source: Source,
     saved: Saved,
+}
+
+/// A gallery card's picture is this many logical pixels square, as a
+/// lesson's are. Cards wrap, so the panel shows two a row at its usual
+/// width, and one when it's narrow.
+const GALLERY_PICTURE: f32 = 160.;
+
+impl HelpPanel {
+    /// A card's "Help: REPEAT" or "Lesson 6": opens that page or lesson.
+    pub fn open_from(
+        &mut self,
+        from: pendown::gallery::From,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        use pendown::gallery::From;
+        match from {
+            From::Help(i) => self.go(Page::Command(i), window, cx),
+            From::Lesson(l) => {
+                self.tab = Tab::Tutorial;
+                self.lesson = l;
+                cx.notify();
+            }
+            From::New => {}
+        }
+    }
+
+    /// For the scripted session: how many of the gallery's pictures are
+    /// drawn, of how many.
+    pub fn gallery_pictures_drawn(&self) -> (usize, usize) {
+        let entries: Vec<_> = pendown::gallery::gallery()
+            .iter()
+            .flat_map(|s| &s.entries)
+            .collect();
+        let drawn = entries
+            .iter()
+            .filter(|e| {
+                matches!(
+                    self.pictures.get(&e.source.code()),
+                    Some(Picture::Drawing(..))
+                )
+            })
+            .count();
+        (drawn, entries.len())
+    }
+
+    /// The Gallery (`.scratch/gallery/`): its sections, each a grid of
+    /// cards with a picture, a title, where it's from, Load and Run.
+    fn render_gallery(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let mut content = Vec::new();
+        for (s, section) in pendown::gallery::gallery().iter().enumerate() {
+            let cards: Vec<AnyElement> = section
+                .entries
+                .iter()
+                .enumerate()
+                .map(|(e, entry)| self.gallery_card(s, e, entry, cx))
+                .collect();
+            content.push(
+                v_flex()
+                    .mt_4()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_base()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(theme.foreground)
+                            .child(section.title.clone()),
+                    )
+                    .child(h_flex().flex_wrap().items_start().gap_3().children(cards))
+                    .into_any_element(),
+            );
+        }
+        div()
+            .flex_1()
+            .min_h_0()
+            .relative()
+            .child(
+                div()
+                    .id("gallery")
+                    .track_scroll(&self.gallery_scroll)
+                    .size_full()
+                    .overflow_y_scroll()
+                    .px_3()
+                    .pb_4()
+                    .children(content),
+            )
+            .vertical_scrollbar(&self.gallery_scroll)
+            .into_any_element()
+    }
+
+    fn gallery_card(
+        &mut self,
+        section: usize,
+        index: usize,
+        entry: &'static pendown::gallery::Entry,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        use pendown::gallery::From;
+        let theme = cx.theme().clone();
+        let size = GALLERY_PICTURE;
+        let source = entry.source;
+        // Outlined while its example is on the canvas.
+        let showing = self.running.as_ref().is_some_and(|r| r.source == source);
+        let picture = match self.picture(&source.code(), cx) {
+            Some(Picture::Drawing(svg, rendered)) => svg_image(svg, rendered, size, size)
+                .rounded_md()
+                .into_any_element(),
+            // Being drawn: a blank square.
+            _ => div()
+                .size(px(size))
+                .rounded_md()
+                .bg(black())
+                .into_any_element(),
+        };
+        let picture = div()
+            .p(px(2.))
+            .rounded_lg()
+            .border_2()
+            .border_color(if showing {
+                theme.foreground
+            } else {
+                transparent_black()
+            })
+            .child(picture);
+        let from = entry.from();
+        let label = div()
+            .id(SharedString::from(format!(
+                "gallery-from-{section}-{index}"
+            )))
+            .text_xs()
+            .text_color(match from {
+                From::New => theme.muted_foreground,
+                _ => theme.link,
+            })
+            .child(entry.from_label())
+            .when(from != From::New, |l| {
+                l.cursor_pointer().hover(|s| s.underline()).on_click(
+                    cx.listener(move |this, _, window, cx| this.open_from(from, window, cx)),
+                )
+            });
+        let (app_load, app_run) = (self.app.clone(), self.app.clone());
+        v_flex()
+            .w(px(size + 8.))
+            .gap_1()
+            .child(picture)
+            .child(
+                div()
+                    .text_sm()
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(theme.foreground)
+                    .child(entry.title.clone()),
+            )
+            .child(label)
+            .child(
+                h_flex()
+                    .mt_1()
+                    .gap_2()
+                    .child(
+                        Button::new(SharedString::from(format!(
+                            "gallery-load-{section}-{index}"
+                        )))
+                        .small()
+                        .label("Load")
+                        .tooltip("Load into editor")
+                        .on_click(move |_, window, cx| {
+                            app_load
+                                .update(cx, |this, cx| this.load_into_editor(source, window, cx))
+                                .ok();
+                        }),
+                    )
+                    .child(
+                        Button::new(SharedString::from(format!("gallery-run-{section}-{index}")))
+                            .small()
+                            .icon(IconName::Play)
+                            .label("Run")
+                            .on_click(move |_, _, cx| {
+                                app_run
+                                    .update(cx, |this, cx| this.run_source(source, cx))
+                                    .ok();
+                            }),
+                    ),
+            )
+            .into_any_element()
+    }
 }

@@ -66,12 +66,9 @@ pub enum After {
     NewFile,
     OpenFile,
     Close,
-    /// Load into editor: a tutorial lesson's program, by lesson and which
-    /// program in it.
-    Load {
-        lesson: usize,
-        program: usize,
-    },
+    /// Load into editor: a lesson's program, or a gallery entry's, as a
+    /// new, untitled program.
+    Load(crate::help_panel::Source),
 }
 
 impl App {
@@ -159,9 +156,9 @@ impl App {
                 self.closing = true;
                 window.remove_window();
             }
-            After::Load { lesson, program } => {
+            After::Load(source) => {
                 self.stop(cx);
-                let code = crate::help_panel::Source::Lesson { lesson, program }.code();
+                let code = source.code();
                 // Like New, so Save can't write a lesson over the user's file.
                 self.document = Document::new(&code);
                 self.editor

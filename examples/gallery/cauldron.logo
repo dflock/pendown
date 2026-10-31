@@ -1,0 +1,50 @@
+; A witch's cauldron, bubbling over a fire.
+
+; Kame goes to a place, with the pen up, facing up.
+TO GO :x :y
+  PU
+  HOME
+  RT 90 FD :x LT 90
+  FD :y
+END
+
+; A flame: an orange oval with a yellow one inside it.
+TO FLAME :x :y :size :tilt
+  GO :x :y
+  RT :tilt
+  SETFC "orangered
+  ELLIPSE :size / 2 :size
+  BK :size / 5
+  SETFC "gold
+  ELLIPSE :size / 4 :size / 2
+END
+
+SETBG "#1d1430
+
+; The fire, under the pot.
+FLAME -110 -330 130 -15
+FLAME 110 -330 130 15
+FLAME 0 -320 170 0
+
+; The pot, and its rim.
+SETFC "#0d0d12
+GO 0 -60
+ELLIPSE 280 230
+GO 0 120
+SETFC "#2b2b36
+ELLIPSE 300 50
+
+; The brew, and its bubbles.
+SETFC "#5fd35f
+ELLIPSE 260 36
+SETFC "#8ef08e
+GO -90 165 CIRCLE 34
+GO -20 200 CIRCLE 24
+GO 50 175 CIRCLE 40
+GO 120 230 CIRCLE 16
+GO -60 270 CIRCLE 14
+GO 20 320 CIRCLE 10
+GO 90 360 CIRCLE 7
+
+; Kame hides, so the picture is all there is to see.
+HT

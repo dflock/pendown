@@ -12,7 +12,7 @@ REPEAT 4 [FD 100 RT 90]
 
 [SETPENSIZE] makes the lines thicker, and [SETBACKGROUND], or `SETBG`, changes the colour behind the drawing.
 
-```logo
+```logo star
 SETBG "midnightblue
 SETPC "gold
 SETPENSIZE 4
@@ -25,7 +25,7 @@ The variables panel shows the colours Kame is using, with a square of each.
 
 A list can hold the colours, and [ITEM] picks one by its position. With [REPCOUNT] as the position, each time round has the next colour.
 
-```logo
+```logo hexagons
 MAKE "colours [red orange yellow green blue purple]
 SETPENSIZE 6
 REPEAT 6 [
@@ -47,7 +47,7 @@ ELLIPSE 60 120
 
 [SETFILLCOLOR], or `SETFC`, fills the shapes with a colour. With the pen up, a shape has no outline, only its fill.
 
-```logo
+```logo target
 SETFC "gold
 CIRCLE 120
 SETFC "orangered
@@ -86,4 +86,4 @@ One way to fix it: put each `SETPC` before the square it's for.
 
 ## What next?
 
-That's the tutorial. You know enough to draw almost anything. The Help tab has every command Kame knows, each with examples you can run: press its **Run**, and Kame draws it right here.
+That's the tutorial. You know enough to draw almost anything. The Help tab has every command Kame knows, each with examples you can run: press its **Run**, and Kame draws it right here. The Gallery tab has pictures to try, from a snowflake to a jack-o'-lantern: load one into the editor, and see how it's made.

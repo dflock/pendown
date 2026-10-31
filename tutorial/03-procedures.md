@@ -30,7 +30,7 @@ Kame already knows a word called `SQUARE`, so give your words names of their own
 
 A procedure can use the words you taught Kame, as well as the ones it knew. Here `FLOWER` draws `BOX` twelve times, turning in between.
 
-```logo
+```logo flower
 TO BOX
   REPEAT 4 [FD 100 RT 90]
 END

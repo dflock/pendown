@@ -1,0 +1,59 @@
+; A garden at night: flowers on tall stems, and fireflies over them.
+
+; A flower: a stem, then petals all the way round. Kame ends where it
+; started.
+TO FLOWER :height :size :colour
+  SETPC "forestgreen
+  SETPENSIZE 6
+  PD
+  FD :height
+  PU
+  SETFC :colour
+  REPEAT 8 [
+    FD :size / 2
+    ELLIPSE :size / 5 :size / 2
+    BK :size / 2
+    RT 45
+  ]
+  SETFC "gold
+  CIRCLE :size / 4
+  BK :height
+END
+
+; Move along the ground to the right.
+TO ALONG :distance
+  PU
+  RT 90 FD :distance LT 90
+END
+
+SETBG "#101a2e
+
+; The grass.
+PU BK 420
+SETFC "darkgreen
+RECTANGLE 1000 160
+FD 20
+
+; The flowers, from the left.
+ALONG -360
+FLOWER 300 120 "orchid
+ALONG 170
+FLOWER 420 100 "tomato
+ALONG 160
+FLOWER 250 140 "gold
+ALONG 180
+FLOWER 380 110 "deepskyblue
+ALONG 170
+FLOWER 290 90 "hotpink
+
+; The fireflies.
+HOME PU
+SETFC "yellow
+REPEAT 12 [
+  RT 150
+  FD 230
+  CIRCLE 7
+]
+
+; Kame hides, so the picture is all there is to see.
+HT

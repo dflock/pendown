@@ -1,0 +1,74 @@
+; A storm: dark clouds, a fork of lightning, and a bare tree on a hill.
+
+; Kame goes to a place, with the pen up, facing up.
+TO GO :x :y
+  PU
+  HOME
+  RT 90 FD :x LT 90
+  FD :y
+END
+
+; The lightning's path, from the cloud down, with a fork halfway.
+TO BOLT
+  RT 182 FD 150
+  LT 50 FD 110
+  RT 55 FD 140
+  LT 30 FD 100
+  ; The fork, there and back.
+  RT 60 FD 120 LT 40 FD 100 BK 100 RT 40 BK 120 LT 60
+  LT 25 FD 150
+  RT 50 FD 120
+END
+
+; A bare tree: a trunk with two smaller trees on top.
+TO TREE :size
+  IF :size < 6 [STOP]
+  SETPENSIZE :size / 6
+  FD :size
+  LT 28
+  TREE :size * 0.7
+  RT 56
+  TREE :size * 0.7
+  LT 28
+  SETPENSIZE :size / 6
+  BK :size
+END
+
+SETBG "#16182b
+
+; The lightning: a wide, soft glow first, then a bright line over it.
+GO -240 320
+PD
+SETPC [255 230 120 90]
+SETPENSIZE 26
+BOLT
+GO -240 320
+PD
+SETPC "#fffbe0
+SETPENSIZE 7
+BOLT
+
+; The clouds.
+PU
+SETFC "#3c4058
+GO -260 380 CIRCLE 110
+GO -110 420 CIRCLE 130
+GO 60 390 CIRCLE 120
+GO 230 420 CIRCLE 110
+GO 380 380 CIRCLE 100
+SETFC "#4c5170
+GO -180 330 CIRCLE 80
+GO 0 330 CIRCLE 90
+GO 170 340 CIRCLE 80
+
+; The hill, and the tree on it.
+SETFC "#0b0c16
+GO 270 -480
+ELLIPSE 400 130
+GO 270 -380
+PD
+SETPC "#0b0c16
+TREE 120
+
+; Kame hides, so the picture is all there is to see.
+HT

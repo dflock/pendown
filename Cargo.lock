@@ -4646,6 +4646,7 @@ dependencies = [
  "embed-resource",
  "gpui-kit",
  "image",
+ "kdl",
  "pendown-cli",
  "pendown-logo",
  "pendown-render",

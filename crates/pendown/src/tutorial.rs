@@ -38,6 +38,15 @@ impl Lesson {
         self.code(false)
     }
 
+    /// Where the program named `name` (after the fence's language, as in
+    /// ```` ```logo tree ````) is among [`Lesson::programs`].
+    pub fn program_named(&self, name: &str) -> Option<usize> {
+        self.blocks
+            .iter()
+            .filter(|b| matches!(b, Block::Code { language, .. } if language != PICTURE))
+            .position(|b| matches!(b, Block::Code { name: Some(n), .. } if n == name))
+    }
+
     /// The programs of its pictures, in order.
     pub fn pictures(&self) -> impl Iterator<Item = &str> {
         self.code(true)
@@ -45,7 +54,7 @@ impl Lesson {
 
     fn code(&self, pictures: bool) -> impl Iterator<Item = &str> {
         self.blocks.iter().filter_map(move |b| match b {
-            Block::Code { language, code } if (language == PICTURE) == pictures => {
+            Block::Code { language, code, .. } if (language == PICTURE) == pictures => {
                 Some(code.as_str())
             }
             _ => None,
@@ -91,5 +100,32 @@ mod tests {
             lesson.pictures().collect::<Vec<_>>(),
             ["REPEAT 4 [FD 100 RT 90]"]
         );
+    }
+
+    #[test]
+    fn no_two_programs_in_a_lesson_share_a_name() {
+        for lesson in lessons() {
+            let mut names = std::collections::HashSet::new();
+            for block in &lesson.blocks {
+                if let Block::Code {
+                    name: Some(name), ..
+                } = block
+                {
+                    assert!(names.insert(name), "“{}” has two “{name}”s", lesson.title);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_program_is_found_by_its_name() {
+        let lesson = Lesson {
+            title: "Trees".into(),
+            blocks: markup::parse(
+                "```picture tree\nFD 1\n```\n\n```logo\nFD 2\n```\n\n```logo tree\nFD 3\n```\n",
+            ),
+        };
+        assert_eq!(lesson.program_named("tree"), Some(1));
+        assert_eq!(lesson.program_named("bush"), None);
     }
 }

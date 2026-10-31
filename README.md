@@ -60,7 +60,7 @@ install -Dm644 crates/pendown/linux/pendown.png ~/.local/share/icons/hicolor/128
 
 On X11 the window shows Kame either way. Wayland needs the desktop file to find it.
 
-`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, pausing, stepping, changing a paused program, breakpoints, Restart and Reset, ending runs, the console, files, errors, filled shapes, how often the window redraws, the counters and variables panels, and the help panel and tutorial. `PENDOWN_AUTOTEST_FROM="Phase 5"` starts it at the first section with that in its title. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
+`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, pausing, stepping, changing a paused program, breakpoints, Restart and Reset, ending runs, the gallery, the console, files, errors, filled shapes, how often the window redraws, the counters and variables panels, and the help panel and tutorial. `PENDOWN_AUTOTEST_FROM="Phase 5"` starts it at the first section with that in its title. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
 
 Type a program in the editor and press **Run**. Use the speed slider to choose how fast the turtle draws. Try the console too: after a run, it knows every procedure your program defined, so you can type `FLOWER 80` and watch.
 
@@ -72,7 +72,9 @@ The **Help** button, or **F1**, opens a panel beside the canvas. Help follows th
 
 The **Tutorial** tab has six lessons with Kame: moving and turning, `REPEAT`, procedures, inputs and variables, recursion, and colours and shapes. Each program in them loads into the editor or runs on the canvas.
 
-The help comes from `pendown-logo.kdl`, and the lessons are markdown files in `tutorial/`. Every example and every lesson's program is a test: it must run, and draw the picture saved in `crates/pendown/tests/help-pictures/`.
+The **Gallery** tab shows example programs with a picture of each, in sections: some written for it, such as a snowflake and a city at night, a Halloween set, and the best pictures from the help and the lessons. **Load** puts one in the editor as a new program, and **Run** plays it on the canvas. Each card says where it's from, and links to that help page or lesson.
+
+The help comes from `pendown-logo.kdl`, the lessons are markdown files in `tutorial/`, and the gallery is `gallery.kdl`, which points at examples where they already live, plus its own programs in `examples/gallery/`. Every example and every lesson's program is a test: it must run, and draw the picture saved in `crates/pendown/tests/help-pictures/`.
 
 ### The CLI
 

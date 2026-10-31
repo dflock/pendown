@@ -1,0 +1,67 @@
+; A city at night: a street of buildings, with lights in their windows,
+; under a crescent moon.
+
+MAKE "lights [#3a3a4a gold gold]
+
+; A building, :columns windows wide and :floors high. Kame starts at
+; the bottom left corner, facing up, and ends at the bottom right, ready
+; for the next one.
+TO BUILDING :columns :floors
+  MAKE "width :columns * 30 + 10
+  MAKE "height :floors * 30 + 20
+  PU
+  RT 90 FD :width / 2 LT 90
+  FD :height / 2
+  SETFC "#2a2f45
+  RECTANGLE :width :height
+  BK :height / 2
+  MAKE "floor 0
+  REPEAT :floors [
+    MAKE "floor :floor + 1
+    WINDOWS :columns
+  ]
+  BK :floors * 30
+  RT 90 FD :width / 2 + 6 LT 90
+END
+
+; One floor of windows, then up to the next floor.
+TO WINDOWS :columns
+  FD 30
+  LT 90 FD :columns * 15 - 15 RT 90
+  REPEAT :columns [
+    SETFC ITEM 1 + REMAINDER REPCOUNT + :floor 3 :lights
+    SQUARE 14
+    RT 90 FD 30 LT 90
+  ]
+  LT 90 FD :columns * 15 + 15 RT 90
+END
+
+SETBG "#0b1026
+
+; The moon: a pale circle, with a circle of sky over most of it.
+PU LT 90 FD 260 RT 90 FD 300
+SETFC "lightyellow
+CIRCLE 60
+RT 90 FD 25 LT 90
+SETFC "#0b1026
+CIRCLE 55
+HOME
+
+; The road.
+PU BK 425
+SETFC "#1c1c1c
+RECTANGLE 1000 150
+FD 75
+
+; The street, from the left.
+LT 90 FD 400 RT 90
+BUILDING 3 8
+BUILDING 4 12
+BUILDING 2 6
+BUILDING 5 18
+BUILDING 3 10
+BUILDING 4 7
+BUILDING 3 14
+
+; Kame hides, so the picture is all there is to see.
+HT

@@ -19,7 +19,7 @@ Builds on pause-and-edit (`.scratch/pause-and-edit/`): Pause finishing the instr
 ## Decisions
 
 - **As many breakpoints as you like.** One would be no easier: it's a set of lines either way.
-- **The gutter, not a button or a menu.** It's where every code editor puts them, and it's one click. gpui-kit's editor has no gutter click event and no gutter markers, so we add them from outside (issue 04), with a patch to gpui-kit as the fallback.
+- **The gutter, not a button or a menu.** It's where every code editor puts them, and it's one click. gpui-kit 0.8.1's editor has no gutter click event and no gutter markers, so we add them from outside (issue 04), with a patch to gpui-kit as the fallback. gpui-kit's main has since added gutter decorations, which keep to their lines as you edit but don't take clicks. If a release has them by the time we start, issues 03 and 04 use them.
 - **The interpreter knows the breakpoints,** through `Control`, as it knows the cancel flag. On a breakpoint line it sends a `Sync` and waits even when not in lockstep, and the animator holds it and pauses. At Instant the interpreter runs ahead of the animator, so without this it would be lines past a breakpoint before the animator saw it (ADR 0012). Checking only breakpoint lines keeps Instant fast.
 - **A breakpoint stops where a line starts,** as `starts_line` does (ADR 0012): when the program comes to that line from another one. So `REPEAT 4 [FD 50 RT 90]`, all on one line, stops once, before the `REPEAT`. To go round it, use Single Step. Spreading the loop over several lines makes each line a place to stop.
 - **Replays ignore breakpoints** until they get back to where you paused (pause-and-edit), so a change that's replayed doesn't stop at a breakpoint it already passed.

@@ -16,6 +16,14 @@ It also says which lines can take a breakpoint: lines with code, from the tokens
 
 `App` calls it on each editor change and keeps the result.
 
+**Check gpui-kit first.** On gpui-kit's main, after 0.8.1, the editor has gutter decorations (`create_gutter_decorations_collection`, #3704). Their ranges follow edits, so they could keep the breakpoints on their lines for us, read back with `get_ranges`, instead of comparing texts. An edit that empties a range leaves it as a boundary, which would count as a deleted line. If a release has them when this starts, upgrade to it (on a branch of its own, as for 0.8.1) and use them. This function then only says which lines can take a breakpoint. Before a release has them, a git dependency pinned to a commit works:
+
+```toml
+gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "94480398", features = ["tree-sitter"] }
+```
+
+Pendown built against 94480398 with no changes beyond 0.8.1's, and its tests passed (2026-10-30).
+
 ## Done when
 
 Unit tests cover:

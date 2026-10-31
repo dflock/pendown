@@ -701,7 +701,7 @@ impl App {
 
     /// For the scripted session: presses `keys` wherever the focus is.
     pub(crate) fn press(&mut self, keys: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let keystroke = Keystroke::parse(keys).expect("a keystroke");
+        let keystroke = Keystroke::parse_with_os(keys, cx.platform_info().os).expect("a keystroke");
         // After this update, since the key's actions update the window.
         window.defer(cx, move |window, cx| {
             window.dispatch_keystroke(keystroke, cx);

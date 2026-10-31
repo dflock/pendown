@@ -303,7 +303,7 @@ impl App {
             "right" => Input::Key(Key::Right),
             "space" => Input::Pen,
             "backspace" => Input::Undo,
-            "z" if keystroke.modifiers.secondary() => Input::Undo,
+            "z" if keystroke.modifiers.secondary(cx) => Input::Undo,
             "escape" => {
                 self.stop_driving(cx);
                 return true;

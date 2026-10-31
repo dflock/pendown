@@ -31,7 +31,10 @@ ADR 0006 made the editor read-only while a program is running or paused, to keep
 - **A console entry while paused ends the paused program,** as Stop did, and runs against what it left (ADR 0006). After that there's nothing to resume. This is how a `FOREVER` program is ended to use the console, now Stop's gone.
 - **Run while paused** starts the editor's program afresh, with a new seed.
 - **Only the editor's program replays.** A paused help example or console entry carries on as before, whatever's in the editor, since its code isn't the editor's.
-- **Ending a run** (Run again, or a console entry while paused) still cancels the interpreter as Stop did (ADR 0011), so `CATCH` still never catches it.
+- **Ending a run** (Run again, Reset, or a console entry while paused) still cancels the interpreter as Stop did (ADR 0011), so `CATCH` still never catches it.
+- **Run says Restart while the editor's program is running or paused,** with a ↺ icon, so the toolbar never shows Run and Resume side by side with the same ▶. A console entry or help example running leaves it as Run, since pressing it runs the editor's program rather than the entry again. (Added after the breakpoints work: `.scratch/breakpoints/proposed-button-states.md`.)
+- **Reset,** an icon-only ⏮ button after Single Step, stops whatever's running and puts everything back as it was before Run, without running anything: the drawing, background, console, Undo, variables panel, and the interpreter's variables, procedures and pen all go back to how a run starts. Restart is exactly Reset and then Run. It's greyed out when there's nothing to put back: when the window opens, and after Reset. It isn't the old Stop, which left the drawing and everything else as the run left them; nor is it `CS`, which only clears the drawing and sends Kame home. It leaves the editor's text, the breakpoints and the speed alone.
+- **The dark button is the one you'd press next:** Run when nothing's running, Pause while running, and Resume while paused. So Restart is never dark.
 
 ## Consequences
 

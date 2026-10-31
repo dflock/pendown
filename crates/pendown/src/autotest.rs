@@ -68,6 +68,14 @@ const TRIANGLE_SIDES: &str =
 const ONE_SIDE: &str = "TO SIDE :n\n  FD :n\n  RT 90\nEND\nREPEAT 1 [SIDE 100]\nPRINT \"done\n";
 const UNCLOSED: &str = "TO SIDE :n\n  FD :n\n  RT 90\nEND\nREPEAT 4 [SIDE 100\nPRINT \"done\n";
 
+/// ADR 0029: a procedure with a loop over several lines, to stop in.
+const BREAKING: &str =
+    "TO TILE :size\n  REPEAT 4 [\n    FD :size\n    RT 90\n  ]\nEND\n\nTILE 100\n";
+/// Long enough to scroll: TILE 1 to TILE 50, each on its line after the
+/// procedure.
+const LONG_TILES: &str = "TO TILE :size\n  REPEAT 4 [FD :size RT 90]\nEND\nTILE 1\nTILE 2\nTILE 3\nTILE 4\nTILE 5\nTILE 6\nTILE 7\nTILE 8\nTILE 9\nTILE 10\nTILE 11\nTILE 12\nTILE 13\nTILE 14\nTILE 15\nTILE 16\nTILE 17\nTILE 18\nTILE 19\nTILE 20\nTILE 21\nTILE 22\nTILE 23\nTILE 24\nTILE 25\nTILE 26\nTILE 27\nTILE 28\nTILE 29\nTILE 30\nTILE 31\nTILE 32\nTILE 33\nTILE 34\nTILE 35\nTILE 36\nTILE 37\nTILE 38\nTILE 39\nTILE 40\nTILE 41\nTILE 42\nTILE 43\nTILE 44\nTILE 45\nTILE 46\nTILE 47\nTILE 48\nTILE 49\nTILE 50\n";
+const FOREVER_TURNING: &str = "FOREVER [\n  FD 1\n  RT 1\n]\n";
+
 const COUNTING: &str = "MAKE \"n 0\nFOREVER [MAKE \"n :n + 1]";
 
 const ERRORS: &str = "TO BOX :n\n  FD :n RT 90\n  FD \"far\n  PRINT 1\nEND\nBOX 100";
@@ -111,6 +119,23 @@ enum Step {
     CheckPaused(bool),
     /// The console holds exactly these lines.
     CheckConsoleExactly(&'static [&'static str]),
+    /// Click a line number, counting from 1, to set or take away its
+    /// breakpoint (ADR 0029).
+    ToggleBreakpoint(usize),
+    /// The lines with a breakpoint, counting from 1.
+    CheckBreakpoints(&'static [usize]),
+    /// Press Run on whatever's in the editor, at this speed.
+    RunAsIs(Speed),
+    /// Scroll the editor so this line, counting from 1, is at the top.
+    ScrollEditorTo(usize),
+    /// The Reset button (ADR 0028).
+    Reset,
+    /// Moves the mouse to a point in the window, for tooltips.
+    HoverAt(f32, f32),
+    /// What the first run button says, and whether Reset can be pressed.
+    CheckButtons(&'static str, bool),
+    /// The line the gutter's arrow is on, counting from 1, if any.
+    CheckCurrentLine(Option<usize>),
     /// The interpreter has started exactly as many lines as the highlight
     /// has reached.
     CheckNothingAhead,
@@ -498,6 +523,146 @@ fn script() -> Vec<Step> {
         CheckPaused(false),
         CheckConsole("hello"),
         Screenshot("console-ends-a-paused-program"),
+        Say("ADR 0029: a breakpoint stops the run each time it gets there"),
+        Type(BREAKING),
+        Wait(ms(100)),
+        ToggleBreakpoint(3),
+        ToggleBreakpoint(7),
+        CheckBreakpoints(&[3]),
+        RunAsIs(Speed::Animated(100.0)),
+        WaitPaused,
+        CheckHighlight("FD :size"),
+        CheckDrawn(0),
+        Wait(ms(100)),
+        Screenshot("at-a-breakpoint"),
+        Resume,
+        WaitPaused,
+        CheckHighlight("FD :size"),
+        CheckDrawn(1),
+        CheckNothingAhead,
+        SingleStep,
+        WaitPaused,
+        CheckHighlight("RT 90"),
+        EndRun,
+        Say("ADR 0029: at Instant too"),
+        RunAsIs(Speed::Instant),
+        WaitPaused,
+        CheckHighlight("FD :size"),
+        CheckDrawn(0),
+        Resume,
+        WaitPaused,
+        CheckDrawn(1),
+        CheckNothingAhead,
+        ToggleBreakpoint(3),
+        CheckBreakpoints(&[]),
+        Resume,
+        WaitFinished,
+        CheckDrawn(4),
+        Say("ADR 0029: a breakpoint on a TO line stops at the procedure's first instruction"),
+        ToggleBreakpoint(1),
+        RunAsIs(Speed::Instant),
+        WaitPaused,
+        CheckHighlight("REPEAT 4 [\n    FD :size\n    RT 90\n  ]"),
+        EndRun,
+        Say("ADR 0029: breakpoints keep to their lines as the program changes"),
+        ToggleBreakpoint(1),
+        ToggleBreakpoint(4),
+        CheckBreakpoints(&[4]),
+        Type(
+            "CS\nPU\nSETPOS [-50 -50]\nPD\nTO TILE :size\n  REPEAT 4 [\n    FD :size\n    RT 90\n  ]\nEND\n\nTILE 100\n",
+        ),
+        Wait(ms(100)),
+        CheckBreakpoints(&[8]),
+        Screenshot("breakpoint-moved-down"),
+        EditorKeys("secondary-z"),
+        Wait(ms(100)),
+        CheckBreakpoints(&[4]),
+        Type("TO TILE :size\n  REPEAT 4 [\n    FD :size\n  ]\nEND\n\nTILE 100\n"),
+        Wait(ms(100)),
+        CheckBreakpoints(&[]),
+        Say("ADR 0029: the line numbers follow the editor as it scrolls"),
+        Type(LONG_TILES),
+        Wait(ms(100)),
+        ToggleBreakpoint(41),
+        ScrollEditorTo(30),
+        Wait(ms(200)),
+        RunAsIs(Speed::Instant),
+        WaitPaused,
+        CheckHighlight("TILE 38"),
+        Wait(ms(100)),
+        Screenshot("scrolled-breakpoint"),
+        EndRun,
+        Say("ADR 0029: a breakpoint set while it runs stops it"),
+        Type(FOREVER_TURNING),
+        Wait(ms(100)),
+        RunAsIs(Speed::Instant),
+        Wait(ms(300)),
+        CheckPaused(false),
+        ToggleBreakpoint(3),
+        WaitPaused,
+        CheckHighlight("RT 1"),
+        ToggleBreakpoint(3),
+        Resume,
+        Wait(ms(300)),
+        CheckPaused(false),
+        EndRun,
+        Say(
+            "ADR 0028: Reset puts everything back as before Run, and Run says Restart while it runs",
+        ),
+        Type(BREAKING),
+        Wait(ms(100)),
+        Reset,
+        CheckButtons("Run", false),
+        CheckDrawn(0),
+        CheckConsoleExactly(&[]),
+        CheckCurrentLine(None),
+        ToggleBreakpoint(3),
+        Say("ADR 0029: the line numbers have tooltips"),
+        Wait(ms(100)),
+        HoverAt(22.0, 98.0),
+        Wait(ms(1000)),
+        Screenshot("breakpoint-tooltip"),
+        HoverAt(22.0, 58.0),
+        Wait(ms(1000)),
+        Screenshot("to-line-tooltip"),
+        HoverAt(700.0, 400.0),
+        RunAsIs(Speed::Animated(100.0)),
+        WaitPaused,
+        CheckButtons("Restart", true),
+        Say(
+            "ADR 0029: the gutter's arrow is on the highlight's line, and a breakpoint's pill there has a white ring",
+        ),
+        CheckCurrentLine(Some(3)),
+        Wait(ms(100)),
+        Screenshot("current-line-at-a-breakpoint"),
+        SingleStep,
+        WaitPaused,
+        CheckCurrentLine(Some(4)),
+        Wait(ms(100)),
+        Screenshot("current-line"),
+        ToggleBreakpoint(3),
+        Resume,
+        WaitFinished,
+        CheckButtons("Run", true),
+        CheckDrawn(4),
+        Console("MAKE \"x 5"),
+        WaitFinished,
+        Reset,
+        CheckButtons("Run", false),
+        CheckDrawn(0),
+        CheckConsoleExactly(&[]),
+        CheckCurrentLine(None),
+        Console("PRINT :x"),
+        WaitFinished,
+        CheckConsole("In the console: :x has no value"),
+        CheckButtons("Run", true),
+        SetSpeed(Speed::Animated(20.0)),
+        Console("FOREVER [FD 1 RT 1]"),
+        Wait(ms(200)),
+        CheckButtons("Run", true),
+        CheckCurrentLine(None),
+        Screenshot("running-pause-is-dark"),
+        EndRun,
         Say("Ending a run at Instant"),
         Run(FOREVER, Speed::Instant),
         Wait(ms(500)),
@@ -1307,6 +1472,59 @@ impl App {
                             if paused { "paused" } else { "not paused" }
                         ),
                     );
+                }
+                Step::ToggleBreakpoint(line) => {
+                    self.gutter
+                        .update(cx, |gutter, cx| gutter.toggle(line - 1, cx));
+                }
+                Step::CheckBreakpoints(expected) => {
+                    let lines: Vec<usize> =
+                        self.gutter.read(cx).lines.iter().map(|l| l + 1).collect();
+                    self.check(lines == expected, format!("breakpoints on lines {lines:?}"));
+                }
+                Step::ScrollEditorTo(line) => {
+                    self.editor.update(cx, |state, cx| {
+                        let height = state.line_height().unwrap_or(px(20.));
+                        let offset = state.scroll_offset();
+                        state.set_scroll_offset(point(offset.x, -height * (line - 1) as f32), cx);
+                    });
+                }
+                Step::Reset => self.reset(cx),
+                Step::HoverAt(x, y) => {
+                    window.dispatch_event(
+                        PlatformInput::MouseMove(MouseMoveEvent {
+                            position: point(px(x), px(y)),
+                            pressed_button: None,
+                            modifiers: Modifiers::default(),
+                        }),
+                        cx,
+                    );
+                }
+                Step::CheckButtons(label, can_reset) => {
+                    let found = if self.running() && self.editor_run {
+                        "Restart"
+                    } else {
+                        "Run"
+                    };
+                    let resettable = !self.at_start;
+                    self.check(
+                        found == label && resettable == can_reset,
+                        format!(
+                            "the toolbar shows {found}, and Reset is {}",
+                            if resettable { "enabled" } else { "greyed out" }
+                        ),
+                    );
+                }
+                Step::CheckCurrentLine(expected) => {
+                    let line = self.gutter.read(cx).current().map(|l| l + 1);
+                    self.check(
+                        line == expected,
+                        format!("the gutter's arrow is on line {line:?}"),
+                    );
+                }
+                Step::RunAsIs(speed) => {
+                    self.set_speed(speed, window, cx);
+                    self.start(DEFAULT_CHANNEL, cx);
                 }
                 Step::CheckConsoleExactly(expected) => {
                     let lines: Vec<&str> = self.console.iter().map(|l| l.as_ref()).collect();

@@ -1,6 +1,6 @@
 # The gutter: clicking sets and clears breakpoints, and the dots
 
-Status: needs-triage
+Status: resolved
 Type: task
 Blocked by: 03
 
@@ -34,3 +34,5 @@ gpui-kit's editor (`gpui-base` 0.8.0, `input/base/element.rs`) draws the line nu
 - **The cursor:** a click in the gutter doesn't move the cursor.
 
 ## Comments
+
+2026-10-31: Done, as option A from the mockup, but by drawing the line numbers ourselves instead of an overlay. `gutter.rs` is a view beside the editor. gpui-kit's numbers and folding are off, and each row follows the editor's scroll offset and line height, under its 8 px top padding. That made pills, hover and clicks ordinary elements, with no guessing at private widths. The tint is a range decoration over each line's text. The mouse wheel over the numbers scrolls the editor. The scripted session toggles through `Gutter::toggle`, not real clicks.

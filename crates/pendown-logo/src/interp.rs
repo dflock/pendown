@@ -5,7 +5,7 @@ use std::{
     cell::RefCell,
     rc::Rc,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering},
         mpsc,
     },
@@ -190,7 +190,36 @@ pub struct Control {
     /// The front end wants a `Watch` at the next instruction. Lockstep sends
     /// one whenever it changes; at Instant the GUI sets this each frame.
     pub watch: AtomicBool,
+    /// The editor's lines with a breakpoint, counting from 0 (ADR 0029):
+    /// the interpreter waits at each, even out of lockstep. `any_breakpoints`
+    /// saves looking when there are none.
+    breakpoints: Mutex<Vec<u32>>,
+    any_breakpoints: AtomicBool,
     pub metrics: InterpreterMetrics,
+}
+
+impl Control {
+    /// Sets the editor's lines that have a breakpoint, counting from 0. It
+    /// can change while a program runs, and takes effect at the next line.
+    pub fn set_breakpoints(&self, lines: impl IntoIterator<Item = u32>) {
+        let mut lines: Vec<u32> = lines.into_iter().collect();
+        lines.sort_unstable();
+        lines.dedup();
+        self.any_breakpoints
+            .store(!lines.is_empty(), Ordering::Relaxed);
+        *self.breakpoints.lock().unwrap() = lines;
+    }
+
+    /// Whether the editor's line `line` has a breakpoint.
+    pub fn is_breakpoint(&self, line: u32) -> bool {
+        self.any_breakpoints.load(Ordering::Relaxed)
+            && self
+                .breakpoints
+                .lock()
+                .unwrap()
+                .binary_search(&line)
+                .is_ok()
+    }
 }
 
 /// The special variables (issue 03): ordinary variables that change how
@@ -461,6 +490,14 @@ impl Interpreter {
     /// the turtle, parse the whole source, define every `TO`, then run the
     /// top-level instructions.
     pub fn run_program(&mut self, text: &str) -> Result<(), RunError> {
+        self.reset();
+        self.run_source(text, SourceId::Editor)
+    }
+
+    /// Back to how a run starts: no variables or procedures, Kame home with
+    /// the default pen, the default background and nothing to undo. Reset
+    /// does this without running anything (ADR 0028).
+    pub fn reset(&mut self) {
         self.vars.clear();
         self.procs.clear();
         self.names.forget_definitions();
@@ -477,7 +514,6 @@ impl Interpreter {
         self.last_line = None;
         self.console_entries = 0;
         self.before_entries.clear();
-        self.run_source(text, SourceId::Editor)
     }
 
     /// A console entry, which runs against whatever the last run left.
@@ -885,14 +921,23 @@ impl Interpreter {
             let starts_line = self.last_line != line;
             self.last_line = line;
             let lockstep = self.control.lockstep.load(Ordering::Relaxed);
-            if lockstep || self.control.watch.load(Ordering::Relaxed) {
+            // Only the editor's program stops at breakpoints (ADR 0029).
+            let breakpoint = starts_line
+                && span.source == SourceId::Editor
+                && self.control.is_breakpoint(span.line);
+            // The panels show what a paused instruction sees, even out of
+            // lockstep.
+            if lockstep || breakpoint || self.control.watch.load(Ordering::Relaxed) {
                 self.control.watch.store(false, Ordering::Relaxed);
                 self.send_watch()?;
+            }
+            if breakpoint {
+                self.emit(Event::Breakpoint)?;
             }
             self.emit(Event::Instruction { span, starts_line })?;
             if starts_line {
                 self.control.lines_started.fetch_add(1, Ordering::Relaxed);
-                if lockstep {
+                if lockstep || breakpoint {
                     self.sync()?;
                 }
             }

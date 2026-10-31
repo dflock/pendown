@@ -14,7 +14,7 @@ use gpui_kit::component::{
     menu::{DropdownMenu as _, PopupMenuItem},
     slider::{Slider, SliderState},
 };
-use gpui_kit::{assets::IconName, *};
+use gpui_kit::{assets::IconName, prelude::FluentBuilder as _, *};
 use pendown::{animator::Speed, metrics::WindowMetrics, run::DEFAULT_CHANNEL, speed::describe};
 
 use crate::{
@@ -129,6 +129,10 @@ impl Render for ConsolePane {
 pub struct ToolbarState {
     pub running: bool,
     pub paused: bool,
+    /// The editor's program is running or paused, so Run says Restart.
+    pub restart: bool,
+    /// Something has run or drawn, so Reset has something to put back.
+    pub can_reset: bool,
     pub speed: Speed,
     /// The side panel is open.
     pub help: bool,
@@ -235,6 +239,8 @@ impl Render for ToolbarPane {
         let ToolbarState {
             running,
             paused,
+            restart,
+            can_reset,
             speed,
             help,
             thinking,
@@ -265,10 +271,21 @@ impl Render for ToolbarPane {
             .child(self.export_menu())
             .child(div().flex_none().w(px(12.)))
             .child(
-                self.button("run", IconName::Play, "Run", |this, _, cx| {
-                    this.start(DEFAULT_CHANNEL, cx)
-                })
-                .primary(),
+                self.button(
+                    "run",
+                    if restart {
+                        IconName::RotateCcw
+                    } else {
+                        IconName::Play
+                    },
+                    if restart { "Restart" } else { "Run" },
+                    |this, _, cx| this.start(DEFAULT_CHANNEL, cx),
+                )
+                // As wide as Restart, so the swap doesn't move what's after it.
+                .w(px(88.))
+                // The dark button is the one you'd press next: Run, then
+                // Pause while it runs, then Resume while paused.
+                .when(!running, |b| b.primary()),
             )
             .child(
                 self.button(
@@ -283,6 +300,7 @@ impl Render for ToolbarPane {
                 )
                 // As wide as Resume, so the swap doesn't move what's after it.
                 .w(px(88.))
+                .when(running, |b| b.primary())
                 .disabled(!running),
             )
             .child(
@@ -293,6 +311,16 @@ impl Render for ToolbarPane {
                     |this, _, cx| this.single_step(cx),
                 )
                 .disabled(!paused),
+            )
+            .child(
+                self.icon_button(
+                    "reset",
+                    IconName::SkipBack,
+                    "Reset: stop, and put everything back as it was before Run",
+                    |this, _, cx| this.reset(cx),
+                )
+                .ghost()
+                .disabled(!can_reset),
             )
             // Nothing shrinks, so the slider keeps its place and size as
             // the speed's description changes length.

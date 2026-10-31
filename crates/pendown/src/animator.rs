@@ -179,6 +179,9 @@ pub struct Animator {
     pub watch: Option<Arc<Watch>>,
     /// The last instruction hasn't moved or turned the turtle yet.
     idle_instruction: bool,
+    /// The next instruction starts a breakpoint's line: pause there
+    /// (ADR 0029).
+    at_breakpoint: bool,
     /// Line starts shown, to compare with `Control::lines_started`.
     pub lines_shown: u64,
     pub instructions_shown: u64,
@@ -222,6 +225,7 @@ impl Animator {
             highlight: None,
             watch: None,
             idle_instruction: false,
+            at_breakpoint: false,
             lines_shown: 0,
             instructions_shown: 0,
             thought: None,
@@ -520,7 +524,8 @@ impl Animator {
                         out.watch_changed = true;
                         break;
                     }
-                    if to_instruction {
+                    let breakpoint = std::mem::take(&mut self.at_breakpoint);
+                    if to_instruction || breakpoint {
                         self.mode = Mode::Paused;
                         self.update_lockstep();
                     }
@@ -646,6 +651,8 @@ impl Animator {
                     self.set_speed(speed);
                     out.speed = Some(speed);
                 }
+                // A replay passes breakpoints until it gets there.
+                Event::Breakpoint => self.at_breakpoint = !replaying,
                 Event::Sync(sync) => {
                     sync.reply();
                     replied = true;

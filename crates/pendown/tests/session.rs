@@ -140,3 +140,24 @@ fn the_same_seed_draws_the_same_picture() {
     assert_eq!(marks(7), first, "the same seed, the same picture");
     assert_ne!(marks(8), first, "another seed, another picture");
 }
+
+#[test]
+fn reset_forgets_what_the_last_run_left() {
+    let session = Session::new();
+    let (run, _) = finish(
+        &session,
+        program("TO BOX :n\n REPEAT 4 [FD :n RT 90]\nEND\nMAKE \"size 30"),
+    );
+    assert_eq!(run.result(), Some(Ok(())));
+    // Reset (ADR 0028): as a run starts, without running anything.
+    session.reset();
+    let (run, marks) = finish(&session, Job::Console("BOX :size".into()));
+    assert_eq!(marks, 0);
+    let Some(Err(RunError::Parse(errors))) = run.result() else {
+        panic!("{:?}", run.result())
+    };
+    assert_eq!(errors[0].message, "I don't know how to BOX");
+    // The variable's gone too.
+    let (run, _) = finish(&session, Job::Console("PRINT :size".into()));
+    assert!(run.result().is_some_and(|r| r.is_err()));
+}

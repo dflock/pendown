@@ -10,6 +10,7 @@ mod canvas;
 mod colours_page;
 mod driving;
 mod files;
+mod gutter;
 mod help_panel;
 mod highlighter;
 mod icons;

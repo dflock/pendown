@@ -16,6 +16,8 @@ gpui_kit::assets::icon_assets!(
         Play,
         Pause,
         Footprints,
+        RotateCcw,
+        SkipBack,
         PencilLine,
         MessageSquarePlus,
         Lightbulb,

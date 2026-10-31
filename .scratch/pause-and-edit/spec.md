@@ -1,6 +1,6 @@
 # Pause, edit and carry on
 
-From testing with real users (`feedback-from-user-testing.md`): people want to change the program while it's paused, then carry on with the change. And having both Stop and Pause is confusing: from where they sit, both stop the turtle. So is having both Step line and Step instruction: with one instruction per line, which is how beginners write, they do the same thing.
+From testing with real users (`.scratch/pause-and-edit/feedback-from-user-testing.md`): people want to change the program while it's paused, then carry on with the change. And having both Stop and Pause is confusing: from where they sit, both stop the turtle. So is having both Step line and Step instruction: with one instruction per line, which is how beginners write, they do the same thing.
 
 So: there's no Stop, only Pause, and one step button, **Single Step**. Pause lets the current instruction finish, then pauses. While paused, the editor can be changed. Resume and Single Step carry on with the changed program by **replaying** it: running the new program from a clean slate, with the same `RANDOM` seed, at Instant and out of sight, up to as many instructions as the old run had shown, and then carrying on from there at the chosen speed.
 

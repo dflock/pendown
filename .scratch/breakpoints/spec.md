@@ -1,6 +1,6 @@
 # Breakpoints
 
-From testing with real users (`feedback-from-user-testing.md`): people want to "run to here", getting quickly to the part of the program they care about, then watching or stepping from there. That's a breakpoint: click a line number in the editor, and Kame stops when the program gets to that line.
+From testing with real users (`.scratch/pause-and-edit/feedback-from-user-testing.md`): people want to "run to here", getting quickly to the part of the program they care about, then watching or stepping from there. That's a breakpoint: click a line number in the editor, and Kame stops when the program gets to that line.
 
 Builds on pause-and-edit (`.scratch/pause-and-edit/`): Pause finishing the instruction, replaying a changed program, and Single Step. Do that first.
 

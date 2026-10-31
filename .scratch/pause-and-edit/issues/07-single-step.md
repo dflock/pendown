@@ -5,7 +5,7 @@ Type: task
 
 ## What
 
-Step line and Step instruction become one button, **Single Step**, which does what Step instruction does now: it runs to the next instruction, including inside brackets and into procedures. With one instruction per line, which is how beginners write, the two buttons did the same thing, and having both was confusing (`feedback-from-user-testing.md`). Step instruction is the one to keep because it can do everything. Step line can't step inside a one-line loop like `FOREVER [FD 1 RT 1]`, which is why ADR 0012 added the second button.
+Step line and Step instruction become one button, **Single Step**, which does what Step instruction does now: it runs to the next instruction, including inside brackets and into procedures. With one instruction per line, which is how beginners write, the two buttons did the same thing, and having both was confusing (`.scratch/pause-and-edit/feedback-from-user-testing.md`). Step instruction is the one to keep because it can do everything. Step line can't step inside a one-line loop like `FOREVER [FD 1 RT 1]`, which is why ADR 0012 added the second button.
 
 What goes is stepping a whole line of several instructions in one press. Resume then Pause, or a faster slider, still does that, and "run to here" later will do it better.
 

@@ -87,6 +87,9 @@ pub enum Event {
     /// `SETSPEED`: the animator changes to this level, from 1 to 11, when it
     /// gets here.
     SetSpeed(u8),
+    /// The next `Instruction` starts a breakpoint's line (ADR 0029): the
+    /// front end pauses there. A `Sync` follows it, even out of lockstep.
+    Breakpoint,
     /// The interpreter waits here until the front end replies (ADR 0011).
     /// In lockstep, one follows each `Instruction` that starts a line, so
     /// the program can't run a line before the animator gets to it.

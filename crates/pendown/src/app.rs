@@ -41,6 +41,7 @@ use crate::{
         After, ExportPicture, NewFile, OpenFile, Picture, RunProgram, SaveFile, SaveFileAs,
         ShowHelp, ToggleMetrics,
     },
+    gutter::{BreakpointsChanged, Gutter},
     help_panel::HelpPanel,
     highlighter::LogoHighlighter,
     panes::{ConsolePane, EditorPane, ToolbarPane, ToolbarState},
@@ -159,6 +160,10 @@ impl Samples {
 pub struct App {
     pub(crate) editor: Entity<EditorState>,
     highlight: RangeDecorationCollection,
+    /// The faint tint on lines with a breakpoint (ADR 0029).
+    breakpoint_tint: RangeDecorationCollection,
+    /// The line numbers, which take breakpoints.
+    pub(crate) gutter: Entity<Gutter>,
     speed_slider: Entity<SliderState>,
     pub(crate) speed: Speed,
     pub(crate) canvas: Rc<RefCell<Canvas>>,
@@ -207,6 +212,12 @@ pub struct App {
     console_before: Vec<Before>,
     /// The job running is a console entry.
     console_job: bool,
+    /// The last job started is the editor's program, so Run says Restart
+    /// while it runs.
+    pub(crate) editor_run: bool,
+    /// Nothing has run or drawn since the window opened or Reset: Reset
+    /// has nothing to do.
+    pub(crate) at_start: bool,
     /// Show Kame thinking: arcs on turns and rulers on moves.
     pub(crate) show_thinking: bool,
     /// Drive Kame, while it's on, and the steps it uses, which last the
@@ -245,11 +256,14 @@ impl App {
         let editor = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("logo")
-                .line_number(true)
+                // Pendown draws the line numbers, for breakpoints, and they
+                // need one row per line: no folding (ADR 0029).
+                .line_number(false)
+                .folding(false)
                 .soft_wrap(false)
                 .default_value(WELCOME)
         });
-        let highlight = editor.update(cx, |state, cx| {
+        let (breakpoint_tint, highlight) = editor.update(cx, |state, cx| {
             state.set_highlighter_factory(
                 Rc::new(|language| {
                     (language == "logo")
@@ -257,8 +271,11 @@ impl App {
                 }),
                 cx,
             );
-            state.create_range_decorations_collection(vec![], cx)
+            // The tint first, so the highlight draws over it.
+            let tint = state.create_range_decorations_collection(vec![], cx);
+            (tint, state.create_range_decorations_collection(vec![], cx))
         });
+        let gutter = cx.new(|cx| Gutter::new(editor.clone(), cx));
         let console_output = cx.new(|cx| TextareaState::new(window, cx));
         let console_input = cx.new(|cx| {
             InputState::new(window, cx).placeholder("Type an instruction and press Enter")
@@ -283,11 +300,17 @@ impl App {
             ),
             // Parse errors show while typing (ADRs 0001 and 0005).
             cx.subscribe(&editor, |this, _, event: &InputEvent, cx| {
-                if let InputEvent::Change = event
-                    && (!this.running() || this.paused())
-                {
-                    this.check_program(cx);
+                if let InputEvent::Change = event {
+                    // Breakpoints keep to their lines (ADR 0029).
+                    this.gutter.update(cx, |gutter, cx| gutter.follow(cx));
+                    this.show_breakpoints(cx);
+                    if !this.running() || this.paused() {
+                        this.check_program(cx);
+                    }
                 }
+            }),
+            cx.subscribe(&gutter, |this, _, _: &BreakpointsChanged, cx| {
+                this.breakpoints_changed(cx);
             }),
             cx.subscribe_in(
                 &console_input,
@@ -312,6 +335,8 @@ impl App {
         let toolbar = ToolbarState {
             running: false,
             paused: false,
+            restart: false,
+            can_reset: false,
             speed,
             help: false,
             thinking: false,
@@ -349,6 +374,8 @@ impl App {
         App {
             editor,
             highlight,
+            breakpoint_tint,
+            gutter,
             speed_slider,
             speed,
             canvas: Rc::new(RefCell::new(Canvas::new(metrics.clone()))),
@@ -380,6 +407,8 @@ impl App {
             console_entry: ConsoleInput::default(),
             console_before: Vec::new(),
             console_job: false,
+            editor_run: false,
+            at_start: true,
             teach_dialog: None,
             show_thinking: false,
             driving: None,
@@ -480,21 +509,53 @@ impl App {
         self.set_diagnostics(Vec::new(), cx);
         let job = Job::Program { text, seed };
         let replay = Some(Replay { to, then });
-        let (animator, run) = self
-            .session
-            .replay(job, self.speed, DEFAULT_CHANNEL, replay);
+        let stops = self.gutter.read(cx).stops(cx);
+        let (animator, run) =
+            self.session
+                .start_with(job, self.speed, DEFAULT_CHANNEL, replay, &stops);
         self.play(animator, run, cx);
+        self.editor_run = true;
     }
 
     /// Run (ADR 0006): stop any running program, clear the drawing, and
     /// start the editor's program from a clean slate.
     pub(crate) fn start(&mut self, channel: Channel, cx: &mut Context<Self>) {
+        self.clear_to_start("Run", cx);
+        let text = self.editor.read(cx).value().to_string();
+        self.run_text = text.clone();
+        // A fresh seed, kept with the run (pause-and-edit issue 03).
+        let seed = pendown_logo::fresh_seed();
+        self.gutter.update(cx, |gutter, cx| gutter.follow(cx));
+        let stops = self.gutter.read(cx).stops(cx);
+        self.start_job_at(Job::Program { text, seed }, channel, &stops, cx);
+        self.editor_run = true;
+    }
+
+    /// Reset (ADR 0028): stop, and put everything back as it was before
+    /// Run, without running anything. Restart is Reset and then Run.
+    pub(crate) fn reset(&mut self, cx: &mut Context<Self>) {
+        self.clear_to_start("Reset", cx);
+        // The interpreter forgets the variables, procedures, pen and
+        // background, as a run would before its first instruction.
+        self.session.reset();
+        self.animator = None;
+        self.run = None;
+        self.finished_at = None;
+        self.stop_at = None;
+        self.error_help = None;
+        self.editor_run = false;
+        self.clear_editor_highlight(cx);
+        self.at_start = true;
+        cx.notify();
+    }
+
+    /// What Run and Reset both do first: stop whatever's running, and clear
+    /// the drawing, console, Undo and variables (ADR 0006).
+    fn clear_to_start(&mut self, button: &str, cx: &mut Context<Self>) {
         self.stop_driving(cx);
         self.stop(cx);
         // Run replaces an example's picture, as it would the user's.
         self.forget_example(cx);
-        let text = self.editor.read(cx).value().to_string();
-        self.run_text = text.clone();
         self.canvas.borrow_mut().drawing.reset();
         self.console.clear();
         self.console_dirty = true;
@@ -504,14 +565,11 @@ impl App {
         if !self.console_definitions.is_empty()
             && !std::mem::replace(&mut self.definitions_cleared, true)
         {
-            self.print("Run cleared the procedures you defined in the console. \"Copy to editor\" keeps them.");
+            self.print(format!("{button} cleared the procedures you defined in the console. \"Copy to editor\" keeps them."));
         }
         self.set_diagnostics(Vec::new(), cx);
         // Run clears the variables (ADR 0006).
         self.show_watch(cx, |watched| watched.set(None));
-        // A fresh seed, kept with the run (pause-and-edit issue 03).
-        let seed = pendown_logo::fresh_seed();
-        self.start_job(Job::Program { text, seed }, channel, cx);
     }
 
     /// Runs a console entry against whatever the last run left (ADR 0006).
@@ -588,20 +646,68 @@ impl App {
     }
 
     pub(crate) fn start_job(&mut self, job: Job, channel: Channel, cx: &mut Context<Self>) {
+        self.start_job_at(job, channel, &[], cx);
+    }
+
+    /// Starts a job that stops at these lines of the editor's program,
+    /// counting from 0 (ADR 0029).
+    fn start_job_at(&mut self, job: Job, channel: Channel, stops: &[u32], cx: &mut Context<Self>) {
         // Driving plays at a speed of its own, whatever the slider says.
         let speed = if self.driving.is_some() {
             Speed::Animated(pendown::drive::DRIVE_SPEED)
         } else {
             self.speed
         };
-        let (animator, run) = self.session.start(job, speed, channel);
+        let (animator, run) = self.session.start_with(job, speed, channel, None, stops);
         self.play(animator, run, cx);
+    }
+
+    /// The breakpoints changed: tint their lines, and tell a run of the
+    /// editor's program, which stops at them from its next line (ADR 0029).
+    fn breakpoints_changed(&mut self, cx: &mut Context<Self>) {
+        self.show_breakpoints(cx);
+        let same_text = self.editor.read(cx).value().as_ref() == self.run_text;
+        if let Some(run) = &self.run
+            && run.seed.is_some()
+            && self.example.is_none()
+            && same_text
+        {
+            run.control.set_breakpoints(self.gutter.read(cx).stops(cx));
+        }
+    }
+
+    /// No breakpoints, for a new, opened or loaded program (ADR 0029).
+    pub(crate) fn clear_breakpoints(&mut self, cx: &mut Context<Self>) {
+        self.gutter.update(cx, |gutter, cx| gutter.clear(cx));
+        self.show_breakpoints(cx);
+    }
+
+    /// Tints the lines with a breakpoint.
+    fn show_breakpoints(&mut self, cx: &mut Context<Self>) {
+        let text = self.editor.read(cx).value().to_string();
+        let lines = &self.gutter.read(cx).lines;
+        let colour = gpui_kit::hsla(0., 0.72, 0.51, 0.07);
+        let mut at = 0;
+        let mut tints = Vec::new();
+        for (i, line) in text.split('\n').enumerate() {
+            if lines.contains(&i) {
+                tints.push(
+                    RangeDecoration::new(at..at + line.len())
+                        .with_style(RangeDecorationStyle::Fill)
+                        .with_color(colour),
+                );
+            }
+            at += line.len() + 1;
+        }
+        self.breakpoint_tint.set(tints, cx);
     }
 
     /// Starts playing a job's events: the user's, or an example's.
     pub(crate) fn play(&mut self, animator: Animator, run: Run, cx: &mut Context<Self>) {
         self.error_help = None;
         self.console_job = false;
+        self.editor_run = false;
+        self.at_start = false;
         self.animator = Some(animator);
         self.run = Some(run);
         self.finished_at = None;
@@ -980,18 +1086,40 @@ impl App {
     }
 
     pub(crate) fn clear_editor_highlight(&mut self, cx: &mut Context<Self>) {
-        self.highlight.set(vec![], cx);
+        self.set_editor_highlight(None, cx);
+    }
+
+    /// The editor's highlight, and the gutter's arrow on its first line.
+    fn set_editor_highlight(&mut self, span: Option<pendown_logo::Span>, cx: &mut Context<Self>) {
+        let ranges = match span {
+            Some(span) => {
+                let color = cx.theme().warning.opacity(0.35);
+                vec![
+                    RangeDecoration::new(span.range())
+                        .with_style(RangeDecorationStyle::Fill)
+                        .with_color(color),
+                ]
+            }
+            None => vec![],
+        };
+        self.highlight.set(ranges, cx);
+        let line = span.map(|s| s.line as usize);
+        self.gutter
+            .update(cx, |gutter, cx| gutter.set_current(line, cx));
     }
 
     /// Shows the program's parse errors as it's typed, without running it.
     pub(crate) fn check_program(&mut self, cx: &mut Context<Self>) {
+        // Setting the text sends no change event, so the breakpoints follow
+        // it here too.
+        self.gutter.update(cx, |gutter, cx| gutter.follow(cx));
         if self.paused() {
             // It goes while the text differs, and comes back when it's the
             // same again.
             self.show_highlight(cx);
         } else {
             // The last run's highlight no longer points at the right text.
-            self.highlight.set(vec![], cx);
+            self.clear_editor_highlight(cx);
         }
         let text = self.editor.read(cx).value().to_string();
         let diagnostics = pendown_logo::syntax::check(&text)
@@ -1050,6 +1178,8 @@ impl App {
     /// to keep it in view (spike 01).
     pub(crate) fn show_highlight(&mut self, cx: &mut Context<Self>) {
         if self.example.is_some() {
+            self.gutter
+                .update(cx, |gutter, cx| gutter.set_current(None, cx));
             self.show_example_highlight(cx);
             return;
         }
@@ -1063,18 +1193,10 @@ impl App {
             .and_then(|a| a.highlight)
             .filter(|s| s.source == SourceId::Editor && same_text)
         else {
-            self.highlight.set(vec![], cx);
+            self.clear_editor_highlight(cx);
             return;
         };
-        let color = cx.theme().warning.opacity(0.35);
-        self.highlight.set(
-            vec![
-                RangeDecoration::new(span.range())
-                    .with_style(RangeDecorationStyle::Fill)
-                    .with_color(color),
-            ],
-            cx,
-        );
+        self.set_editor_highlight(Some(span), cx);
         let line = span.line as usize;
         let lines = self.run_text.matches('\n').count() + 1;
         self.editor.update(cx, |state, cx| {
@@ -1353,6 +1475,8 @@ impl App {
         let toolbar = ToolbarState {
             running,
             paused,
+            restart: running && self.editor_run,
+            can_reset: !self.at_start,
             speed: self.speed,
             help: self.help_open,
             thinking: self.show_thinking,
@@ -1449,9 +1573,16 @@ impl App {
             )
             .child(div().flex_1().min_h_0().child({
                 let editor = resizable_panel().size(px(460.)).child(
-                    self.editor_pane
-                        .clone()
-                        .cached(StyleRefinement::default().size_full()),
+                    h_flex()
+                        .size_full()
+                        // Not cached: it sets its own width, from the
+                        // number of lines.
+                        .child(self.gutter.clone())
+                        .child(
+                            self.editor_pane
+                                .clone()
+                                .cached(StyleRefinement::default().h_full().flex_1().min_w_0()),
+                        ),
                 );
                 let canvas = resizable_panel().child(canvas_area);
                 // The side panel, when it's open (phase 5). Each layout

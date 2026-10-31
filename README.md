@@ -2,7 +2,7 @@
 
 **A Logo playground for learning to code, where you can watch the turtle think.**
 
-Most Logos draw everything instantly. Pendown lets you slow the turtle right down and watch it draw, with the instruction it's carrying out highlighted in your code as it goes. Pause it, step through it an instruction at a time, or speed it up again. While it's paused you can change your program, and Resume carries on with the change. You can always see which bit of code made which bit of the picture. Beside the console, two panels show what the highlighted instruction sees: the counter of every loop running, and the value of every variable, in each procedure of the call chain. A value flashes when it changes.
+Most Logos draw everything instantly. Pendown lets you slow the turtle right down and watch it draw, with the instruction it's carrying out highlighted in your code as it goes. Pause it, step through it an instruction at a time, or speed it up again; Reset puts everything back as it was before Run. While it's paused you can change your program, and Resume carries on with the change. Click a line number to put a breakpoint there, and the program stops each time it gets to that line. You can always see which bit of code made which bit of the picture. Beside the console, two panels show what the highlighted instruction sees: the counter of every loop running, and the value of every variable, in each procedure of the call chain. A value flashes when it changes.
 
 Pendown speaks [UCBLogo](https://people.eecs.berkeley.edu/~bh/logo.html), the most widely used Logo, with a few modern touches:
 
@@ -60,7 +60,7 @@ install -Dm644 crates/pendown/linux/pendown.png ~/.local/share/icons/hicolor/128
 
 On X11 the window shows Kame either way. Wayland needs the desktop file to find it.
 
-`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, pausing, stepping, changing a paused program, ending runs, the console, files, errors, filled shapes, how often the window redraws, the counters and variables panels, and the help panel and tutorial. `PENDOWN_AUTOTEST_FROM="Phase 5"` starts it at the first section with that in its title. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
+`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, pausing, stepping, changing a paused program, breakpoints, Restart and Reset, ending runs, the console, files, errors, filled shapes, how often the window redraws, the counters and variables panels, and the help panel and tutorial. `PENDOWN_AUTOTEST_FROM="Phase 5"` starts it at the first section with that in its title. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
 
 Type a program in the editor and press **Run**. Use the speed slider to choose how fast the turtle draws. Try the console too: after a run, it knows every procedure your program defined, so you can type `FLOWER 80` and watch.
 

@@ -1005,7 +1005,7 @@ PRINT :n";
     #[test]
     fn a_replay_ends_where_stepping_would() {
         for n in [1, 2, 5, 17, 40, 91] {
-            let (mut animator, _run) = Session::new().replay(
+            let (mut animator, _run) = Session::new().start_with(
                 job(SPIRAL),
                 Speed::Animated(10.0),
                 DEFAULT_CHANNEL,
@@ -1013,6 +1013,7 @@ PRINT :n";
                     to: n,
                     then: Mode::Paused,
                 }),
+                &[],
             );
             let mut marks = Vec::new();
             play_to_pause(&mut animator, &mut marks);
@@ -1029,7 +1030,7 @@ PRINT :n";
 
     #[test]
     fn nothing_is_shown_until_it_gets_there() {
-        let (mut animator, _run) = Session::new().replay(
+        let (mut animator, _run) = Session::new().start_with(
             job(SPIRAL),
             Speed::Animated(10.0),
             DEFAULT_CHANNEL,
@@ -1037,6 +1038,7 @@ PRINT :n";
                 to: 60,
                 then: Mode::Paused,
             }),
+            &[],
         );
         animator.instant_slice = Duration::from_micros(50);
         let mut last = None;
@@ -1054,7 +1056,7 @@ PRINT :n";
     #[test]
     fn then_it_carries_on_at_the_sliders_speed() {
         let src = "FD 10\nFD 10\nFD 100\nFD 10";
-        let (mut animator, _run) = Session::new().replay(
+        let (mut animator, _run) = Session::new().start_with(
             job(src),
             Speed::Animated(10.0),
             DEFAULT_CHANNEL,
@@ -1062,6 +1064,7 @@ PRINT :n";
                 to: 3,
                 then: Mode::Running,
             }),
+            &[],
         );
         let mut marks = Vec::new();
         while animator.replaying_now() {
@@ -1078,7 +1081,7 @@ PRINT :n";
     #[test]
     fn or_takes_a_single_step() {
         let src = "FD 10\nRT 90\nFD 10\nFD 10";
-        let (mut animator, _run) = Session::new().replay(
+        let (mut animator, _run) = Session::new().start_with(
             job(src),
             Speed::Animated(1000.0),
             DEFAULT_CHANNEL,
@@ -1086,6 +1089,7 @@ PRINT :n";
                 to: 2,
                 then: Mode::StepInstruction,
             }),
+            &[],
         );
         let mut marks = Vec::new();
         while animator.replaying_now() {
@@ -1101,7 +1105,7 @@ PRINT :n";
     #[test]
     fn a_shorter_program_just_ends() {
         let src = "REPEAT 3 [FD 10 RT 120]";
-        let (mut animator, run) = Session::new().replay(
+        let (mut animator, run) = Session::new().start_with(
             job(src),
             Speed::Animated(10.0),
             DEFAULT_CHANNEL,
@@ -1109,6 +1113,7 @@ PRINT :n";
                 to: 1000,
                 then: Mode::Paused,
             }),
+            &[],
         );
         let mut marks = Vec::new();
         play_to_pause(&mut animator, &mut marks);
@@ -1127,7 +1132,7 @@ PRINT :n";
     fn a_replay_doesnt_wait_for_the_slider() {
         let src = "REPEAT 200 [\n  FD 10\n  RT 10\n  WAIT 1\n]";
         let frames = |speed| {
-            let (mut animator, _run) = Session::new().replay(
+            let (mut animator, _run) = Session::new().start_with(
                 job(src),
                 speed,
                 DEFAULT_CHANNEL,
@@ -1135,6 +1140,7 @@ PRINT :n";
                     to: 790,
                     then: Mode::Paused,
                 }),
+                &[],
             );
             play_to_pause(&mut animator, &mut Vec::new())
         };
@@ -1143,5 +1149,138 @@ PRINT :n";
             slow <= instant + 5 && slow < 30,
             "{slow} frames, {instant} at Instant"
         );
+    }
+}
+
+mod breakpoints {
+    //! ADR 0029: the run stops at breakpoints, at every speed.
+
+    use super::*;
+    use pendown::{
+        animator::Replay,
+        run::{Job, Session},
+    };
+
+    fn start_at(src: &str, speed: Speed, lines: &[u32]) -> (Animator, Run) {
+        let job = Job::Program {
+            text: src.into(),
+            seed: 1,
+        };
+        Session::new().start_with(job, speed, DEFAULT_CHANNEL, None, lines)
+    }
+
+    /// Plays until paused or finished, and says where.
+    fn next_stop<'a>(src: &'a str, animator: &mut Animator) -> &'a str {
+        for _ in 0..100_000 {
+            if animator.mode() == Mode::Paused || animator.finished() {
+                break;
+            }
+            frame(animator, FRAME);
+        }
+        if animator.finished() {
+            "finished"
+        } else {
+            highlighted(src, animator)
+        }
+    }
+
+    const LOOP: &str = "MAKE \"n 0\nREPEAT 3 [\n  MAKE \"n :n + 1\n  FD 10\n]\nPRINT :n";
+
+    #[test]
+    fn it_stops_each_time_round_a_loop() {
+        for speed in [Speed::Animated(1000.0), Speed::Instant] {
+            let (mut animator, _run) = start_at(LOOP, speed, &[3]);
+            for round in 1..=3 {
+                assert_eq!(
+                    next_stop(LOOP, &mut animator),
+                    "FD 10",
+                    "round {round} at {speed:?}"
+                );
+                thread::sleep(Duration::from_millis(5));
+                assert_eq!(animator.lines_ahead(), 0, "nothing run ahead at {speed:?}");
+                assert_eq!(watched(&animator), format!("REPEAT {round} n={round}"));
+                animator.resume();
+            }
+            assert_eq!(next_stop(LOOP, &mut animator), "finished");
+        }
+    }
+
+    #[test]
+    fn a_one_line_loop_stops_once() {
+        let src = "REPEAT 4 [FD 10 RT 90]\nPRINT \"done";
+        let (mut animator, _run) = start_at(src, Speed::Instant, &[0]);
+        assert_eq!(next_stop(src, &mut animator), "REPEAT 4 [FD 10 RT 90]");
+        animator.resume();
+        assert_eq!(next_stop(src, &mut animator), "finished");
+    }
+
+    #[test]
+    fn single_step_from_a_breakpoint_goes_on() {
+        let (mut animator, _run) = start_at(LOOP, Speed::Animated(1000.0), &[3]);
+        assert_eq!(next_stop(LOOP, &mut animator), "FD 10");
+        animator.single_step();
+        assert_eq!(next_stop(LOOP, &mut animator), "MAKE \"n :n + 1");
+        animator.single_step();
+        assert_eq!(next_stop(LOOP, &mut animator), "FD 10");
+        animator.single_step();
+        assert_eq!(next_stop(LOOP, &mut animator), "MAKE \"n :n + 1");
+    }
+
+    #[test]
+    fn a_breakpoint_set_while_running_stops_it() {
+        let src = "REPEAT 100000 [\n  FD 1\n  RT 1\n]";
+        let (mut animator, run) = start_at(src, Speed::Instant, &[]);
+        frame(&mut animator, FRAME);
+        run.control.set_breakpoints([2]);
+        assert_eq!(next_stop(src, &mut animator), "RT 1");
+        run.control.set_breakpoints([]);
+        animator.resume();
+        for _ in 0..5 {
+            frame(&mut animator, FRAME);
+        }
+        assert_ne!(
+            animator.mode(),
+            Mode::Paused,
+            "taken away, it no longer stops"
+        );
+    }
+
+    #[test]
+    fn a_replay_passes_breakpoints_until_it_gets_there() {
+        let job = Job::Program {
+            text: LOOP.into(),
+            seed: 1,
+        };
+        let (mut animator, _run) = Session::new().start_with(
+            job,
+            Speed::Animated(1000.0),
+            DEFAULT_CHANNEL,
+            Some(Replay {
+                to: 6,
+                then: Mode::Running,
+            }),
+            &[3],
+        );
+        while animator.replaying_now() {
+            frame(&mut animator, FRAME);
+        }
+        // Six instructions in is the second round's FD 10, where it arrives
+        // without stopping at the first round's.
+        assert_eq!(watched(&animator), "REPEAT 2 n=2");
+        assert_eq!(next_stop(LOOP, &mut animator), "FD 10");
+        assert_eq!(watched(&animator), "REPEAT 3 n=3");
+    }
+
+    #[test]
+    fn console_entries_dont_stop() {
+        let session = Session::new();
+        let (mut animator, _run) = session.start_with(
+            Job::Console("FD 10".into()),
+            Speed::Instant,
+            DEFAULT_CHANNEL,
+            None,
+            &[0],
+        );
+        assert_eq!(next_stop("FD 10", &mut animator), "finished");
     }
 }

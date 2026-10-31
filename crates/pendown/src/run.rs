@@ -45,6 +45,9 @@ pub enum Job {
     /// Defines Teach Kame's procedure at the console, without saving Kame
     /// for Undo, since it isn't one of the user's entries.
     Define(String),
+    /// Reset (ADR 0028): the clean slate a program starts from, with
+    /// nothing run.
+    Reset,
 }
 
 /// One job's progress, as the GUI sees it.
@@ -125,6 +128,10 @@ impl Session {
                         Job::Console(text) => it.run_console(text),
                         Job::Undo => it.undo_console(),
                         Job::Define(text) => it.define_console(text),
+                        Job::Reset => {
+                            it.reset();
+                            Ok(())
+                        }
                     };
                     // The result first: dropping the sender tells the
                     // animator the job is over, and the window reads the
@@ -141,19 +148,23 @@ impl Session {
     /// Starts a job, and returns the animator that plays its events. A job
     /// started while another runs waits for it, so stop that one first.
     pub fn start(&self, job: Job, speed: Speed, channel: Channel) -> (Animator, Run) {
-        self.replay(job, speed, channel, None)
+        self.start_with(job, speed, channel, None, &[])
     }
 
     /// Starts a job that replays out of sight up to a point first, if
-    /// `replay` says so (pause-and-edit issue 04).
-    pub fn replay(
+    /// `replay` says so (ADR 0028), and stops at the editor's lines in
+    /// `breakpoints`, counting from 0 (ADR 0029). Both are set before the
+    /// job starts.
+    pub fn start_with(
         &self,
         job: Job,
         speed: Speed,
         channel: Channel,
         replay: Option<Replay>,
+        breakpoints: &[u32],
     ) -> (Animator, Run) {
         let control = Arc::new(Control::default());
+        control.set_breakpoints(breakpoints.iter().copied());
         let (events, rx) = mpsc::sync_channel::<Vec<Event>>(channel.capacity);
         let run = Run {
             control: control.clone(),
@@ -179,6 +190,23 @@ impl Session {
             .send(command)
             .expect("the interpreter thread is running");
         (animator, run)
+    }
+
+    /// Puts the interpreter back to how a run starts, without running
+    /// anything (ADR 0028). Nothing plays it, so it sends no events.
+    pub fn reset(&self) {
+        let (events, _) = mpsc::sync_channel::<Vec<Event>>(1);
+        let command = Command {
+            job: Job::Reset,
+            events,
+            channel: DEFAULT_CHANNEL,
+            control: Arc::default(),
+            result: Arc::default(),
+            exited: Arc::default(),
+        };
+        self.commands
+            .send(command)
+            .expect("the interpreter thread is running");
     }
 }
 

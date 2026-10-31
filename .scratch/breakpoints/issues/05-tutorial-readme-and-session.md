@@ -1,6 +1,6 @@
 # The tutorial, README and the scripted session
 
-Status: needs-triage
+Status: resolved
 Type: task
 Blocked by: 02, 04
 
@@ -21,3 +21,5 @@ Blocked by: 02, 04
 The tutorial and README explain breakpoints, and the whole session passes.
 
 ## Comments
+
+2026-10-31: Done. Lesson 1 and the README. The scripted session has six ADR 0029 sections: stopping each time round, at Instant, on a TO line, keeping to lines through edits, a scrolled editor, and a breakpoint set while running.

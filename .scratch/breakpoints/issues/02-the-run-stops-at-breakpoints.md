@@ -1,6 +1,6 @@
 # The run stops at breakpoints
 
-Status: needs-triage
+Status: resolved
 Type: task
 Blocked by: pause-and-edit 02, 04, 07
 
@@ -24,3 +24,5 @@ Interpreter tests show it stopping at a breakpoint line with lockstep off, not a
 - a replay passing a breakpoint before its target without stopping.
 
 ## Comments
+
+2026-10-31: Done. `Control::set_breakpoints` and `is_breakpoint`. On a breakpoint line the interpreter sends `Event::Breakpoint` before the `Instruction`, then sends a `Watch` and a `Sync`, even out of lockstep. Sending the `Watch` matters, or the panels are empty when Kame stops at Instant. The animator pauses once that instruction is shown. `Session::start_with` takes the breakpoints, so they are set before the job starts. Tests: `mod breakpoints` in `tests/animator.rs`.

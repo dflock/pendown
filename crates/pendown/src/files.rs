@@ -132,6 +132,7 @@ impl App {
                 self.document = Document::new("");
                 self.editor
                     .update(cx, |state, cx| state.set_value("", window, cx));
+                self.clear_breakpoints(cx);
                 self.check_program(cx);
             }
             After::OpenFile => {
@@ -165,6 +166,7 @@ impl App {
                 self.document = Document::new(&code);
                 self.editor
                     .update(cx, |state, cx| state.set_value(code, window, cx));
+                self.clear_breakpoints(cx);
                 self.check_program(cx);
             }
         }
@@ -178,6 +180,7 @@ impl App {
                 self.editor
                     .update(cx, |state, cx| state.set_value(text, window, cx));
                 // Setting the text sends no change event, so check it here.
+                self.clear_breakpoints(cx);
                 self.check_program(cx);
                 remember_folder(path);
                 self.print(format!("Opened {}", path.display()));

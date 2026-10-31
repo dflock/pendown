@@ -1,6 +1,6 @@
 # Breakpoints follow their lines through edits
 
-Status: needs-triage
+Status: resolved
 Type: task
 
 ## What
@@ -36,3 +36,5 @@ Unit tests cover:
 - a text that doesn't parse.
 
 ## Comments
+
+2026-10-31: Done, without gpui-kit (no release has the gutter decorations): `pendown::breakpoints::{can_take, follow, stops}`, with unit tests. The gutter calls `follow` on every change, and `check_program` and Run call it too, since `set_value` sends no change event.

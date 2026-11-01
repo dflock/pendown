@@ -70,7 +70,7 @@ While a program runs, the **Repeat counters** panel shows every `REPEAT`, `FOREV
 
 The **Help** button, or **F1**, opens a panel beside the canvas. Help follows the editor's cursor: put it on `FD`, or on `:size`, and the panel explains it. Each page has our description, examples with a picture of what they draw, and links to the rest. **Run** plays an example on the canvas, with its code highlighted in the panel, and **Back to my drawing** brings yours back. **Copy to editor** adds it to your program. Browse the contents by chapter, search by name, and tick **Show obsolete commands** to see the UCBLogo commands Pendown leaves out, and why.
 
-The **Tutorial** tab has six lessons with Kame: moving and turning, `REPEAT`, procedures, inputs and variables, recursion, and colours and shapes. Each program in them loads into the editor or runs on the canvas.
+The **Tutorial** tab has eight lessons with Kame: moving and turning, `REPEAT`, procedures, helping Kame fix a bug, inputs and variables, recursion, colours and shapes, and exploring L-systems. Each program in them loads into the editor or runs on the canvas.
 
 The **Gallery** tab shows example programs with a picture of each, in sections: some written for it, such as a snowflake and a city at night, a Halloween set, and the best pictures from the help and the lessons. **Load** puts one in the editor as a new program, and **Run** plays it on the canvas. Each card says where it's from, and links to that help page or lesson.
 

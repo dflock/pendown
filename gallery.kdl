@@ -59,6 +59,12 @@ section "Shapes inside shapes" {
   lesson 4 "house" title="A house"
 }
 
+section "L-systems" {
+  lesson 8 "gasket" title="Triangles of triangles"
+  lesson 8 "arrowhead" title="One wiggly line"
+  lesson 8 "gosper" title="A Gosper curve"
+}
+
 section "Circles, waves and chance" {
   help "circle" "Rings"
   help "sin" "Points on a circle"

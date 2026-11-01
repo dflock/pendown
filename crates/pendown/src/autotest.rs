@@ -864,6 +864,17 @@ fn script() -> Vec<Step> {
         CheckDrawn(7),
         Screenshot("tutorial-bug-run"),
         BackToMyDrawing,
+        Say("Tutorial: lesson 8, L-systems"),
+        Lesson(7),
+        Wait(ms(500)),
+        Screenshot("tutorial-l-systems"),
+        RunLesson(7, 3),
+        WaitFinished,
+        // The gasket at level 4: 81 triangles of 3 sides, and the 120
+        // lines between corners at levels 1 to 4.
+        CheckDrawn(363),
+        Screenshot("tutorial-l-systems-run"),
+        BackToMyDrawing,
         CloseHelp,
         Say("Gallery: examples from the help, the lessons and its own, to run or load"),
         Run(crate::app::WELCOME, Speed::Instant),

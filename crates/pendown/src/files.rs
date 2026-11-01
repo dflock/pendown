@@ -17,6 +17,9 @@ actions!(
         SaveFileAs,
         ExportPicture,
         RunProgram,
+        PauseOrResume,
+        SingleStep,
+        ResetProgram,
         ToggleMetrics,
         ShowHelp
     ]
@@ -36,27 +39,6 @@ impl Picture {
             Picture::Svg => "svg",
         }
     }
-}
-
-/// The usual shortcuts: Ctrl on Linux and Windows, Cmd on macOS.
-pub fn bind_keys(cx: &mut gpui_kit::App) {
-    // `secondary-` needs the host OS, so these go through `load`.
-    let secondary = |keys: &str, action: Box<dyn Action>, cx: &gpui_kit::App| {
-        KeyBinding::load(keys, action, None, false, None, cx).expect("a key binding")
-    };
-    let bindings = [
-        secondary("secondary-n", Box::new(NewFile), cx),
-        secondary("secondary-o", Box::new(OpenFile), cx),
-        secondary("secondary-s", Box::new(SaveFile), cx),
-        secondary("secondary-shift-s", Box::new(SaveFileAs), cx),
-        secondary("secondary-e", Box::new(ExportPicture), cx),
-        secondary("secondary-enter", Box::new(RunProgram), cx),
-        // The metrics overlay (ADR 0020).
-        KeyBinding::new("f12", ToggleMetrics, None),
-        // Help for the word under the editor's cursor (phase 5).
-        KeyBinding::new("f1", ShowHelp, None),
-    ];
-    cx.bind_keys(bindings);
 }
 
 /// What to do once any unsaved changes have been dealt with.

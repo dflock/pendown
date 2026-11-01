@@ -19,7 +19,10 @@ use pendown::{animator::Speed, metrics::WindowMetrics, run::DEFAULT_CHANNEL, spe
 
 use crate::{
     app::App,
-    files::{After, Picture},
+    files::{
+        After, ExportPicture, NewFile, OpenFile, PauseOrResume, Picture, ResetProgram, RunProgram,
+        SaveFile, SingleStep,
+    },
 };
 
 pub struct EditorPane {
@@ -167,23 +170,25 @@ impl ToolbarPane {
     }
 
     /// A button with only an icon, named by its tooltip, that calls `f` on
-    /// the window's `App`.
+    /// the window's `App`. The tooltip shows the key for `action`, if it
+    /// has one, from the keymap (`crate::shortcuts`).
     fn icon_button(
         &self,
         id: &'static str,
         icon: IconName,
         tooltip: &'static str,
+        action: Option<&dyn Action>,
         f: impl Fn(&mut App, &mut Window, &mut Context<App>) + 'static,
     ) -> Button {
         let app = self.app.clone();
-        Button::new(id)
-            .flex_none()
-            .small()
-            .icon(icon)
-            .tooltip(tooltip)
-            .on_click(move |_, window, cx| {
-                app.update(cx, |this, cx| f(this, window, cx)).ok();
-            })
+        let button = Button::new(id).flex_none().small().icon(icon);
+        match action {
+            Some(action) => button.tooltip_with_action(tooltip, action, None),
+            None => button.tooltip(tooltip),
+        }
+        .on_click(move |_, window, cx| {
+            app.update(cx, |this, cx| f(this, window, cx)).ok();
+        })
     }
 
     /// A button that calls `f` on the window's `App`.
@@ -222,7 +227,7 @@ impl ToolbarPane {
             .small()
             .ghost()
             .icon(IconName::ImageDown)
-            .tooltip("Export")
+            .tooltip_with_action("Export", &ExportPicture, None)
             // An icon-only button is a fixed square, which cuts off the
             // caret: an empty child sizes it as a button with content.
             .child(div())
@@ -251,21 +256,33 @@ impl Render for ToolbarPane {
             .size_full()
             .overflow_hidden()
             .child(
-                self.icon_button("new", IconName::FilePlus, "New", |this, window, cx| {
-                    this.then(After::NewFile, window, cx)
-                })
+                self.icon_button(
+                    "new",
+                    IconName::FilePlus,
+                    "New",
+                    Some(&NewFile),
+                    |this, window, cx| this.then(After::NewFile, window, cx),
+                )
                 .ghost(),
             )
             .child(
-                self.icon_button("open", IconName::FolderOpen, "Open", |this, window, cx| {
-                    this.then(After::OpenFile, window, cx)
-                })
+                self.icon_button(
+                    "open",
+                    IconName::FolderOpen,
+                    "Open",
+                    Some(&OpenFile),
+                    |this, window, cx| this.then(After::OpenFile, window, cx),
+                )
                 .ghost(),
             )
             .child(
-                self.icon_button("save", IconName::Save, "Save", |this, window, cx| {
-                    this.save(After::Nothing, window, cx)
-                })
+                self.icon_button(
+                    "save",
+                    IconName::Save,
+                    "Save",
+                    Some(&SaveFile),
+                    |this, window, cx| this.save(After::Nothing, window, cx),
+                )
                 .ghost(),
             )
             .child(self.export_menu())
@@ -283,6 +300,15 @@ impl Render for ToolbarPane {
                 )
                 // As wide as Restart, so the swap doesn't move what's after it.
                 .w(px(88.))
+                .tooltip_with_action(
+                    if restart {
+                        "Run your program again from the start"
+                    } else {
+                        "Run your program"
+                    },
+                    &RunProgram,
+                    None,
+                )
                 // The dark button is the one you'd press next: Run, then
                 // Pause while it runs, then Resume while paused.
                 .when(!running, |b| b.primary()),
@@ -300,6 +326,15 @@ impl Render for ToolbarPane {
                 )
                 // As wide as Resume, so the swap doesn't move what's after it.
                 .w(px(88.))
+                .tooltip_with_action(
+                    if paused {
+                        "Carry on from here"
+                    } else {
+                        "Pause before the next instruction"
+                    },
+                    &PauseOrResume,
+                    None,
+                )
                 .when(running, |b| b.primary())
                 .disabled(!running),
             )
@@ -310,6 +345,7 @@ impl Render for ToolbarPane {
                     "Single Step",
                     |this, _, cx| this.single_step(cx),
                 )
+                .tooltip_with_action("Run one instruction, then pause", &SingleStep, None)
                 .disabled(!paused),
             )
             .child(
@@ -317,6 +353,7 @@ impl Render for ToolbarPane {
                     "reset",
                     IconName::SkipBack,
                     "Reset: stop, and put everything back as it was before Run",
+                    Some(&ResetProgram),
                     |this, _, cx| this.reset(cx),
                 )
                 .ghost()

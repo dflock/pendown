@@ -32,6 +32,8 @@ pub enum Tab {
     Tutorial,
     /// Examples to run or load, with their pictures (`.scratch/gallery/`).
     Gallery,
+    /// Every keyboard shortcut (`.scratch/shortcuts/`).
+    Shortcuts,
 }
 
 /// A help page.
@@ -95,6 +97,7 @@ pub struct HelpPanel {
     pub page_scroll: ScrollHandle,
     /// The Gallery's, kept as you switch tabs.
     pub gallery_scroll: ScrollHandle,
+    pub shortcuts_scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -157,6 +160,7 @@ impl HelpPanel {
             program_running: false,
             page_scroll: ScrollHandle::new(),
             gallery_scroll: ScrollHandle::new(),
+            shortcuts_scroll: ScrollHandle::new(),
             _subscriptions: subscriptions,
         }
     }
@@ -1235,6 +1239,14 @@ impl Render for HelpPanel {
                     },
                 )),
             )
+            .child(
+                tab("tab-shortcuts", "Shortcuts", self.tab == Tab::Shortcuts, cx).on_click(
+                    cx.listener(|this, _, _, cx| {
+                        this.tab = Tab::Shortcuts;
+                        cx.notify();
+                    }),
+                ),
+            )
             .child(div().flex_1())
             .child(
                 Button::new("close-help")
@@ -1251,6 +1263,7 @@ impl Render for HelpPanel {
             Tab::Help => self.render_help(&query, window, cx),
             Tab::Tutorial => self.render_tutorial(window, cx),
             Tab::Gallery => self.render_gallery(cx),
+            Tab::Shortcuts => self.render_shortcuts(window, cx),
         };
         v_flex()
             .size_full()
@@ -1984,6 +1997,87 @@ impl HelpPanel {
 
     /// The Gallery (`.scratch/gallery/`): its sections, each a grid of
     /// cards with a picture, a title, where it's from, Load and Run.
+    /// The Shortcuts tab: every group of the table, each row's keys asked
+    /// of the keymap as it draws (`crate::shortcuts`).
+    fn render_shortcuts(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let mut content = vec![
+            div()
+                .mt_4()
+                .text_color(theme.muted_foreground)
+                .child("Keys that save reaching for the mouse.")
+                .into_any_element(),
+        ];
+        for group in crate::shortcuts::groups() {
+            let rows = group.rows.iter().map(|row| {
+                let (strokes, either) = crate::shortcuts::keystrokes(row, window, cx);
+                let mut keys = h_flex().flex_none().gap_1p5();
+                for (i, stroke) in strokes.into_iter().enumerate() {
+                    if either && i > 0 {
+                        keys = keys.child(
+                            div()
+                                .text_xs()
+                                .text_color(theme.muted_foreground)
+                                .child("or"),
+                        );
+                    }
+                    keys = keys.child(gpui_kit::component::kbd::Kbd::new(crate::shortcuts::shown(
+                        &stroke,
+                    )));
+                }
+                h_flex()
+                    .gap_3()
+                    .min_h(px(30.))
+                    .py_0p5()
+                    .border_b_1()
+                    .border_color(theme.border.opacity(0.5))
+                    .child(div().flex_1().min_w_0().child(row.what))
+                    .child(keys)
+            });
+            content.push(
+                v_flex()
+                    .mt_5()
+                    .child(
+                        h_flex()
+                            .items_baseline()
+                            .gap_2()
+                            .mb_1p5()
+                            .child(
+                                div()
+                                    .text_base()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.foreground)
+                                    .child(group.title),
+                            )
+                            .children(group.when.map(|when| {
+                                div()
+                                    .text_xs()
+                                    .text_color(theme.muted_foreground)
+                                    .child(when)
+                            })),
+                    )
+                    .children(rows)
+                    .into_any_element(),
+            );
+        }
+        div()
+            .flex_1()
+            .min_h_0()
+            .relative()
+            .child(
+                div()
+                    .id("shortcuts")
+                    .track_scroll(&self.shortcuts_scroll)
+                    .size_full()
+                    .overflow_y_scroll()
+                    .px_3()
+                    .pb_4()
+                    .children(content),
+            )
+            .vertical_scrollbar(&self.shortcuts_scroll)
+            .into_any_element()
+    }
+
     fn render_gallery(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let mut content = Vec::new();

@@ -86,4 +86,4 @@ One way to fix it: put each `SETPC` before the square it's for.
 
 ## What next?
 
-That's the tutorial. You know enough to draw almost anything. The Help tab has every command Kame knows, each with examples you can run: press its **Run**, and Kame draws it right here. The Gallery tab has pictures to try, from a snowflake to a jack-o'-lantern: load one into the editor, and see how it's made.
+Recursion again, with snowflakes, triangles made of triangles, and curves that fill a shape: the next lesson is about L-systems.

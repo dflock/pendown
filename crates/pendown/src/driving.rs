@@ -27,6 +27,65 @@ pub enum Input {
     Undo,
 }
 
+/// What a drive key does.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum DriveKey {
+    Forward,
+    Back,
+    Left,
+    Right,
+    Pen,
+    Undo,
+    Stop,
+}
+
+/// The keys while driving, in gpui's notation, and what they do: the one
+/// list, which `drive_key`, the drive strip and the Shortcuts tab all read
+/// (`.scratch/shortcuts/`). They're handled here, not bound in the keymap,
+/// as they only mean this while driving.
+pub(crate) const DRIVE_KEYS: [(DriveKey, &[&str], &str); 7] = [
+    (DriveKey::Forward, &["up"], "Forward"),
+    (DriveKey::Back, &["down"], "Back"),
+    (DriveKey::Left, &["left"], "Turn left"),
+    (DriveKey::Right, &["right"], "Turn right"),
+    (DriveKey::Pen, &["space"], "Pen up or down"),
+    (
+        DriveKey::Undo,
+        &["backspace", "secondary-z"],
+        "Undo the last move",
+    ),
+    (DriveKey::Stop, &["escape"], "Stop driving"),
+];
+
+/// The keystroke `keys` names, in gpui's notation, on this computer:
+/// `secondary-z` is Ctrl+Z, or Cmd+Z on a Mac.
+pub(crate) fn keystroke(keys: &str, cx: &gpui_kit::App) -> Keystroke {
+    Keystroke::parse_with_os(keys, cx.platform_info().os).expect("a keystroke")
+}
+
+/// What `pressed` asks of driving, if it's a drive key. A key with no
+/// modifiers in the table matches with any, so Shift+Up still drives.
+fn drive_key_for(pressed: &Keystroke, cx: &gpui_kit::App) -> Option<DriveKey> {
+    DRIVE_KEYS.iter().find_map(|(what, keys, _)| {
+        keys.iter()
+            .any(|k| {
+                let k = keystroke(k, cx);
+                k.key == pressed.key
+                    && (k.modifiers == Modifiers::default() || k.modifiers == pressed.modifiers)
+            })
+            .then_some(*what)
+    })
+}
+
+/// The label of a drive key's first key, as the Shortcuts tab shows it.
+fn key_label(what: DriveKey, cx: &gpui_kit::App) -> String {
+    let (_, keys, _) = DRIVE_KEYS
+        .iter()
+        .find(|(w, ..)| *w == what)
+        .expect("every drive key is in the table");
+    crate::shortcuts::label(&keystroke(keys[0], cx))
+}
+
 /// The entry presses are joining into.
 pub(crate) struct Open {
     pub joined: Joined,
@@ -292,23 +351,31 @@ impl App {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
+        self.drive_keystroke(&event.keystroke, window, cx)
+    }
+
+    /// `drive_key` for a keystroke, which the scripted session presses.
+    pub(crate) fn drive_keystroke(
+        &mut self,
+        keystroke: &Keystroke,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         if self.driving.is_none() {
             return false;
         }
-        let keystroke = &event.keystroke;
-        let input = match keystroke.key.as_str() {
-            "up" => Input::Key(Key::Forward),
-            "down" => Input::Key(Key::Back),
-            "left" => Input::Key(Key::Left),
-            "right" => Input::Key(Key::Right),
-            "space" => Input::Pen,
-            "backspace" => Input::Undo,
-            "z" if keystroke.modifiers.secondary(cx) => Input::Undo,
-            "escape" => {
+        let input = match drive_key_for(keystroke, cx) {
+            Some(DriveKey::Forward) => Input::Key(Key::Forward),
+            Some(DriveKey::Back) => Input::Key(Key::Back),
+            Some(DriveKey::Left) => Input::Key(Key::Left),
+            Some(DriveKey::Right) => Input::Key(Key::Right),
+            Some(DriveKey::Pen) => Input::Pen,
+            Some(DriveKey::Undo) => Input::Undo,
+            Some(DriveKey::Stop) => {
                 self.stop_driving(cx);
                 return true;
             }
-            _ => return false,
+            None => return false,
         };
         self.drive(input, cx);
         window.focus(&self.canvas_focus, cx);
@@ -321,7 +388,7 @@ impl App {
         let driving = self.driving.as_ref()?;
         let theme = cx.theme().clone();
         let accent: Hsla = rgb(0xfde68a).into();
-        let key = |label: &'static str| {
+        let key = |label: String| {
             div()
                 .px_1()
                 .min_w(px(20.))
@@ -337,7 +404,7 @@ impl App {
                 .font_weight(FontWeight::SEMIBOLD)
                 .child(label)
         };
-        let pair = |a: &'static str, b: &'static str, what: (&'static str, &'static str)| {
+        let pair = |a: String, b: String, what: (&'static str, &'static str)| {
             h_flex()
                 .gap_1()
                 .child(key(a))
@@ -396,21 +463,34 @@ impl App {
                         .text_color(accent)
                         .child("Driving"),
                 )
-                .child(pair("↑", "↓", ("FD", "BK")))
+                .child(pair(
+                    key_label(DriveKey::Forward, cx),
+                    key_label(DriveKey::Back, cx),
+                    ("FD", "BK"),
+                ))
                 .child(steps(
                     "move-step",
                     &MOVE_STEPS,
                     self.drive_steps.moves,
                     false,
                 ))
-                .child(pair("←", "→", ("LT", "RT")))
+                .child(pair(
+                    key_label(DriveKey::Left, cx),
+                    key_label(DriveKey::Right, cx),
+                    ("LT", "RT"),
+                ))
                 .child(steps(
                     "turn-step",
                     &TURN_STEPS,
                     self.drive_steps.turns,
                     true,
                 ))
-                .child(h_flex().gap_1().child(key("Space")).child("Pen"))
+                .child(
+                    h_flex()
+                        .gap_1()
+                        .child(key(key_label(DriveKey::Pen, cx)))
+                        .child("Pen"),
+                )
                 .when(driving.pen_up, |d| {
                     d.child(
                         div()
@@ -422,8 +502,18 @@ impl App {
                             .child("Pen up"),
                     )
                 })
-                .child(h_flex().gap_1().child(key("⌫")).child("Undo"))
-                .child(h_flex().gap_1().child(key("Esc")).child("Stop driving"))
+                .child(
+                    h_flex()
+                        .gap_1()
+                        .child(key(key_label(DriveKey::Undo, cx)))
+                        .child("Undo"),
+                )
+                .child(
+                    h_flex()
+                        .gap_1()
+                        .child(key(key_label(DriveKey::Stop, cx)))
+                        .child("Stop driving"),
+                )
                 .into_any_element(),
         )
     }

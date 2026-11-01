@@ -15,6 +15,7 @@ mod help_panel;
 mod highlighter;
 mod icons;
 mod panes;
+mod shortcuts;
 mod teach_dialog;
 mod watching;
 
@@ -43,7 +44,7 @@ fn main() {
         .with_assets(icons::AppAssets)
         .run(|cx| {
             gpui_kit::init(cx);
-            files::bind_keys(cx);
+            shortcuts::bind_keys(cx);
             // The UI font is built in, so it looks the same everywhere. The
             // system's is often a variable font, such as Ubuntu on Linux, and gpui
             // draws only its regular weight, so bold text isn't.

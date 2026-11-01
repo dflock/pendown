@@ -297,6 +297,13 @@ enum Step {
     Gallery,
     /// Every gallery picture is drawn.
     CheckGalleryDrawn,
+    /// Opens the Shortcuts tab.
+    Shortcuts,
+    /// Every row of the Shortcuts tab has all its keys from the keymap.
+    CheckShortcutsBound,
+    /// The row that says this shows these keys, as this computer writes
+    /// them.
+    CheckShortcut(&'static str, &'static [&'static str]),
     /// Press Run, Load or the "from" link on the gallery card with this
     /// title.
     RunGallery(&'static str),
@@ -917,6 +924,71 @@ fn script() -> Vec<Step> {
         CheckTab("Help"),
         CheckHelpPage("REPEAT"),
         CloseHelp,
+        Say("Shortcuts: a tab of every key, from the keymap, and F5 runs"),
+        Shortcuts,
+        Wait(ms(300)),
+        CheckTab("Shortcuts"),
+        CheckShortcutsBound,
+        // As Linux writes them; on a Mac, Ctrl is ⌘.
+        CheckShortcut("Run your program", &["Ctrl+Enter", "F5"]),
+        CheckShortcut("Undo", &["Ctrl+Z"]),
+        CheckShortcut("Cut, copy and paste", &["Ctrl+X", "Ctrl+C", "Ctrl+V"]),
+        CheckShortcut("Undo the last move", &["Backspace", "Ctrl+Z"]),
+        CheckShortcut("Turn left", &["←"]),
+        CheckShortcut("Pause, or carry on when paused", &["F6"]),
+        CheckShortcut("Single step: one instruction, then pause", &["F10"]),
+        CheckShortcut("Reset: stop, and put everything back", &["Shift+F5"]),
+        Screenshot("shortcuts"),
+        SetSpeed(Speed::Instant),
+        Run("REPEAT 4 [FD 100 RT 90]", Speed::Instant),
+        WaitFinished,
+        Console("CS"),
+        WaitFinished,
+        CheckDrawn(0),
+        // In the editor, where you'd press it. Pressed on the next frame,
+        // so the run starts after a moment.
+        EditorKeys("f5"),
+        Wait(ms(300)),
+        WaitFinished,
+        CheckDrawn(4),
+        Console("CS"),
+        WaitFinished,
+        EditorKeys("secondary-enter"),
+        Wait(ms(300)),
+        WaitFinished,
+        CheckDrawn(4),
+        // F6 pauses and carries on, F10 steps, Shift+F5 resets.
+        Run("FD 300\nRT 90\nFD 300", Speed::Animated(50.0)),
+        Wait(ms(1500)),
+        EditorKeys("f6"),
+        Wait(ms(300)),
+        WaitPaused,
+        CheckPaused(true),
+        CheckHighlight("RT 90"),
+        // After the toolbar has redrawn as Resume.
+        Wait(ms(100)),
+        HoverAt(323.0, 20.0),
+        Wait(ms(1000)),
+        Screenshot("resume-tooltip"),
+        HoverAt(700.0, 400.0),
+        EditorKeys("f10"),
+        Wait(ms(300)),
+        WaitPaused,
+        CheckHighlight("FD 300"),
+        EditorKeys("f6"),
+        Wait(ms(300)),
+        CheckPaused(false),
+        CheckMoving,
+        EditorKeys("shift-f5"),
+        Wait(ms(300)),
+        CheckPaused(false),
+        CheckDrawn(0),
+        Wait(ms(100)),
+        HoverAt(228.0, 20.0),
+        Wait(ms(1000)),
+        Screenshot("run-tooltip"),
+        HoverAt(700.0, 400.0),
+        CloseHelp,
         Say("Console undo: an oops at the console, taken back"),
         Run("", Speed::Instant),
         WaitFinished,
@@ -1229,7 +1301,7 @@ fn script() -> Vec<Step> {
         Wait(ms(100)),
         Screenshot("driving"),
         Say("Drive Kame: Backspace takes back the whole entry, and Space lifts the pen"),
-        DriveKeys(&["undo"]),
+        DriveKeys(&["backspace"]),
         WaitDriven,
         CheckTurtle(100.0, 100.0, 90.0),
         CheckUndoLabel("FD 100"),
@@ -1697,23 +1769,11 @@ impl App {
                     }
                 }
                 Step::DriveKeys(keys) => {
-                    use crate::driving::Input;
-                    use pendown::drive::Key;
+                    // Through the drive key table, as a real key would be.
                     for key in keys {
-                        let input = match *key {
-                            "up" => Input::Key(Key::Forward),
-                            "down" => Input::Key(Key::Back),
-                            "left" => Input::Key(Key::Left),
-                            "right" => Input::Key(Key::Right),
-                            "space" => Input::Pen,
-                            "undo" => Input::Undo,
-                            "escape" => {
-                                self.stop_driving(cx);
-                                continue;
-                            }
-                            other => panic!("no driving key {other}"),
-                        };
-                        self.drive(input, cx);
+                        let keystroke = crate::driving::keystroke(key, cx);
+                        let handled = self.drive_keystroke(&keystroke, window, cx);
+                        self.check(handled, format!("{key} is a drive key"));
                     }
                 }
                 Step::DriveSteps(moves, turns) => {
@@ -2031,6 +2091,34 @@ impl App {
                         (found - y).abs() < 1.0,
                         format!("the Gallery is scrolled {found:.0} down"),
                     );
+                }
+                Step::Shortcuts => {
+                    if !self.help_open {
+                        self.toggle_help(cx);
+                    }
+                    self.help_panel.update(cx, |p, cx| {
+                        p.tab = crate::help_panel::Tab::Shortcuts;
+                        cx.notify();
+                    });
+                }
+                Step::CheckShortcutsBound => {
+                    for row in crate::shortcuts::groups().iter().flat_map(|g| &g.rows) {
+                        let found = crate::shortcuts::labels(row, window, cx);
+                        let expected = crate::shortcuts::expected(row);
+                        self.check(
+                            found.len() == expected,
+                            format!("“{}” shows {found:?}, {expected} expected", row.what),
+                        );
+                    }
+                }
+                Step::CheckShortcut(what, expected) => {
+                    let found = crate::shortcuts::groups()
+                        .iter()
+                        .flat_map(|g| &g.rows)
+                        .find(|r| r.what == what)
+                        .map(|row| crate::shortcuts::labels(row, window, cx))
+                        .unwrap_or_default();
+                    self.check(found == expected, format!("“{what}” shows {found:?}"));
                 }
                 Step::CheckTab(expected) => {
                     let tab = format!("{:?}", self.help_panel.read(cx).tab);

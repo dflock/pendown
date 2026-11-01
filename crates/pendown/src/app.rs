@@ -38,8 +38,8 @@ use crate::{
     autotest::Autotest,
     canvas::{Canvas, Overlay, TURTLE_SIZE},
     files::{
-        After, ExportPicture, NewFile, OpenFile, Picture, RunProgram, SaveFile, SaveFileAs,
-        ShowHelp, ToggleMetrics,
+        After, ExportPicture, NewFile, OpenFile, PauseOrResume, Picture, ResetProgram, RunProgram,
+        SaveFile, SaveFileAs, ShowHelp, SingleStep, ToggleMetrics,
     },
     gutter::{BreakpointsChanged, Gutter},
     help_panel::HelpPanel,
@@ -1552,6 +1552,22 @@ impl App {
                 this.export(Picture::Png, window, cx)
             }))
             .on_action(cx.listener(|this, _: &RunProgram, _, cx| this.start(DEFAULT_CHANNEL, cx)))
+            // Only when their buttons would work.
+            .on_action(cx.listener(|this, _: &PauseOrResume, _, cx| {
+                if this.running() {
+                    this.toggle_pause(cx)
+                }
+            }))
+            .on_action(cx.listener(|this, _: &SingleStep, _, cx| {
+                if this.paused() {
+                    this.single_step(cx)
+                }
+            }))
+            .on_action(cx.listener(|this, _: &ResetProgram, _, cx| {
+                if !this.at_start {
+                    this.reset(cx)
+                }
+            }))
             .on_action(
                 cx.listener(|this, _: &ToggleMetrics, window, cx| this.toggle_metrics(window, cx)),
             )

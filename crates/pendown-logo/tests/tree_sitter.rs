@@ -1,5 +1,5 @@
 //! The tree-sitter grammar's highlights list Pendown's built-in commands
-//! and special variables, generated from `pendown-logo.kdl`, and this test
+//! and special variables, generated from `content/reference.kdl`, and this test
 //! keeps them up to date (phase 5 issue 10). After adding commands, run
 //! `UPDATE_HIGHLIGHTS=1 cargo test -p pendown-logo --test tree_sitter`.
 

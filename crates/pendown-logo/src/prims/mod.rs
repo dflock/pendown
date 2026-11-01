@@ -1,5 +1,5 @@
 //! The built-in procedures. The table here gives each one's names, inputs
-//! and code; the code is in a module per area, as `pendown-logo.kdl` groups
+//! and code; the code is in a module per area, as `content/reference.kdl` groups
 //! them.
 
 mod arithmetic;

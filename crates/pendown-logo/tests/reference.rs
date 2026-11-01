@@ -1,4 +1,4 @@
-//! The language reference, from `pendown-logo.kdl` (phase 5 issue 01).
+//! The language reference, from `content/reference.kdl` (phase 5 issue 01).
 
 use pendown_logo::reference::{Kind, reference};
 

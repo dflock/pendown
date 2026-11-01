@@ -9,7 +9,7 @@
 
 (parameter) @variable.parameter
 
-; Built-in commands and special variables, from Pendown's pendown-logo.kdl.
+; Built-in commands and special variables, from Pendown's content/reference.kdl.
 ; Generated: change them with
 ; UPDATE_HIGHLIGHTS=1 cargo test -p pendown-logo --test tree_sitter
 ; BEGIN GENERATED

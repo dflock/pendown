@@ -22,3 +22,7 @@ These are phase 5, after phase 2, so they cover the complete core language once 
 - Writing `help` text and examples is real work: about 165 commands in phases 1 and 2.
 - The documentation and the interpreter can't drift apart without a test failing.
 - Open questions in `implementation-plan.md`: the markup format, the tutorial file format, where examples run, and whether to show pictures of example output.
+
+## Note
+
+2026-11-01: `pendown-logo.kdl` moved to `content/reference.kdl`, beside `content/tutorial/` and `content/gallery.kdl`, so everything the panel shows is in one folder. `berkeley-logo.kdl`, the manual converted to KDL, which `reference.kdl` started from, moved to `content/ucblogo/`, with the manual it's made from, which was only in the ignored `refs/` before.

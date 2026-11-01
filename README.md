@@ -76,7 +76,22 @@ The **Gallery** tab shows example programs with a picture of each, in sections: 
 
 The **Shortcuts** tab lists every keyboard shortcut: running (**Ctrl+Enter** or **F5**), pausing and carrying on (**F6**), single stepping (**F10**), Reset (**Shift+F5**), files, the editor, the console and driving Kame. It shows each key as this computer writes it, ⌘ on a Mac, and asks the keymap for them as it draws, so it's always right. The toolbar's tooltips show their keys too. The keys are one table in `crates/pendown/src/shortcuts.rs`, which binds them.
 
-The help comes from `pendown-logo.kdl`, the lessons are markdown files in `tutorial/`, and the gallery is `gallery.kdl`, which points at examples where they already live, plus its own programs in `examples/gallery/`. Every example and every lesson's program is a test: it must run, and draw the picture saved in `crates/pendown/tests/help-pictures/`.
+### Changing the help, the tutorial and the gallery
+
+Everything the panel shows is in `content/`: the help is `reference.kdl`, the lessons are in `tutorial/`, and the gallery is `gallery.kdl`, which points at examples where they already live, plus its own programs in `examples/gallery/`. `ucblogo/` has the UCBLogo manual and `berkeley-logo.kdl`, the manual converted to KDL by `scripts/manual_to_kdl.py`, which `reference.kdl` started from; the app doesn't use them.
+
+The help and the lessons are written in a small part of Markdown (`crates/pendown/src/markup.rs`): paragraphs, `` `code` ``, `**bold**`, `*italics*`, `- ` lists, `#` headings, `> ` notes, fenced code blocks, and `[FORWARD]`, a link to a command's help page (or a syntax entry's, by its key in the file, ignoring case, such as `[Colours]` for `colours`). Both are built into the app, so rebuild to see a change.
+
+- **The help** is `content/reference.kdl`. Each command has its `help """…"""` text, any number of `example title="…" """…"""` programs (add `fails=#true` to one that stops with an error on purpose), and `see "back" "left"` for its "See also" links. Leave `desc` alone: it's the UCBLogo manual's wording. Syntax that isn't a command, such as numbers and quoted words, is in the `syntax` block at the top. The comment at the top of the file lists every field.
+- **The lessons** are the files in `content/tutorial/`, one per lesson, starting with its title as a `#` heading. Every ` ```logo ` block is a program with **Load into editor** and **Run**. A ` ```picture ` block shows only what its program draws, for a picture without its code. A word after the language names a program, as in ` ```logo tree `, so `content/gallery.kdl` can point at it (`lesson 6 "tree"`).
+- **A new lesson** also needs its file added to `SOURCES` in `crates/pendown/src/tutorial.rs`, and the lesson count updated in `crates/pendown/tests/help.rs`. `content/gallery.kdl` and the scripted session refer to lessons by number, so renumbering lessons means updating them too.
+
+Every help example and lesson program is a test: it must run, and draw the picture saved in `crates/pendown/tests/help-pictures/`. After adding or changing one, make its picture, then look at the new SVGs before committing:
+
+```sh
+UPDATE_PICTURES=1 cargo test -p pendown --test examples
+cargo test -p pendown
+```
 
 ### The CLI
 
@@ -128,11 +143,12 @@ The crates are in `crates/`. `spikes/` holds the experiments made before phase 1
 ## Learn more
 
 - `examples/phase-1/` and `examples/phase-2/` have programs that between them use every command Pendown supports so far.
-- `pendown-logo.kdl` lists every Logo command, which ones Pendown supports, and how ours differ from UCBLogo.
+- `content/reference.kdl` lists every Logo command, which ones Pendown supports, and how ours differ from UCBLogo.
 - `docs/adr/` records the design decisions and why we made them.
 - `tree-sitter-logo/` is a tree-sitter grammar for Logo, with a Zed extension, ready to become a repository of its own.
 
 ## Credits
 
-- Kame's picture, `tutorial/kame-turtle.svg`, is [Turtle](https://openclipart.org/detail/229886/turtle) from Openclipart, in the public domain (CC0).
+- Kame's picture, `content/tutorial/kame-turtle.svg`, is [Turtle](https://openclipart.org/detail/229886/turtle) from Openclipart, in the public domain (CC0).
+- The UCBLogo manual, `content/ucblogo/Berkeley-Logo-Reference-Manual.html`, is © 1993 the Regents of the University of California, under the GNU General Public License, version 3 or later. The `desc` of each command in `content/reference.kdl` is taken from it.
 - The app's font is [Noto Sans](https://notofonts.github.io/), by the Noto Project Authors, under the SIL Open Font License: see `crates/pendown/fonts/OFL.txt`.

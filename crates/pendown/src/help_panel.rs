@@ -1,5 +1,5 @@
 //! The side panel (phase 5): Help, a reference for every command generated
-//! from `pendown-logo.kdl`, and the Tutorial. It's drawn as a cached view,
+//! from `content/reference.kdl`, and the Tutorial. It's drawn as a cached view,
 //! so it only redraws when it changes, not on every animation frame.
 
 use std::{

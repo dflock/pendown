@@ -2,7 +2,7 @@
 //! `code`, `**bold**`, `*italics*`, lists of lines starting `- `, headings,
 //! notes starting `> `, fenced code blocks, and `[NAME]`, a link to the
 //! help for a command or a syntax entry. The help text in
-//! `pendown-logo.kdl` and the tutorial are written in it.
+//! `content/reference.kdl` and the tutorial are written in it.
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Inline {

@@ -2,7 +2,7 @@
 
 Usage (from the repo root):
 
-    python3 -I scripts/manual_to_kdl.py refs/logo/Berkeley-Logo-Reference-Manual.html berkeley-logo.kdl
+    python3 -I scripts/manual_to_kdl.py content/ucblogo/Berkeley-Logo-Reference-Manual.html content/ucblogo/berkeley-logo.kdl
 
 Structure: logo > chapter > [section >] entry
 """
@@ -269,7 +269,7 @@ def emit_entry(entry, depth, out):
 
 def main(src, dst):
     chapters = parse(src)
-    out = ["// Generated from refs/logo/Berkeley-Logo-Reference-Manual.html", "logo {"]
+    out = ["// Generated from content/ucblogo/Berkeley-Logo-Reference-Manual.html", "logo {"]
     count = 0
     for c in chapters:
         children = [(k, v) for k, v in c["children"] if k == "entry" or v["entries"]]

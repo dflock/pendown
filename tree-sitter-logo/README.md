@@ -16,7 +16,7 @@ That's enough for colours, brackets, outlines, indentation and folding. UCBLogo'
 
 ## Queries
 
-- `highlights.scm`: Pendown's built-in commands and special variables are listed in it, generated from `pendown-logo.kdl`. Pendown's tests check it's up to date: `UPDATE_HIGHLIGHTS=1 cargo test -p pendown-logo --test tree_sitter` regenerates it, and copies the queries into the Zed extension.
+- `highlights.scm`: Pendown's built-in commands and special variables are listed in it, generated from `content/reference.kdl`. Pendown's tests check it's up to date: `UPDATE_HIGHLIGHTS=1 cargo test -p pendown-logo --test tree_sitter` regenerates it, and copies the queries into the Zed extension.
 - `brackets.scm`, `outline.scm` (procedures), `indents.scm` and `folds.scm`.
 
 No two highlight patterns match the same node, since editors differ about which pattern wins.

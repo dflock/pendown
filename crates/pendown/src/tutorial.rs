@@ -1,4 +1,4 @@
-//! The tutorial (phase 5): lessons with Kame, in `tutorial/` at the top of
+//! The tutorial (phase 5): lessons with Kame, in `content/tutorial/` at the top of
 //! the repository, in the help panel's markup. Each starts with its title
 //! as a heading. Their code blocks are programs, which load into the
 //! editor and run; a block marked `picture` shows only what its program
@@ -10,14 +10,14 @@ use crate::markup::{self, Block};
 
 /// The lessons' files, in order.
 const SOURCES: [&str; 8] = [
-    include_str!("../../../tutorial/01-moving-and-turning.md"),
-    include_str!("../../../tutorial/02-repeat.md"),
-    include_str!("../../../tutorial/03-procedures.md"),
-    include_str!("../../../tutorial/04-help-kame-fix-the-bug.md"),
-    include_str!("../../../tutorial/05-inputs-and-variables.md"),
-    include_str!("../../../tutorial/06-recursion.md"),
-    include_str!("../../../tutorial/07-colours-and-shapes.md"),
-    include_str!("../../../tutorial/08-exploring-l-systems.md"),
+    include_str!("../../../content/tutorial/01-moving-and-turning.md"),
+    include_str!("../../../content/tutorial/02-repeat.md"),
+    include_str!("../../../content/tutorial/03-procedures.md"),
+    include_str!("../../../content/tutorial/04-help-kame-fix-the-bug.md"),
+    include_str!("../../../content/tutorial/05-inputs-and-variables.md"),
+    include_str!("../../../content/tutorial/06-recursion.md"),
+    include_str!("../../../content/tutorial/07-colours-and-shapes.md"),
+    include_str!("../../../content/tutorial/08-exploring-l-systems.md"),
 ];
 
 /// The language that marks a code block as a picture: only what its
@@ -25,7 +25,7 @@ const SOURCES: [&str; 8] = [
 pub const PICTURE: &str = "picture";
 
 /// A picture of Kame, for the top of each lesson.
-pub const KAME: &[u8] = include_bytes!("../../../tutorial/kame-turtle.svg");
+pub const KAME: &[u8] = include_bytes!("../../../content/tutorial/kame-turtle.svg");
 
 pub struct Lesson {
     pub title: String,

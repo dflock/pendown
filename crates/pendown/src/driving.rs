@@ -4,28 +4,20 @@
 //! shown while driving, for the whole entry, with a line out in front of
 //! Kame and what the entry means.
 
-use std::{collections::VecDeque, time::Instant};
+use std::time::Instant;
 
 use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::{prelude::FluentBuilder as _, *};
 use pendown::{
     animator::{FADE, Thinking, Thought},
-    drive::{Joined, Key, MOVE_STEPS, Press, TURN_STEPS, caption, number, pen, press},
+    drive::{
+        Input, Joined, Key, MOVE_STEPS, Press, Presses, TURN_STEPS, caption, number, pen, press,
+    },
     run::Job,
 };
 use pendown_logo::Point;
 
 use crate::app::App;
-
-/// What a key asks driving to do.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Input {
-    Key(Key),
-    /// Space: the pen up or down.
-    Pen,
-    /// Backspace or Ctrl+Z.
-    Undo,
-}
 
 /// What a drive key does.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -105,8 +97,8 @@ pub(crate) struct Driving {
     /// Whether Space has lifted the pen. Driving starts with it down.
     pub pen_up: bool,
     pub open: Option<Open>,
-    /// Presses made while one plays, which wait their turn.
-    pub queue: VecDeque<Input>,
+    /// The keys down, and the presses made while one plays.
+    pub presses: Presses,
     /// The last entry's thought, fading, and when it started to.
     fading: Option<(Thought, Instant)>,
 }
@@ -161,16 +153,11 @@ impl App {
         }
     }
 
-    /// A key while driving. It waits if a press is still playing.
-    pub(crate) fn drive(&mut self, input: Input, cx: &mut Context<Self>) {
-        let running = self.running();
+    /// Plays a press, with none playing.
+    fn drive(&mut self, input: Input, cx: &mut Context<Self>) {
         let Some(driving) = &mut self.driving else {
             return;
         };
-        if running {
-            driving.queue.push_back(input);
-            return;
-        }
         match input {
             Input::Undo => self.undo_console(cx),
             Input::Pen => {
@@ -235,7 +222,7 @@ impl App {
         if self.running() {
             return;
         }
-        if let Some(input) = self.driving.as_mut().and_then(|d| d.queue.pop_front()) {
+        if let Some(input) = self.driving.as_mut().and_then(|d| d.presses.next()) {
             self.drive(input, cx);
         }
     }
@@ -377,9 +364,23 @@ impl App {
             }
             None => return false,
         };
-        self.drive(input, cx);
+        let running = self.running();
+        let play = self
+            .driving
+            .as_mut()
+            .and_then(|d| d.presses.down(&keystroke.key, input, running));
+        if let Some(input) = play {
+            self.drive(input, cx);
+        }
         window.focus(&self.canvas_focus, cx);
         true
+    }
+
+    /// A key coming up on the canvas, which stops it repeating.
+    pub(crate) fn drive_key_up(&mut self, keystroke: &Keystroke) {
+        if let Some(driving) = &mut self.driving {
+            driving.presses.up(&keystroke.key);
+        }
     }
 
     /// The strip across the top of the canvas while driving: the keys, the

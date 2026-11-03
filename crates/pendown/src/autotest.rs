@@ -185,8 +185,14 @@ enum Step {
     SetThinking(bool),
     /// Turn Drive on or off.
     Drive(bool),
-    /// Press keys while driving: up, down, left, right, space, undo, escape.
+    /// Press and let go of keys while driving: up, down, left, right, space,
+    /// undo, escape.
     DriveKeys(&'static [&'static str]),
+    /// Keys coming down with no key-up, as when the keyboard repeats a key
+    /// that's held.
+    DriveKeysDown(&'static [&'static str]),
+    /// A key held while driving comes up.
+    DriveKeyUp(&'static str),
     /// Wait until every press has played.
     WaitDriven,
     /// Driving is on, or not.
@@ -1380,6 +1386,32 @@ fn script() -> Vec<Step> {
         WaitDriven,
         Wait(ms(500)),
         CheckDriveThinking("turn 15"),
+        Say("Drive Kame: a held key builds up no queue, and letting go stops Kame"),
+        DriveSteps(50.0, 90.0),
+        DriveKeysDown(&["up", "up", "up", "up", "up", "up"]),
+        CheckDriveQueue(1),
+        DriveKeyUp("up"),
+        CheckDriveQueue(0),
+        WaitDriven,
+        CheckConsole("> FD 50"),
+        // Still held when the press ends: its repeat plays, and only that.
+        DriveKeysDown(&["up", "up", "up", "up", "up", "up"]),
+        WaitDriven,
+        CheckConsole("> FD 150"),
+        DriveKeyUp("up"),
+        // Holding Space flips the pen once.
+        DriveKeysDown(&["space", "space", "space"]),
+        WaitDriven,
+        CheckConsole("> PU"),
+        DriveKeyUp("space"),
+        DriveKeys(&["space"]),
+        WaitDriven,
+        CheckConsole("> PD"),
+        // Holding Backspace takes back one entry.
+        DriveKeysDown(&["backspace", "backspace", "backspace"]),
+        WaitDriven,
+        CheckUndoLabel("PU"),
+        DriveKeyUp("backspace"),
         DriveKeys(&["escape"]),
         Quit,
     ]
@@ -1499,7 +1531,10 @@ impl App {
                     Step::Wait(d) => since.elapsed() >= d,
                     Step::WaitDriven => {
                         (self.animator.as_ref().is_none_or(|a| a.finished())
-                            && self.driving.as_ref().is_none_or(|d| d.queue.is_empty()))
+                            && self
+                                .driving
+                                .as_ref()
+                                .is_none_or(|d| d.presses.waiting() == 0))
                             || since.elapsed() > Duration::from_secs(20)
                     }
                     Step::WaitFinished => {
@@ -1802,13 +1837,24 @@ impl App {
                         let keystroke = crate::driving::keystroke(key, cx);
                         let handled = self.drive_keystroke(&keystroke, window, cx);
                         self.check(handled, format!("{key} is a drive key"));
+                        self.drive_key_up(&keystroke);
                     }
+                }
+                Step::DriveKeysDown(keys) => {
+                    for key in keys {
+                        let keystroke = crate::driving::keystroke(key, cx);
+                        let handled = self.drive_keystroke(&keystroke, window, cx);
+                        self.check(handled, format!("{key} is a drive key"));
+                    }
+                }
+                Step::DriveKeyUp(key) => {
+                    self.drive_key_up(&crate::driving::keystroke(key, cx));
                 }
                 Step::DriveSteps(moves, turns) => {
                     self.drive_steps = pendown::drive::Steps { moves, turns };
                 }
                 Step::CheckDriveQueue(expected) => {
-                    let found = self.driving.as_ref().map_or(0, |d| d.queue.len());
+                    let found = self.driving.as_ref().map_or(0, |d| d.presses.waiting());
                     self.check(found == expected, format!("{found} presses waiting"));
                 }
                 Step::CheckDriveThinking(expected) => {

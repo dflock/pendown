@@ -20,3 +20,7 @@ Drive Kame moves and turns Kame from the arrow keys, the floor turtle's button b
 - An entry joined from ten presses is ten lines in the drawing, which look as one. Teach Kame and Undo see one entry.
 - Space tracks the pen from when driving starts, assuming it's down; a program that left it up makes the first Space say `PU` again.
 - Driving needs the canvas to have focus. The toolbar's New, Open, Save and Export became icons with tooltips, to make room for Drive and Thinking at the default window size.
+
+## Note
+
+2026-11-03: Holding a key queued every repeat, and the keyboard repeats far faster than big steps play, so Kame kept going for seconds after the key came up. Now only separate presses wait their turn. Of a held key's repeats, at most one waits, and its key-up takes it back, so Kame stops when the step in progress ends. Steps still play in full, so entries stay whole multiples of the step. Holding Space flips the pen once, and holding Undo takes back one entry. A key coming down again with no key-up between is a repeat: gpui's `is_held` can't say, since it's always false on X11.

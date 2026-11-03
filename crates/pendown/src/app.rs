@@ -1523,6 +1523,9 @@ impl App {
                     cx.stop_propagation();
                 }
             }))
+            .on_key_up(cx.listener(|this, event: &KeyUpEvent, _, _| {
+                this.drive_key_up(&event.keystroke);
+            }))
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, window, cx| {

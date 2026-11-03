@@ -8,6 +8,23 @@ This builds and runs Pendown on Windows 11 from a Linux machine, in a VM inside 
 | `oem/setup.ps1` | Installs Git, the Visual Studio C++ build tools with the Windows SDK, and Rust |
 | `build.ps1` | Builds Pendown in the VM, copies the `.exe` files out and starts it |
 
+## Check for Windows without the VM
+
+To catch Windows-only warnings and compile errors quickly, type-check the whole workspace from Linux. It needs mingw-w64 and the Rust target, once:
+
+```sh
+sudo apt install mingw-w64
+rustup target add x86_64-pc-windows-gnu
+```
+
+Then, from the repo's root:
+
+```sh
+cargo check --target x86_64-pc-windows-gnu --workspace --all-targets
+```
+
+This only checks the code, so it doesn't make a `.exe`. For one, use the VM: a release build fails on Linux because gpui only compiles its Windows shaders with `fxc.exe` when building on Windows, and a debug build looks for the shader files at their Linux path when it starts.
+
 ## Choose where the VM lives
 
 Windows' disk grows to tens of gigabytes (the limit is 128 GB), so it's kept outside the repo. Choose a folder and name it in `.env` here, which Git ignores. Use a full path:

@@ -2,6 +2,8 @@
 
 Run `cargo fmt --all` after changing Rust code. A Stop hook in `.claude/settings.json` also does this automatically at the end of each turn.
 
+Linux-only code can leave warnings or errors that only show on Windows. After changing `cfg`-gated or platform-specific code, run `cargo check --target x86_64-pc-windows-gnu --workspace --all-targets`. Setup is in `scripts/windows-vm/README.md`.
+
 ## Agent skills
 
 ### Issue tracker

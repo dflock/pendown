@@ -60,7 +60,7 @@ install -Dm644 crates/pendown/linux/pendown.png ~/.local/share/icons/hicolor/128
 
 On X11 the window shows Kame either way. Wayland needs the desktop file to find it.
 
-To build for Windows from Linux, there's a Windows VM in Docker: see [`scripts/windows-vm/README.md`](scripts/windows-vm/README.md).
+To build for Windows from Linux, there's a Windows VM in Docker, and a quick check for Windows that doesn't need it: see [`scripts/windows-vm/README.md`](scripts/windows-vm/README.md).
 
 `PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, pausing, stepping, changing a paused program, breakpoints, Restart and Reset, ending runs, the gallery, the shortcuts, the console, files, errors, filled shapes, how often the window redraws, the counters and variables panels, and the help panel and tutorial. `PENDOWN_AUTOTEST_FROM="Phase 5"` starts it at the first section with that in its title. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
 

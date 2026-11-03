@@ -3,7 +3,7 @@
 //! so it only redraws when it changes, not on every animation frame.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     ops::Range,
     sync::{Arc, Mutex, OnceLock},
 };
@@ -55,6 +55,13 @@ pub enum Picture {
     Failed(String),
 }
 
+/// A picture waiting to be drawn, and where it'll go in `pictures`.
+struct WaitingPicture {
+    key: String,
+    code: String,
+    options: pendown_cli::Options,
+}
+
 /// A program in the panel that runs on the canvas: a help example, a
 /// lesson's program, or one of the gallery's.
 pub use pendown::source::Source;
@@ -84,6 +91,12 @@ pub struct HelpPanel {
     /// Open chapters and sections of the contents, by key.
     expanded: HashSet<String>,
     pictures: HashMap<String, Picture>,
+    /// Pictures still to draw. They're drawn one at a time, however many a
+    /// page asks for at once: each takes moments, and Windows runs every
+    /// background task it's given at once, on as many threads as that takes.
+    pictures_waiting: VecDeque<WaitingPicture>,
+    /// Whether a picture is being drawn.
+    drawing_picture: bool,
     pub running: Option<Running>,
     /// The tutorial's lesson, counting from 0.
     pub lesson: usize,
@@ -156,6 +169,8 @@ impl HelpPanel {
             following: None,
             expanded: HashSet::new(),
             pictures: HashMap::new(),
+            pictures_waiting: VecDeque::new(),
+            drawing_picture: false,
             running: None,
             lesson: 0,
             clear_search: false,
@@ -322,12 +337,33 @@ impl HelpPanel {
         // blank square.
         self.pictures
             .insert(key.clone(), Picture::Printed(String::new()));
-        let code = code.to_string();
+        self.pictures_waiting.push_back(WaitingPicture {
+            key,
+            code: code.to_string(),
+            options,
+        });
+        self.draw_next_picture(cx);
+        None
+    }
+
+    /// Starts drawing the next picture, unless one is being drawn. When it
+    /// finishes, it starts the one after.
+    fn draw_next_picture(&mut self, cx: &mut Context<Self>) {
+        if self.drawing_picture {
+            return;
+        }
+        let Some(WaitingPicture { key, code, options }) = self.pictures_waiting.pop_front() else {
+            return;
+        };
+        self.drawing_picture = true;
         let task = cx.background_spawn(async move { pendown_cli::render(&code, options) });
         cx.spawn(async move |this, cx| {
             let output = task.await;
             let picture = match &output.result {
-                Err(e) if output.drawn == 0 => Picture::Failed(format!("{e:?}")),
+                Err(e) if output.drawn == 0 => {
+                    log::error!("a picture's program failed: {e:?}");
+                    Picture::Failed(format!("{e:?}"))
+                }
                 _ if output.drawn == 0 => Picture::Printed(output.printed.clone()),
                 _ => Picture::Drawing(
                     Arc::from(output.svg.expect("asked for").into_bytes()),
@@ -336,12 +372,13 @@ impl HelpPanel {
             };
             this.update(cx, |this, cx| {
                 this.pictures.insert(key, picture);
+                this.drawing_picture = false;
+                this.draw_next_picture(cx);
                 cx.notify();
             })
             .ok();
         })
         .detach();
-        None
     }
 
     /// Whether the user's program is running, which turns Copy to editor
@@ -433,12 +470,27 @@ fn svg_aspect(svg: &[u8]) -> Option<f32> {
     (height > 0.).then(|| width / height)
 }
 
-pub(crate) type Rendered = Arc<Mutex<HashMap<(i32, i32), Arc<RenderImage>>>>;
+pub(crate) type Rendered =
+    Arc<Mutex<HashMap<(i32, i32), Result<Arc<RenderImage>, ImageCacheError>>>>;
+
+/// What's kept for `size`, making it the first time. Failures are kept too,
+/// or an image that can't be rendered would try again at every repaint.
+fn once_for_size<T: Clone>(
+    kept: &Mutex<HashMap<(i32, i32), T>>,
+    size: (i32, i32),
+    make: impl FnOnce() -> T,
+) -> T {
+    kept.lock()
+        .unwrap()
+        .entry(size)
+        .or_insert_with(make)
+        .clone()
+}
 
 /// An SVG, `width` by `height` logical pixels. It's rendered at exactly
 /// that size in device pixels, once for each size, in `rendered`: an SVG
 /// image is otherwise rendered at its own size and shrunk on the GPU,
-/// which leaves it jagged or blurred.
+/// which leaves it jagged or blurred. If it can't be, it says so.
 pub(crate) fn svg_image(svg: Arc<[u8]>, rendered: Rendered, width: f32, height: f32) -> Img {
     let source = ImageSource::Custom(Arc::new(move |window: &mut Window, cx: &mut App| {
         let scale = window.scale_factor();
@@ -446,25 +498,38 @@ pub(crate) fn svg_image(svg: Arc<[u8]>, rendered: Rendered, width: f32, height: 
             (width * scale).round() as i32,
             (height * scale).round() as i32,
         );
-        if let Some(image) = rendered.lock().unwrap().get(&device) {
-            return Some(Ok(image.clone()));
-        }
-        let renderer = cx.svg_renderer();
-        let image = renderer
-            .parse_svg(&svg)
-            .and_then(|tree| {
-                renderer.render_parsed(
-                    &tree,
-                    SvgSize::Size(size(DevicePixels(device.0), DevicePixels(device.1))),
-                )
-            })
-            .map_err(|e| ImageCacheError::Asset(e.to_string().into()));
-        if let Ok(image) = &image {
-            rendered.lock().unwrap().insert(device, image.clone());
-        }
-        Some(image)
+        Some(once_for_size(&rendered, device, || {
+            let renderer = cx.svg_renderer();
+            renderer
+                .parse_svg(&svg)
+                .and_then(|tree| {
+                    renderer.render_parsed(
+                        &tree,
+                        SvgSize::Size(size(DevicePixels(device.0), DevicePixels(device.1))),
+                    )
+                })
+                .map_err(|e| {
+                    log::error!("can't render an SVG at {device:?}: {e}");
+                    ImageCacheError::Asset(e.to_string().into())
+                })
+        }))
     }));
-    img(source).w(px(width)).h(px(height)).flex_none()
+    img(source)
+        .w(px(width))
+        .h(px(height))
+        .flex_none()
+        .with_fallback(|| picture_note("This picture couldn't be drawn.".into()))
+}
+
+/// Words in place of a picture, inside a square of the picture's size.
+fn picture_note(text: SharedString) -> AnyElement {
+    div()
+        .size_full()
+        .p_1()
+        .overflow_hidden()
+        .text_xs()
+        .child(text)
+        .into_any_element()
 }
 
 /// Kame's picture, `width` by `height` logical pixels.
@@ -2224,6 +2289,14 @@ impl HelpPanel {
             Some(Picture::Drawing(svg, rendered)) => svg_image(svg, rendered, size, size)
                 .rounded_md()
                 .into_any_element(),
+            Some(Picture::Failed(text)) => div()
+                .size(px(size))
+                .child(picture_note(text.into()))
+                .into_any_element(),
+            Some(Picture::Printed(text)) if !text.is_empty() => div()
+                .size(px(size))
+                .child(picture_note(text.into()))
+                .into_any_element(),
             // Being drawn: a blank square.
             _ => div()
                 .size(px(size))
@@ -2300,5 +2373,32 @@ impl HelpPanel {
                     ),
             )
             .into_any_element()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, sync::Mutex};
+
+    use super::once_for_size;
+
+    #[test]
+    fn a_failure_is_only_tried_once_for_each_size() {
+        let kept = Mutex::new(HashMap::new());
+        let mut tries = 0;
+        for _ in 0..3 {
+            let got: Result<(), &str> = once_for_size(&kept, (84, 84), || {
+                tries += 1;
+                Err("it can't")
+            });
+            assert_eq!(got, Err("it can't"));
+        }
+        assert_eq!(tries, 1);
+        once_for_size(&kept, (168, 168), || {
+            tries += 1;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(tries, 2);
     }
 }

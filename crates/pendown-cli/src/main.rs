@@ -68,6 +68,7 @@ fn main() -> ExitCode {
             fit: args.fit,
             svg,
             crop: false,
+            pixels: true,
         },
     );
     print!("{}", output.printed);

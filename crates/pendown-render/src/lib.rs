@@ -68,6 +68,8 @@ pub struct Drawing {
     context: RenderContext,
     resources: Resources,
     threads: u16,
+    /// Whether marks are drawn into `data`, or only kept for SVG.
+    pixels: bool,
     /// Recent drawing cost per mark, which the GUI uses to size Instant
     /// mode's frames.
     pub per_segment: Duration,
@@ -94,6 +96,18 @@ impl Drawing {
     pub fn new() -> Drawing {
         let threads = std::thread::available_parallelism()
             .map_or(1, |n| n.get().saturating_sub(1).max(1)) as u16;
+        Drawing::with(threads, true)
+    }
+
+    /// A drawing that keeps its marks but draws no pixels, so it can make an
+    /// SVG but not a PNG or tiles. It starts no worker threads, which matters
+    /// when many are made at once, as for the gallery's pictures.
+    pub fn without_pixels() -> Drawing {
+        Drawing::with(0, false)
+    }
+
+    /// `threads` of 0 draws on the calling thread.
+    fn with(threads: u16, pixels: bool) -> Drawing {
         Drawing {
             width: 0,
             height: 0,
@@ -107,6 +121,7 @@ impl Drawing {
             context: RenderContext::new_with(1, 1, settings(threads)),
             resources: Resources::new(),
             threads,
+            pixels,
             per_segment: Duration::from_micros(2),
             last_draw: Duration::ZERO,
             metrics: DrawingMetrics::default(),
@@ -249,8 +264,11 @@ impl Drawing {
         );
         self.width = width;
         self.height = height;
-        self.data = vec![0; width as usize * height as usize * 4];
-        self.context = RenderContext::new_with(width as u16, height as u16, settings(self.threads));
+        if self.pixels {
+            self.data = vec![0; width as usize * height as usize * 4];
+            self.context =
+                RenderContext::new_with(width as u16, height as u16, settings(self.threads));
+        }
         self.columns = width.div_ceil(TILE);
         self.dirty = vec![true; (self.columns * height.div_ceil(TILE)) as usize];
         self.fill_background();
@@ -285,7 +303,7 @@ impl Drawing {
     }
 
     fn draw(&mut self, marks: &[Mark]) {
-        if marks.is_empty() || self.width == 0 || self.height == 0 {
+        if !self.pixels || marks.is_empty() || self.width == 0 || self.height == 0 {
             return;
         }
         let started = Instant::now();
@@ -766,6 +784,36 @@ mod tests {
         d.draw_pending();
         let dirty: Vec<_> = d.take_dirty_tiles().iter().map(|t| t.index).collect();
         assert_eq!(dirty, [5]);
+    }
+
+    #[test]
+    fn a_drawing_without_pixels_makes_the_same_svg() {
+        let line = |x: f64| -> Mark {
+            Segment {
+                from: p(0.0, 0.0),
+                to: p(x, 40.0),
+                pen: WHITE,
+            }
+            .into()
+        };
+        let build = |d: &mut Drawing| {
+            d.resize(84, 84);
+            d.push(&[line(30.0)]);
+            d.draw_pending();
+            d.set_background([10, 20, 30, 255]);
+            d.push(&[line(-30.0)]);
+            d.draw_pending();
+            d.fit(100.0);
+        };
+        let (mut with, mut without) = (Drawing::new(), Drawing::without_pixels());
+        build(&mut with);
+        build(&mut without);
+        assert_eq!(without.segments(), 2);
+        assert_eq!(without.svg(0.01), with.svg(0.01));
+        assert_eq!(
+            without.svg_cropped(0.01, 100.0),
+            with.svg_cropped(0.01, 100.0)
+        );
     }
 
     #[test]

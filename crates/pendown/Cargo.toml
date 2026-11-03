@@ -10,6 +10,8 @@ gpui-kit.workspace = true
 image.workspace = true
 # The gallery's index, content/gallery.kdl (.scratch/gallery/).
 kdl.workspace = true
+# Where errors go, including gpui's: a file on Windows, which has no console.
+log = "0.4"
 # Draws the help panel's pictures of examples (phase 5).
 pendown-cli.workspace = true
 pendown-logo.workspace = true

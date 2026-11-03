@@ -18,7 +18,7 @@ Learners want easy access to example programs to run or load. The good ones alre
 - **A test checks every entry,** and fails with which and why if one points at nothing: an example renamed or removed, a lesson program's name gone, or a file not built in. At run time, an entry that points at nothing is left out.
 - **Load, not Copy.** A gallery program is a whole program, so Load makes it a new, untitled program, as a lesson's Load does, asking first about unsaved changes. Help's Copy to editor adds to yours.
 - **No grading:** no "easy" or "hard" labels or stars (ADR 0027).
-- **The pictures are drawn as the help panel's are,** in the background, fitted to the drawing, and cached, the first time the tab opens.
+- **The pictures are drawn as the help panel's are,** in the background, one at a time, fitted to the drawing, and cached, the first time the tab opens. They're shown from SVG, so they draw no pixels and start no worker threads.
 
 ## Consequences
 
@@ -26,3 +26,7 @@ Learners want easy access to example programs to run or load. The good ones alre
 - Renaming or removing a help example the gallery uses breaks the test until `gallery.kdl` is updated.
 - Adding, removing or reordering a lesson's programs doesn't move the gallery's entries. Renaming or removing a named program breaks the test until `gallery.kdl` is updated, and a name after a lesson's fence says the gallery uses that program.
 - `Source`, which names a program by where it lives, moved from the help panel to the library, with a `File` kind, and Load takes any `Source`.
+
+## Note
+
+2026-11-03: On a Windows PC, the gallery's pictures stayed blank and the app became slow. Its cause wasn't found, but gpui on Windows runs background tasks in the OS's thread pool, where Linux has a fixed number of threads, and opening the tab started 41 renders, each with three sets of vello_cpu workers. So pictures now need no workers and are drawn one at a time, a picture that can't be rendered tries only once, and failures show on the card and in the log (`log_file.rs`).

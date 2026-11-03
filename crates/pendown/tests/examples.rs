@@ -148,6 +148,7 @@ fn every_svg_looks_like_its_png() {
         fit: false,
         svg: Some(thinnest),
         crop: false,
+        pixels: true,
     };
     // And some that the examples don't cover: shapes at headings where
     // turning the wrong way would show, arcs both ways and past a whole

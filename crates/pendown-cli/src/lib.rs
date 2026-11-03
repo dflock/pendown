@@ -34,13 +34,18 @@ pub struct Options {
     /// Crop the SVG to what's drawn, with a margin, rather than showing the
     /// whole turtle area (`Drawing::svg_cropped`).
     pub crop: bool,
+    /// Draw the pixels, for `Output::png`. Without them there's no PNG, but
+    /// an SVG is just as good, and it's much cheaper: it needs no worker
+    /// threads (`Drawing::without_pixels`).
+    pub pixels: bool,
 }
 
 /// The smallest area, in turtle steps, that `fit` zooms in to.
 pub const FIT_MIN: f64 = 100.0;
 
 pub struct Output {
-    /// The picture, as far as the program got.
+    /// The picture, as far as the program got. Empty without
+    /// `Options::pixels`.
     pub png: Vec<u8>,
     /// The same as SVG, if `Options::svg` asked for it.
     pub svg: Option<String>,
@@ -158,7 +163,11 @@ pub fn render(source: &str, options: Options) -> Output {
         .stack_size(STACK)
         .spawn(move || {
             let (started, cpu) = (Instant::now(), ThreadCpu::now());
-            let drawing = Rc::new(RefCell::new(Drawing::new()));
+            let drawing = Rc::new(RefCell::new(if options.pixels {
+                Drawing::new()
+            } else {
+                Drawing::without_pixels()
+            }));
             drawing.borrow_mut().resize(options.width, options.height);
             let printed = Rc::new(RefCell::new(String::new()));
             let sink = DrawingSink { drawing: drawing.clone(), printed: printed.clone(), pending: Vec::new() };
@@ -177,7 +186,7 @@ pub fn render(source: &str, options: Options) -> Output {
                 drawing.borrow_mut().fit(FIT_MIN);
             }
             let drawing = drawing.borrow();
-            let png = drawing.png();
+            let png = if options.pixels { drawing.png() } else { Vec::new() };
             let svg = options.svg.map(|thinnest| {
                 if options.crop {
                     drawing.svg_cropped(thinnest, FIT_MIN)

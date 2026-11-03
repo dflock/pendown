@@ -4690,6 +4690,7 @@ dependencies = [
  "gpui-kit",
  "image",
  "kdl",
+ "log",
  "pendown-cli",
  "pendown-logo",
  "pendown-render",

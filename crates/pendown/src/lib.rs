@@ -11,6 +11,7 @@ pub mod drive;
 pub mod errors;
 pub mod gallery;
 pub mod help;
+pub mod log_file;
 pub mod markup;
 pub mod metrics;
 pub mod run;

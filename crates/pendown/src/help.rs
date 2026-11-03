@@ -10,7 +10,8 @@ pub const PICTURE_SIZE: u32 = 84;
 
 /// How an example is drawn for its picture: fitted, with `RANDOM`'s seed
 /// fixed so the picture is always the same, as in the tests. No line is
-/// thinner than a pixel, or thin lines would be grey on a 1× screen.
+/// thinner than a pixel, or thin lines would be grey on a 1× screen. It's
+/// shown from its SVG, so it needs no pixels.
 pub fn picture_options() -> Options {
     let thinnest = 1.0 / PICTURE_SIZE as f64;
     Options {
@@ -21,6 +22,7 @@ pub fn picture_options() -> Options {
         fit: true,
         svg: Some(thinnest),
         crop: false,
+        pixels: false,
     }
 }
 

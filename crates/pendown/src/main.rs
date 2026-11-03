@@ -40,6 +40,7 @@ const ICON: &[u8] = include_bytes!("../linux/pendown.png");
 const APP_ID: &str = "pendown";
 
 fn main() {
+    pendown::log_file::init();
     gpui_kit::application()
         .with_assets(icons::AppAssets)
         .run(|cx| {

@@ -1482,8 +1482,14 @@ impl App {
             thinking: self.show_thinking,
             driving: self.driving.is_some(),
         };
-        self.toolbar_pane
-            .update(cx, |pane, cx| pane.set(toolbar, cx));
+        if self
+            .toolbar_pane
+            .update(cx, |pane, cx| pane.set(toolbar, cx))
+        {
+            // Notified mid-draw, so it redraws in the next frame: make sure
+            // there is one, as nothing else may ask for it when a run ends.
+            window.request_animation_frame();
+        }
 
         let canvas_area = div()
             .relative()

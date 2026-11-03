@@ -180,34 +180,38 @@ pub struct ThreadCpu {
 }
 
 impl ThreadCpu {
-    /// Read now. On platforms other than Linux, it's all zero.
+    /// Read now.
+    #[cfg(target_os = "linux")]
     pub fn now() -> ThreadCpu {
         let mut cpu = ThreadCpu::default();
-        #[cfg(target_os = "linux")]
-        {
-            let pid = std::process::id().to_string();
-            let Ok(tasks) = std::fs::read_dir("/proc/self/task") else {
-                return cpu;
+        let pid = std::process::id().to_string();
+        let Ok(tasks) = std::fs::read_dir("/proc/self/task") else {
+            return cpu;
+        };
+        for task in tasks.flatten() {
+            let path = task.path();
+            let Some(used) = std::fs::read_to_string(path.join("schedstat"))
+                .ok()
+                .and_then(|s| schedstat(&s))
+            else {
+                continue;
             };
-            for task in tasks.flatten() {
-                let path = task.path();
-                let Some(used) = std::fs::read_to_string(path.join("schedstat"))
-                    .ok()
-                    .and_then(|s| schedstat(&s))
-                else {
-                    continue;
-                };
-                let name = std::fs::read_to_string(path.join("comm")).unwrap_or_default();
-                if task.file_name().to_str() == Some(&pid) {
-                    cpu.main += used;
-                } else if name.trim() == "interpreter" {
-                    cpu.interpreter += used;
-                } else {
-                    cpu.other += used;
-                }
+            let name = std::fs::read_to_string(path.join("comm")).unwrap_or_default();
+            if task.file_name().to_str() == Some(&pid) {
+                cpu.main += used;
+            } else if name.trim() == "interpreter" {
+                cpu.interpreter += used;
+            } else {
+                cpu.other += used;
             }
         }
         cpu
+    }
+
+    /// On platforms other than Linux, it's all zero.
+    #[cfg(not(target_os = "linux"))]
+    pub fn now() -> ThreadCpu {
+        ThreadCpu::default()
     }
 
     /// The CPU time used between `earlier` and now. A thread that ended
@@ -248,6 +252,7 @@ pub fn this_thread_cpu() -> Option<Duration> {
 }
 
 /// `schedstat`'s first field: nanoseconds spent running.
+#[cfg(target_os = "linux")]
 fn schedstat(text: &str) -> Option<Duration> {
     text.split_whitespace()
         .next()?
@@ -296,6 +301,7 @@ mod tests {
         assert_eq!(wait.total_now(), wait.total());
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn schedstat_is_read_in_nanoseconds() {
         assert_eq!(

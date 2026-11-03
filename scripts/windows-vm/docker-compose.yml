@@ -1,0 +1,40 @@
+# A Windows 11 VM for building and trying Pendown, with dockur/windows. See
+# README.md here. Windows' disk and the built .exe files are kept outside the
+# repo, in the folder PENDOWN_VM_DIR names in .env.
+#   Start:  sudo docker compose up -d     (the first start installs Windows)
+#   Watch:  http://127.0.0.1:8006         (or Remote Desktop to 127.0.0.1:3389)
+#   Stop:   sudo docker compose stop
+name: pendown-windows
+services:
+  windows:
+    image: dockurr/windows
+    container_name: pendown-windows
+    environment:
+      VERSION: "11"
+      RAM_SIZE: "8G"
+      CPU_CORES: "4"
+      DISK_SIZE: "128G"
+      USERNAME: "pendown"
+      PASSWORD: "pendown"
+    devices:
+      - /dev/kvm
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    # Only this machine can connect, not the rest of the network.
+    ports:
+      - 127.0.0.1:8006:8006
+      - 127.0.0.1:3389:3389/tcp
+      - 127.0.0.1:3389:3389/udp
+    volumes:
+      # Without PENDOWN_VM_DIR, stop rather than install a new Windows
+      # somewhere else.
+      - ${PENDOWN_VM_DIR:?Set PENDOWN_VM_DIR in scripts/windows-vm/.env; see README.md}/storage:/storage
+      # Copied to C:\OEM in Windows when it's installed: the setup script.
+      - ./oem:/oem
+      # The shared folder is Z: and "Shared" on the desktop. build.ps1 copies
+      # the .exe files there. The repo is inside it, read-only, as Z:\pendown,
+      # and build.ps1 clones it from there.
+      - ${PENDOWN_VM_DIR:?Set PENDOWN_VM_DIR in scripts/windows-vm/.env; see README.md}/shared:/shared
+      - ../..:/shared/pendown:ro
+    stop_grace_period: 2m

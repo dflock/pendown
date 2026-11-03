@@ -4,3 +4,6 @@ target/
 # Pictures from failing picture tests
 *.actual.png
 mindstorms/conversion/build/
+
+# The Windows VM: where its disk is on this machine
+scripts/windows-vm/.env

@@ -53,7 +53,7 @@ POLYGON 8 60
 
 Kame wanted three boxes, each bigger than the last.
 
-```picture
+```picture What Kame meant to draw
 PU LT 90 FD 75 RT 90 BK 75 PD
 REPEAT 4 [FD 50 RT 90]
 REPEAT 4 [FD 100 RT 90]

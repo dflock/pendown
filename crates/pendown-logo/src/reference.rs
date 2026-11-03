@@ -1,4 +1,4 @@
-//! The language reference, from `pendown-logo.kdl` (ADR 0018): every
+//! The language reference, from `content/reference.kdl` (ADR 0018): every
 //! command's names, usage, our description and examples, by chapter and
 //! section, and the syntax that isn't a command. The help panel shows it,
 //! and the interpreter uses it to say why an obsolete command isn't here.
@@ -9,7 +9,7 @@ use std::{collections::HashMap, sync::OnceLock};
 
 use kdl::{KdlDocument, KdlNode, KdlValue};
 
-const SOURCE: &str = include_str!("../../../pendown-logo.kdl");
+const SOURCE: &str = include_str!("../../../content/reference.kdl");
 
 /// The infix operators, which `eg` shows as `num1 + num2`.
 const OPERATORS: [&str; 10] = ["+", "-", "*", "/", "=", "<", ">", "<=", ">=", "<>"];
@@ -106,7 +106,8 @@ pub struct Reference {
 pub fn reference() -> &'static Reference {
     static REFERENCE: OnceLock<Reference> = OnceLock::new();
     REFERENCE.get_or_init(|| {
-        Reference::parse(SOURCE).unwrap_or_else(|e| panic!("pendown-logo.kdl doesn't parse: {e}"))
+        Reference::parse(SOURCE)
+            .unwrap_or_else(|e| panic!("content/reference.kdl doesn't parse: {e}"))
     })
 }
 

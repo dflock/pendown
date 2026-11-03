@@ -2,7 +2,7 @@
 
 Kame wants to draw a house. Its plan: a house is a box with a triangle on top. Kame already knows `BOX`, so it teaches itself `TRIANGLE`, and then `HOUSE`, which draws one and then the other.
 
-```picture
+```picture What Kame meant to draw
 PU LT 90 FD 50 RT 90 BK 93 PD
 REPEAT 4 [FD 100 RT 90]
 FD 100 RT 30
@@ -71,7 +71,7 @@ After `BOX`, Kame is back where it started, facing up. `FD 100` takes it to the 
 
 ### A square that won't close
 
-```picture
+```picture What Kame meant to draw
 PU BK 50 LT 90 FD 50 RT 90 PD
 REPEAT 4 [FD 100 RT 90]
 ```
@@ -84,7 +84,7 @@ How far does Kame turn altogether, going round? A shape that closes up turns Kam
 
 ### A star that won't close
 
-```picture
+```picture What Kame meant to draw
 PU LT 90 FD 22 RT 90 BK 100 PD
 REPEAT 5 [FD 200 RT 144]
 ```
@@ -97,7 +97,7 @@ This star turns Kame round twice as it draws, not once. How far does each turn h
 
 ### A flower with a gap
 
-```picture
+```picture What Kame meant to draw
 TO BOX
   REPEAT 4 [FD 100 RT 90]
 END

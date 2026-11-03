@@ -67,6 +67,7 @@ fn main() -> ExitCode {
             seed: args.seed,
             fit: args.fit,
             svg,
+            crop: false,
         },
     );
     print!("{}", output.printed);

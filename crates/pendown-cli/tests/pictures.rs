@@ -28,6 +28,7 @@ fn check_output(name: &str, program: &str, width: u32, height: u32) -> String {
             seed: Some(1),
             fit: false,
             svg: None,
+            crop: false,
         },
     );
     assert_eq!(output.result, Ok(()), "{name} should run without errors");

@@ -199,6 +199,8 @@ enum Step {
     CheckDriveThinking(&'static str),
     /// Scroll the help page this far down, in logical pixels.
     ScrollHelp(f32),
+    /// Scroll the lesson showing this far down, in logical pixels.
+    ScrollLesson(f32),
     /// Type in the Colours page's R, G, B, A or hex field, counting from 0.
     ColourField(usize, &'static str),
     /// Click on the Colours page's wheel, from 0 to 1 across and down.
@@ -875,7 +877,27 @@ fn script() -> Vec<Step> {
         Lesson(7),
         Wait(ms(500)),
         Screenshot("tutorial-l-systems"),
-        RunLesson(7, 3),
+        // "Rules for growing a line": its program, pictures and text block.
+        ScrollLesson(330.0),
+        Wait(ms(500)),
+        Screenshot("tutorial-l-systems-reading"),
+        ScrollLesson(680.0),
+        Wait(ms(500)),
+        Screenshot("tutorial-l-systems-bump"),
+        ScrollLesson(1050.0),
+        Wait(ms(500)),
+        Screenshot("tutorial-l-systems-width"),
+        ScrollLesson(1600.0),
+        Wait(ms(500)),
+        Screenshot("tutorial-l-systems-rewriting"),
+        ScrollLesson(0.0),
+        // By its name, so a new program earlier in the lesson doesn't move it.
+        RunLesson(
+            7,
+            pendown::tutorial::lessons()[7]
+                .program_named("gasket")
+                .expect("lesson 8 has the gasket"),
+        ),
         WaitFinished,
         // The gasket at level 4: 81 triangles of 3 sides, and the 120
         // lines between corners at levels 1 to 4.
@@ -1757,6 +1779,12 @@ impl App {
                     self.check(found == expected, format!("Teach Kame is enabled: {found}"));
                 }
                 Step::Keys(keys) => self.press(keys, window, cx),
+                Step::ScrollLesson(y) => {
+                    self.help_panel.update(cx, |p, cx| {
+                        p.lesson_scrolls[p.lesson].set_offset(point(px(0.), px(-y)));
+                        cx.notify();
+                    });
+                }
                 Step::ScrollHelp(y) => {
                     self.help_panel.update(cx, |p, cx| {
                         p.page_scroll.set_offset(point(px(0.), px(-y)));

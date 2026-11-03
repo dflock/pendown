@@ -31,6 +31,9 @@ pub struct Options {
     /// Make an SVG of the drawing too, with no line thinner than this
     /// fraction of its width (`Drawing::svg`).
     pub svg: Option<f64>,
+    /// Crop the SVG to what's drawn, with a margin, rather than showing the
+    /// whole turtle area (`Drawing::svg_cropped`).
+    pub crop: bool,
 }
 
 /// The smallest area, in turtle steps, that `fit` zooms in to.
@@ -175,7 +178,13 @@ pub fn render(source: &str, options: Options) -> Output {
             }
             let drawing = drawing.borrow();
             let png = drawing.png();
-            let svg = options.svg.map(|thinnest| drawing.svg(thinnest));
+            let svg = options.svg.map(|thinnest| {
+                if options.crop {
+                    drawing.svg_cropped(thinnest, FIT_MIN)
+                } else {
+                    drawing.svg(thinnest)
+                }
+            });
             let printed = printed.borrow().clone();
             let summary = metrics::enabled().then(|| {
                 let wall = started.elapsed();

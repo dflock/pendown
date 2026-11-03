@@ -2,7 +2,7 @@
 //! `code`, `**bold**`, `*italics*`, lists of lines starting `- `, headings,
 //! notes starting `> `, fenced code blocks, and `[NAME]`, a link to the
 //! help for a command or a syntax entry. The help text in
-//! `pendown-logo.kdl` and the tutorial are written in it.
+//! `content/reference.kdl` and the tutorial are written in it.
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Inline {
@@ -22,8 +22,9 @@ pub enum Block {
     /// A note set apart, such as the tutorial's "Try this".
     Note(Vec<Inline>),
     /// A fenced code block: a program, with the language after the fence,
-    /// if any, and a name after that (such as ```` ```logo tree ````), so the
-    /// gallery can point at it. Markdown viewers read only the language.
+    /// if any, and the rest of the line after that: a program's name (such
+    /// as ```` ```logo tree ````), so the gallery can point at it, or a
+    /// picture's caption. Markdown viewers read only the language.
     Code {
         language: String,
         name: Option<String>,
@@ -112,10 +113,12 @@ pub fn parse(text: &str) -> Vec<Block> {
                 }
                 code.push(line);
             }
-            let mut words = info.split_whitespace();
+            let info = info.trim();
+            let (language, rest) = info.split_once(char::is_whitespace).unwrap_or((info, ""));
+            let rest = rest.trim();
             blocks.push(Block::Code {
-                language: words.next().unwrap_or_default().to_string(),
-                name: words.next().map(str::to_string),
+                language: language.to_string(),
+                name: (!rest.is_empty()).then(|| rest.to_string()),
                 code: code.join("\n"),
             });
         } else if trimmed.is_empty() {
@@ -284,6 +287,25 @@ mod tests {
                 name: Some("tree".into()),
                 code: "TREE 120".into()
             }]
+        );
+    }
+
+    #[test]
+    fn a_picture_has_the_rest_of_the_line_as_its_caption() {
+        assert_eq!(
+            parse("```picture  The four lines, in order \nFD 100\n```\n\n```picture\nFD 1\n```"),
+            [
+                Block::Code {
+                    language: "picture".into(),
+                    name: Some("The four lines, in order".into()),
+                    code: "FD 100".into()
+                },
+                Block::Code {
+                    language: "picture".into(),
+                    name: None,
+                    code: "FD 1".into()
+                }
+            ]
         );
     }
 

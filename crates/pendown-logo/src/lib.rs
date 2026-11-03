@@ -45,7 +45,7 @@ pub fn fresh_seed() -> u64 {
 }
 
 /// Every built-in command's names, the first being the one the manual uses
-/// first, for checking against `pendown-logo.kdl`.
+/// first, for checking against `content/reference.kdl`.
 pub fn command_names() -> impl Iterator<Item = &'static [&'static str]> {
     prims::PRIMS.iter().map(|p| p.names)
 }

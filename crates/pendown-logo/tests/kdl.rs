@@ -1,4 +1,4 @@
-//! `pendown-logo.kdl` is the source of truth for which commands exist (see
+//! `content/reference.kdl` is the source of truth for which commands exist (see
 //! `implementation-plan.md`), so it must parse, and the interpreter must
 //! implement exactly the commands it marks as phases 1 and 2.
 
@@ -7,9 +7,9 @@ use std::collections::BTreeSet;
 use kdl::{KdlDocument, KdlNode};
 
 fn document() -> KdlDocument {
-    let text = include_str!("../../../pendown-logo.kdl");
+    let text = include_str!("../../../content/reference.kdl");
     text.parse()
-        .unwrap_or_else(|e| panic!("pendown-logo.kdl doesn't parse: {e:?}"))
+        .unwrap_or_else(|e| panic!("content/reference.kdl doesn't parse: {e:?}"))
 }
 
 /// Every command node: one with an `eg` child. Chapters and sections hold

@@ -1,4 +1,4 @@
-//! The help text in `pendown-logo.kdl` is good markup, and its links go
+//! The help text in `content/reference.kdl` is good markup, and its links go
 //! somewhere (phase 5 issue 03).
 
 use pendown::markup::{self, Block};

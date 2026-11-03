@@ -63,7 +63,7 @@ CIRCLE 20
 
 Kame wanted an orange square, and a sky blue one turned across it.
 
-```picture
+```picture What Kame meant to draw
 PU LT 90 FD 71 RT 90 BK 15 PD
 SETPC "orange
 REPEAT 4 [FD 100 RT 90]

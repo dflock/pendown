@@ -64,7 +64,7 @@ Walking back to where it started matters: each smaller tree leaves Kame just whe
 
 Kame meant to draw the tree above.
 
-```picture
+```picture What Kame meant to draw
 PU BK 200 PD
 TO TREE :size
   IF :size < 5 [STOP]

@@ -1,5 +1,5 @@
 //! The gallery (`.scratch/gallery/`, ADR 0030): sections of examples to
-//! run or load into the editor, from `gallery.kdl` at the top of the
+//! run or load into the editor, from `content/gallery.kdl` at the top of the
 //! repository. Each entry points at an example where it already lives (a
 //! help example, a lesson's program, or a program in `examples/gallery/`),
 //! so nothing is copied. Everything is built into the app.
@@ -11,11 +11,11 @@ use pendown_logo::reference::reference;
 
 use crate::{source::Source, tutorial};
 
-const INDEX: &str = include_str!("../../../gallery.kdl");
+const INDEX: &str = include_str!("../../../content/gallery.kdl");
 
 /// The gallery's own programs, by their path from the top of the
 /// repository. A test checks this is every `.logo` file in
-/// `examples/gallery/`, and that `gallery.kdl` uses each.
+/// `examples/gallery/`, and that `content/gallery.kdl` uses each.
 pub const FILES: [(&str, &str); 10] = [
     (
         "examples/gallery/snowflake.logo",
@@ -125,7 +125,7 @@ pub fn parse(text: &str) -> (Vec<Section>, Vec<String>) {
         Err(e) => {
             return (
                 Vec::new(),
-                vec![format!("gallery.kdl doesn't parse: {e:?}")],
+                vec![format!("content/gallery.kdl doesn't parse: {e:?}")],
             );
         }
     };
@@ -273,7 +273,7 @@ mod tests {
         for (i, (path, _)) in FILES.iter().enumerate() {
             assert!(
                 title_of(Source::File(i)).is_some(),
-                "gallery.kdl doesn't use {path}"
+                "content/gallery.kdl doesn't use {path}"
             );
         }
     }

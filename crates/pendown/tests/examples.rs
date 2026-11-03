@@ -12,7 +12,8 @@
 
 use std::path::PathBuf;
 
-use pendown::help::picture_options;
+use pendown::help::{lesson_picture_options, picture_options};
+use pendown_cli::Options;
 use pendown_logo::reference::reference;
 
 /// As in `pendown-cli`'s picture tests: a pixel counts as different if a
@@ -28,8 +29,9 @@ fn dir() -> PathBuf {
 /// Every example and lesson program: its name, as `forward-1` for
 /// FORWARD's first example, `tutorial-1-2` for lesson 1's second
 /// program and `tutorial-4-picture-1` for lesson 4's first picture, its
-/// code, and whether it should stop with an error.
-fn programs() -> Vec<(String, String, bool)> {
+/// code, whether it should stop with an error, and how the panel draws its
+/// picture: a lesson's pictures are the shape of their drawing.
+fn programs() -> Vec<(String, String, bool, Options)> {
     let mut out = Vec::new();
     for command in reference().commands.iter().filter(|c| c.implemented) {
         for (i, example) in command.examples.iter().enumerate() {
@@ -37,6 +39,7 @@ fn programs() -> Vec<(String, String, bool)> {
                 pendown::help::example_name(&command.key, i),
                 example.code.clone(),
                 example.fails,
+                picture_options(),
             ));
         }
     }
@@ -46,6 +49,7 @@ fn programs() -> Vec<(String, String, bool)> {
                 format!("tutorial-{}-{}", l + 1, p + 1),
                 program.to_string(),
                 false,
+                picture_options(),
             ));
         }
         for (p, picture) in lesson.pictures().enumerate() {
@@ -53,6 +57,7 @@ fn programs() -> Vec<(String, String, bool)> {
                 format!("tutorial-{}-picture-{}", l + 1, p + 1),
                 picture.to_string(),
                 false,
+                lesson_picture_options(),
             ));
         }
     }
@@ -61,8 +66,8 @@ fn programs() -> Vec<(String, String, bool)> {
 
 /// Checks one program, named `name`, and returns what went wrong, if
 /// anything.
-fn check(name: &str, code: &str, fails: bool) -> Option<String> {
-    let output = pendown_cli::render(code, picture_options());
+fn check(name: &str, code: &str, fails: bool, options: Options) -> Option<String> {
+    let output = pendown_cli::render(code, options);
     match (&output.result, fails) {
         (Ok(()), true) => return Some(format!("{name}: should stop with an error, but didn't")),
         (Err(e), false) => return Some(format!("{name}: {e:?}")),
@@ -110,7 +115,7 @@ fn every_example_runs_and_draws_its_picture() {
     let programs = programs();
     let problems: Vec<_> = programs
         .iter()
-        .filter_map(|(name, code, fails)| check(name, code, *fails))
+        .filter_map(|(name, code, fails, options)| check(name, code, *fails, *options))
         .collect();
     assert!(problems.is_empty(), "{problems:#?}");
     // No pictures are left from examples that have gone.
@@ -142,6 +147,7 @@ fn every_svg_looks_like_its_png() {
         seed: Some(1),
         fit: false,
         svg: Some(thinnest),
+        crop: false,
     };
     // And some that the examples don't cover: shapes at headings where
     // turning the wrong way would show, arcs both ways and past a whole
@@ -161,7 +167,7 @@ fn every_svg_looks_like_its_png() {
         ),
     ];
     let mut problems = Vec::new();
-    let programs = programs().into_iter().map(|(n, c, _)| (n, c));
+    let programs = programs().into_iter().map(|(n, c, _, _)| (n, c));
     for (name, code) in programs.chain(extra.map(|(n, c)| (n.to_string(), c.to_string()))) {
         let output = pendown_cli::render(&code, options);
         let svg = output.svg.expect("asked for");

@@ -20,6 +20,16 @@ pub fn picture_options() -> Options {
         seed: Some(1),
         fit: true,
         svg: Some(thinnest),
+        crop: false,
+    }
+}
+
+/// A lesson's picture: as [`picture_options`], but the shape of the
+/// drawing (`.scratch/lesson-8-rules/` issue 02).
+pub fn lesson_picture_options() -> Options {
+    Options {
+        crop: true,
+        ..picture_options()
     }
 }
 

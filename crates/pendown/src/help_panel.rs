@@ -19,8 +19,9 @@ use gpui_kit::component::{
 };
 use gpui_kit::{assets::IconName, prelude::FluentBuilder as _, *};
 use pendown::{
-    help::{PICTURE_SIZE, picture_options},
+    help::{PICTURE_SIZE, lesson_picture_options, picture_options},
     markup::{self, Block, Inline},
+    tutorial::{Kind as CodeKind, kind},
 };
 use pendown_logo::reference::{Command, Kind, reference};
 
@@ -97,6 +98,8 @@ pub struct HelpPanel {
     pub page_scroll: ScrollHandle,
     /// The Gallery's, kept as you switch tabs.
     pub gallery_scroll: ScrollHandle,
+    /// Each lesson's scroll, so each keeps its place.
+    pub lesson_scrolls: Vec<ScrollHandle>,
     pub shortcuts_scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
@@ -160,6 +163,10 @@ impl HelpPanel {
             program_running: false,
             page_scroll: ScrollHandle::new(),
             gallery_scroll: ScrollHandle::new(),
+            lesson_scrolls: pendown::tutorial::lessons()
+                .iter()
+                .map(|_| ScrollHandle::new())
+                .collect(),
             shortcuts_scroll: ScrollHandle::new(),
             _subscriptions: subscriptions,
         }
@@ -291,17 +298,32 @@ impl HelpPanel {
 
     /// The picture of an example, starting to draw it if it isn't yet.
     fn picture(&mut self, code: &str, cx: &mut Context<Self>) -> Option<Picture> {
-        if let Some(picture) = self.pictures.get(code) {
+        self.picture_with(code, picture_options(), cx)
+    }
+
+    /// The picture of a program, drawn with `options`, starting to draw it
+    /// if it isn't yet.
+    fn picture_with(
+        &mut self,
+        code: &str,
+        options: pendown_cli::Options,
+        cx: &mut Context<Self>,
+    ) -> Option<Picture> {
+        // A lesson's cropped picture isn't an example's square one.
+        let key = if options.crop {
+            format!("cropped\n{code}")
+        } else {
+            code.to_string()
+        };
+        if let Some(picture) = self.pictures.get(&key) {
             return Some(picture.clone());
         }
-        let key = code.to_string();
         // Drawing it can take a moment: in the meantime, the panel shows a
         // blank square.
         self.pictures
             .insert(key.clone(), Picture::Printed(String::new()));
-        let code = key.clone();
-        let task =
-            cx.background_spawn(async move { pendown_cli::render(&code, picture_options()) });
+        let code = code.to_string();
+        let task = cx.background_spawn(async move { pendown_cli::render(&code, options) });
         cx.spawn(async move |this, cx| {
             let output = task.await;
             let picture = match &output.result {
@@ -393,6 +415,23 @@ fn tab(id: &'static str, label: &'static str, active: bool, cx: &App) -> Statefu
 /// A lesson's pictures are this many logical pixels square, bigger than
 /// Help's, since they're the point of the paragraph.
 const LESSON_PICTURE: f32 = 160.;
+
+/// The widest a lesson's picture is drawn, before it's shrunk to fit the
+/// panel: a little more than the panel's text at its usual width.
+const LESSON_PICTURE_WIDEST: f32 = 400.;
+
+/// An SVG's width over its height, from its `width` and `height`.
+fn svg_aspect(svg: &[u8]) -> Option<f32> {
+    let svg = std::str::from_utf8(svg).ok()?;
+    let tag = &svg[svg.find("<svg")?..];
+    let tag = &tag[..tag.find('>')?];
+    let number = |name: &str| -> Option<f32> {
+        let rest = &tag[tag.find(&format!(" {name}=\""))? + name.len() + 3..];
+        rest[..rest.find('"')?].parse().ok()
+    };
+    let (width, height) = (number("width")?, number("height")?);
+    (height > 0.).then(|| width / height)
+}
 
 pub(crate) type Rendered = Arc<Mutex<HashMap<(i32, i32), Arc<RenderImage>>>>;
 
@@ -593,6 +632,17 @@ pub(crate) fn code_block(
         .text_xs()
         .whitespace_normal()
         .child(text)
+}
+
+/// A lesson's text block: as a program is shown, but plain, as it is.
+fn text_block(text: &str, theme: &gpui_kit::component::Theme) -> Div {
+    div()
+        .p_2()
+        .rounded_md()
+        .bg(theme.muted)
+        .font_family(theme.mono_font_family.clone())
+        .text_xs()
+        .child(text.to_string())
 }
 
 impl HelpPanel {
@@ -1501,8 +1551,11 @@ impl HelpPanel {
         let mut p = 0;
         for (b, block) in lesson.blocks.iter().enumerate() {
             match block {
-                Block::Code { language, code, .. } if language == pendown::tutorial::PICTURE => {
-                    body.push(self.lesson_picture(code, cx));
+                Block::Code { code, name, .. } if kind(block) == Some(CodeKind::Picture) => {
+                    body.push(self.lesson_picture(code, name.as_deref(), cx));
+                }
+                Block::Code { code, .. } if kind(block) == Some(CodeKind::Text) => {
+                    body.push(text_block(code, &theme).mt_2().into_any_element());
                 }
                 Block::Code { code, .. } => {
                     body.push(self.program_card(l, p, code, cx));
@@ -1574,29 +1627,58 @@ impl HelpPanel {
                 div()
                     .flex_1()
                     .min_h_0()
-                    .px_3()
-                    .pb_4()
-                    .children(body)
-                    .overflow_y_scrollbar()
-                    .id(SharedString::from(format!("lesson-{l}"))),
+                    .relative()
+                    .child(
+                        div()
+                            .id(SharedString::from(format!("lesson-{l}")))
+                            .track_scroll(&self.lesson_scrolls[l])
+                            .size_full()
+                            .overflow_y_scroll()
+                            .px_3()
+                            .pb_4()
+                            .children(body),
+                    )
+                    .vertical_scrollbar(&self.lesson_scrolls[l]),
             )
             .child(footer)
             .into_any_element()
     }
 
-    /// One of a lesson's programs, with Load into editor and Run.
     /// A lesson's picture: what its program draws, with no code, Load or
-    /// Run, drawn as Help's example pictures are.
-    fn lesson_picture(&mut self, code: &str, cx: &mut Context<Self>) -> AnyElement {
+    /// Run, and its caption, if it has one. It's the shape of the drawing:
+    /// `LESSON_PICTURE` tall, or as wide as the panel if that's less.
+    fn lesson_picture(
+        &mut self,
+        code: &str,
+        caption: Option<&str>,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
-        let size = LESSON_PICTURE;
-        let picture = match self.picture(code, cx) {
-            Some(Picture::Drawing(svg, rendered)) => svg_image(svg, rendered, size, size)
-                .rounded_md()
-                .into_any_element(),
+        let tall = LESSON_PICTURE;
+        let picture = match self.picture_with(code, lesson_picture_options(), cx) {
+            Some(Picture::Drawing(svg, rendered)) => {
+                let aspect = svg_aspect(&svg).unwrap_or(1.0);
+                // Drawn at its widest, and shrunk to fit the panel.
+                let (width, height) = if tall * aspect > LESSON_PICTURE_WIDEST {
+                    (LESSON_PICTURE_WIDEST, LESSON_PICTURE_WIDEST / aspect)
+                } else {
+                    (tall * aspect, tall)
+                };
+                div()
+                    .w_full()
+                    .max_w(px(width))
+                    .child(
+                        svg_image(svg, rendered, width, height)
+                            .w_full()
+                            .h_auto()
+                            .aspect_ratio(aspect)
+                            .rounded_md(),
+                    )
+                    .into_any_element()
+            }
             // Being drawn, or drew nothing: a blank square.
             _ => div()
-                .size(px(size))
+                .size(px(tall))
                 .rounded_md()
                 .bg(black())
                 .into_any_element(),
@@ -1606,15 +1688,19 @@ impl HelpPanel {
             .items_center()
             .gap_1()
             .child(picture)
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(theme.muted_foreground)
-                    .child("What Kame meant to draw"),
-            )
+            .when_some(caption, |v, caption| {
+                v.child(
+                    div()
+                        .text_xs()
+                        .text_center()
+                        .text_color(theme.muted_foreground)
+                        .child(caption.to_string()),
+                )
+            })
             .into_any_element()
     }
 
+    /// One of a lesson's programs, with Load into editor and Run.
     fn program_card(
         &self,
         lesson: usize,

@@ -4,23 +4,96 @@ Recursion can be hard to think about. Following every call of a procedure that c
 
 ## Rules for growing a line
 
-An **L-system** is a rule for rewriting a line. Write `F` for a line, `-` for a turn left of 60 degrees, and `+` for a turn right of 60. Here's a rule:
+An **L-system** is a rule for rewriting a line, again and again. It's written in a tiny language of three letters, and each letter is something Kame can do:
+
+- `F` means draw a line: `FD`
+- `-` means turn left 60 degrees: `LT 60`
+- `+` means turn right 60 degrees: `RT 60`
+
+Here's a rule:
 
 > `F` becomes `F-F++F-F`
 
-That's a line, a left turn, a line, two right turns, a line, a left turn and a line: a line with a bump in the middle.
+### Reading the rule
 
-Now do it again. Every `F` in `F-F++F-F` becomes `F-F++F-F`, all at once:
-
-> `F-F++F-F - F-F++F-F ++ F-F++F-F - F-F++F-F`
-
-Each line has grown its own bump. Do it again and every one of those lines grows a bump too. Each time you rewrite is a **level**: level 0 is just `F`, level 1 is the rule once, and level 2 is the rule twice.
-
-## The Koch curve
-
-Here's the rule as a procedure. `:level` says how many times to rewrite. At level 0, Kame draws a line. At any other level, it draws the rule, with four smaller curves, a level lower, where the rule says `F`.
+Read it one letter at a time, as Kame would. Here it is as Kame's instructions, with each letter beside the instruction it stands for:
 
 ```logo
+PU LT 90 FD 150 RT 180 PD
+
+FD 100        ; F
+LT 60         ; -
+FD 100        ; F
+RT 60 RT 60   ; ++
+FD 100        ; F
+LT 60         ; -
+FD 100        ; F
+```
+
+```picture The four lines, in the order Kame draws them: orange, blue, green, pink. The grey dashes are where Kame would have gone without turning.
+TO AHEAD
+  SETPC "gray SETPENSIZE 2
+  REPEAT 4 [FD 6 PU FD 4 PD]
+  PU BK 40 PD
+  SETPENSIZE 3
+END
+
+SETPENSIZE 3
+RT 90
+SETPC "orange FD 100 AHEAD
+LT 60
+SETPC "deepskyblue FD 100 AHEAD
+RT 120
+SETPC "limegreen FD 100 AHEAD
+LT 60
+SETPC "hotpink FD 100
+```
+
+`++` is two right turns together, 120 degrees: the sharp turn at the top of the bump.
+
+Now add up the turns: left 60, right 120, left 60. They cancel out, so Kame finishes facing the way it started, on the same straight line. That's what makes the trick work: any line can be swapped for a bump, and Kame still ends up in the right place, facing the right way.
+
+> **Try this:** run it with **Single Step**, and say each letter as Kame does it.
+
+### The same width
+
+```picture A line, and the rule drawn with lines a third as long.
+TO GUIDE
+  RT 90 SETPC "gray SETPENSIZE 1.5
+  REPEAT 12 [FD 3 PU FD 7 PD]
+  PU BK 120 PD LT 90
+END
+
+RT 90
+PU LT 90 FD 120 RT 90 PD
+SETPENSIZE 3 SETPC "white FD 300
+PU BK 300 PD
+REPEAT 4 [GUIDE PU FD 100 PD]
+PU BK 400 RT 90 FD 120 LT 90 PD
+SETPENSIZE 3
+SETPC "orange FD 100 LT 60
+SETPC "deepskyblue FD 100 RT 120
+SETPC "limegreen FD 100 LT 60
+SETPC "hotpink FD 100
+```
+
+Each `F` in the rule is a third as long as the line it replaces. The first and last lines cover the outside thirds. The two in the middle lean in towards each other, so together they cover the middle third. The bump fits in exactly the same space as the line.
+
+### Rewriting, again and again
+
+Now do it again. Every `F` in `F-F++F-F` becomes the whole rule, all at once. The turns stay as they were: only the `F`s change.
+
+```text
+F-F++F-F    the orange line
+-
+F-F++F-F    the blue line
+++
+F-F++F-F    the green line
+-
+F-F++F-F    the pink line
+```
+
+```picture Level 1, and level 2: each line has grown its own bump, in the same colour.
 TO KOCH :size :level
   IF :level = 0 [FD :size STOP]
   KOCH :size / 3 :level - 1
@@ -32,9 +105,46 @@ TO KOCH :size :level
   KOCH :size / 3 :level - 1
 END
 
+TO COLOURED :level
+  SETPC "orange KOCH 100 :level LT 60
+  SETPC "deepskyblue KOCH 100 :level RT 120
+  SETPC "limegreen KOCH 100 :level LT 60
+  SETPC "hotpink KOCH 100 :level
+END
+
+SETPENSIZE 3
+RT 90
+PU LT 90 FD 135 RT 90 PD
+COLOURED 0
+PU BK 300 RT 90 FD 135 LT 90 PD
+COLOURED 1
+```
+
+Each time you rewrite is a **level**. Level 0 is just `F`, level 1 is the rule once, and level 2 is the rule twice. Every level has four times as many lines as the one before, each a third as long: 4 lines, then 16, then 64.
+
+Writing all those letters out by hand would take a long time. A procedure that calls itself can do the rewriting for you.
+
+## The Koch curve
+
+Here's the rule as a procedure. `:level` says how many times to rewrite. At level 0, Kame draws a line. At any other level, it draws the rule, with four smaller curves, a level lower, where the rule says `F`. Each line has the letter of the rule it stands for beside it.
+
+```logo
+TO KOCH :size :level
+  IF :level = 0 [FD :size STOP]
+  KOCH :size / 3 :level - 1   ; F
+  LT 60                       ; -
+  KOCH :size / 3 :level - 1   ; F
+  RT 120                      ; ++
+  KOCH :size / 3 :level - 1   ; F
+  LT 60                       ; -
+  KOCH :size / 3 :level - 1   ; F
+END
+
 PU LT 90 FD 240 RT 180 PD
 KOCH 480 2
 ```
+
+Read down the comments and you get `F-F++F-F`, the rule. Each `F` is a smaller `KOCH`, a third the size and a level lower. Each `-` is `LT 60`, and `++` is `RT 120`, the two turns in one. The first line, `IF :level = 0`, is where the rewriting stops: at level 0, an `F` is just a line.
 
 That is the whole trick, and it's worth saying slowly:
 
@@ -49,13 +159,13 @@ This program draws levels 0, 1, 2 and 3, one under another, so you can see that 
 ```logo
 TO KOCH :size :level
   IF :level = 0 [FD :size STOP]
-  KOCH :size / 3 :level - 1
-  LT 60
-  KOCH :size / 3 :level - 1
-  RT 120
-  KOCH :size / 3 :level - 1
-  LT 60
-  KOCH :size / 3 :level - 1
+  KOCH :size / 3 :level - 1   ; F
+  LT 60                       ; -
+  KOCH :size / 3 :level - 1   ; F
+  RT 120                      ; ++
+  KOCH :size / 3 :level - 1   ; F
+  LT 60                       ; -
+  KOCH :size / 3 :level - 1   ; F
 END
 
 PU FD 330 LT 90 FD 240 RT 180 PD
@@ -220,7 +330,7 @@ Look closely: the shape is made of seven smaller copies of itself, each made of 
 
 Kame meant to draw the level 2 Koch curve from the start of the lesson.
 
-```picture
+```picture What Kame meant to draw
 TO KOCH :size :level
   IF :level = 0 [FD :size STOP]
   KOCH :size / 3 :level - 1

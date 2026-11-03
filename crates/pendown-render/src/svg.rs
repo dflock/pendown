@@ -155,13 +155,91 @@ impl Drawing {
     /// width: an SVG shown small, as the help panel's pictures are, would
     /// otherwise lose its thin lines. Zero keeps every pen's own width.
     pub fn svg(&self, thinnest: f64) -> String {
-        let thinnest = thinnest * self.area;
-        let area = num(self.area);
-        let corner = num(-self.area / 2.0);
+        let corner = -self.area / 2.0;
+        self.svg_of(
+            Point {
+                x: corner,
+                y: -corner,
+            },
+            self.area,
+            self.area,
+            thinnest,
+        )
+    }
+
+    /// The drawing as an SVG file, as [`Drawing::svg`], but cropped to what's
+    /// drawn, with a margin, and no less than `min` steps each way: the shape
+    /// of the drawing, for a lesson's picture. `thinnest` is a fraction of
+    /// its larger side. With nothing drawn, it's the whole turtle area.
+    pub fn svg_cropped(&self, thinnest: f64, min: f64) -> String {
+        let Some((low, high)) = self.bounds() else {
+            return self.svg(thinnest);
+        };
+        let margin = 0.05 * (high.x - low.x).max(high.y - low.y);
+        let side = |low: f64, high: f64| {
+            let length = (high - low + 2.0 * margin).max(min);
+            ((low + high - length) / 2.0, length)
+        };
+        let (left, width) = side(low.x, high.x);
+        let (bottom, height) = side(low.y, high.y);
+        self.svg_of(
+            Point {
+                x: left,
+                y: bottom + height,
+            },
+            width,
+            height,
+            thinnest,
+        )
+    }
+
+    /// The lowest and highest corners of what's drawn since the last
+    /// `CLEAN`, counting the pen's width, or `None` if nothing is.
+    pub fn bounds(&self) -> Option<(Point, Point)> {
+        let mut points = self.display.iter().flat_map(|m| {
+            let half_pen = if m.pen().down {
+                m.pen().size / 2.0
+            } else {
+                0.0
+            };
+            m.outline(1.0).into_iter().flat_map(move |p| {
+                [
+                    Point {
+                        x: p.x - half_pen,
+                        y: p.y - half_pen,
+                    },
+                    Point {
+                        x: p.x + half_pen,
+                        y: p.y + half_pen,
+                    },
+                ]
+            })
+        });
+        let first = points.next()?;
+        Some(points.fold((first, first), |(low, high), p| {
+            (
+                Point {
+                    x: low.x.min(p.x),
+                    y: low.y.min(p.y),
+                },
+                Point {
+                    x: high.x.max(p.x),
+                    y: high.y.max(p.y),
+                },
+            )
+        }))
+    }
+
+    /// The SVG of `width` by `height` steps, from `top_left` in turtle
+    /// coordinates.
+    fn svg_of(&self, top_left: Point, width: f64, height: f64, thinnest: f64) -> String {
+        let thinnest = thinnest * width.max(height);
+        let (x, y) = (num(top_left.x), num(-top_left.y));
+        let (w, h) = (num(width), num(height));
         let (background, opacity) = colour(self.background);
         let mut out = format!(
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{area}\" height=\"{area}\" viewBox=\"{corner} {corner} {area} {area}\">\n\
-             <rect x=\"{corner}\" y=\"{corner}\" width=\"{area}\" height=\"{area}\" fill=\"{background}\"{}/>\n\
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"{x} {y} {w} {h}\">\n\
+             <rect x=\"{x}\" y=\"{y}\" width=\"{w}\" height=\"{h}\" fill=\"{background}\"{}/>\n\
              <g fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n",
             opacity
                 .map(|o| format!(r#" fill-opacity="{o}""#))
@@ -223,6 +301,27 @@ mod tests {
             "{svg}"
         );
         assert!(svg.contains(r##"<ellipse cx="10" cy="-20" rx="30" ry="40" transform="rotate(45 10 -20)" fill="#0000ff"/>"##), "{svg}");
+    }
+
+    #[test]
+    fn a_cropped_svg_is_the_shape_of_the_drawing() {
+        let mut d = Drawing::new();
+        assert_eq!(d.bounds(), None);
+        assert_eq!(d.svg_cropped(0.0, 100.0), d.svg(0.0));
+        d.push(&[Segment {
+            from: p(0.0, 0.0),
+            to: p(300.0, 0.0),
+            pen: RED,
+        }
+        .into()]);
+        assert_eq!(d.bounds(), Some((p(-1.25, -1.25), p(301.25, 1.25))));
+        // A margin of 5% of the longer side, and no thinner than 100 steps,
+        // centred on the line.
+        let svg = d.svg_cropped(0.0, 100.0);
+        assert!(
+            svg.contains(r#"width="332.75" height="100" viewBox="-16.375 -50 332.75 100""#),
+            "{svg}"
+        );
     }
 
     #[test]

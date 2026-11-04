@@ -6,7 +6,7 @@ Blocked by: 01, 05
 
 ## What
 
-A new view, `crates/pendown/src/error_card.rs`, over the editor, built on what the spike found. It draws an error's `Explanation`, as in the mockup's "Paused on the line" and "Narrow pane" states:
+A new view, `crates/pendown/src/error_card.rs`, over the editor, placed as issue 01's comments say: from the scroll offset, line height and measured text width, not `range_to_bounds`. It draws an error's `Explanation`, as in the mockup's "Paused on the line" and "Narrow pane" states:
 
 - **The message,** at the end of the line, in red on a pale background. It takes no clicks.
 - **The card,** under the line and starting at the error's column: "Written like this", "Example", "Esc hides this" and the Help button. Syntax and example use the editor's font and code colours, and it takes clicks so they don't reach the hidden code. The wheel over it still scrolls the editor.

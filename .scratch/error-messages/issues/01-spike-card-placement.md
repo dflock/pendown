@@ -1,6 +1,6 @@
 # Spike: placing a card over the editor
 
-Status: ready-for-agent
+Status: resolved
 Type: prototype
 
 ## What
@@ -24,3 +24,31 @@ Answer these, on the private Xvfb display:
 - The spike's code is not kept.
 
 ## Comments
+
+2026-11-04: Placement works, but not with `range_to_bounds`. The spike's code is gone. Tested on X11 only, in Xvfb with xfwm4 at 1x scale, with a 60-line program, logging what each frame rendered and what the editor then painted.
+
+**Use this:**
+
+- **y:** `8 + scroll.y + line_height * line`, as `gutter.rs` does. It was right in every section of the test.
+- **x of the end of a line:** `12 + scroll.x + width`, with `width` from `window.text_system().shape_line` in the theme's mono font and size. The 12 is the editor's padding, like the gutter's `TOP`, read from `range_to_bounds` at scroll 0. The marker I checked used 13, and sat 1 px past the end of the text at 8 and 112 characters, scrolled sideways, and with a `ü`. So 12 fits, but hasn't been looked at itself. Wide characters, such as CJK from a fallback font, weren't tried.
+- **The parent:** a `relative` wrapper with `overflow_hidden` around `editor_pane` and the overlay, keeping `.cached(size_full)`. It sets the coordinates, and clips the card when its line scrolls out of view, at either edge.
+- **Redrawing:** `cx.observe(&editor, ...)`, as the gutter does.
+
+**Why not `range_to_bounds`:**
+
+- For a line scrolled above the view, it doesn't return nothing, whatever its docs say. It returns the first visible line, as though the line had stuck to the top of the pane (8 px, with line 6 of 60 far out of view).
+- It reads the last layout, so it's a frame behind while scrolling (69 of 629 frames in the first run, against 33 for the sum above, nearly all from typing). Its width was also 0 after typing a long line, until something else redrew it, about half a second later by the look of the log, though I didn't time it.
+- `visible_row_range` also lags a frame, so it shouldn't decide whether the card shows.
+
+**The answers:**
+
+- **Stays on its line?** With the wheel, the scrollbar and pane drags, the sum was never behind. When the editor scrolls itself, as Ctrl+Home, Ctrl+End, Page Down and typing past the edge do, the card is one frame behind, then right on the next. That's about 16 ms and I couldn't see it in screenshots, so I don't think it matters. Check by eye in issue 06.
+- **Line out of view?** The wrapper clips it, with nothing special needed.
+- **`.occlude()`?** A click on the box hit its handler and left the cursor where it was, and the keyboard still worked after. The box forwarded the wheel with its own handler calling `set_scroll_offset`, which worked (two clicks moved it 120 px). I didn't test it without that handler, so it may not be needed.
+- **A box with no handlers?** Clicks go through to the editor, and the cursor moved to that line.
+
+**For issue 06:**
+
+- The card needs clamping to the pane: at a narrow pane it was cut off on the right.
+- Text needs `whitespace_nowrap`, as a box near the right edge wrapped into a tall thin column.
+- At the end of a long line, the message landed off the pane's right edge, so the "no room, move it into the card" rule is needed.

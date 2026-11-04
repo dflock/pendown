@@ -756,7 +756,15 @@ impl Parser<'_, '_, '_> {
         let sym = self.cx.names.intern(name);
         match self.cx.arity(sym) {
             Some(arity) => Ok((Target::User(sym), arity)),
-            None => Err(Error::unknown(name, Some(span))),
+            None => {
+                let procedures: Vec<_> = (0..self.cx.names.len() as Sym)
+                    .filter_map(|sym| {
+                        let name = self.cx.names.spelling(sym).to_string();
+                        Some((name, self.cx.arity(sym)?))
+                    })
+                    .collect();
+                Err(Error::unknown(name, Some(span), &procedures))
+            }
         }
     }
 }

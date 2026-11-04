@@ -1,6 +1,10 @@
 use std::fmt;
 
-use crate::span::Span;
+use crate::{
+    parse::Arity,
+    span::Span,
+    suggest::{Suggestion, suggest},
+};
 
 /// A parse or runtime error, pointing at the code that caused it (ADR 0005).
 #[derive(Clone, Debug, PartialEq)]
@@ -42,6 +46,16 @@ pub fn too_many_inputs(name: &str, max: usize, exactly: bool, got: usize) -> Str
     format!("{name} takes {at_most}{}, but got {got}", inputs(max))
 }
 
+/// What to say about a value nothing uses, straight after a call that had
+/// all the inputs it takes.
+pub fn nothing_uses(value: &str, name: &str, takes: usize) -> String {
+    format!(
+        "Nothing uses {value}. {} takes {}",
+        name.to_uppercase(),
+        inputs(takes)
+    )
+}
+
 /// One step of an error's call chain: `procedure` was called at `span`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CallSite {
@@ -66,13 +80,19 @@ impl Error {
     }
 
     /// For a name that isn't a procedure: why, if it's an obsolete command,
-    /// and otherwise "I don't know how to".
-    pub fn unknown(name: &str, span: Option<Span>) -> Error {
+    /// and otherwise "I don't know how to", with what it might have been
+    /// meant as, from the commands and these procedures.
+    pub fn unknown(name: &str, span: Option<Span>, procedures: &[(String, Arity)]) -> Error {
         let upper = name.to_uppercase();
-        match crate::reference::reference().obsolete_reason(name) {
-            Some(reason) => {
-                Error::new(format!("{upper} isn't in Pendown: {reason}"), span).about(name)
-            }
+        if let Some(reason) = crate::reference::reference().obsolete_reason(name) {
+            return Error::new(format!("{upper} isn't in Pendown: {reason}"), span).about(name);
+        }
+        match suggest(name, procedures) {
+            Some(Suggestion { text, command }) => Error::new(
+                format!("I don't know how to {upper}. Did you mean {text}?"),
+                span,
+            )
+            .about(&command),
             None => Error::new(format!("I don't know how to {upper}"), span),
         }
     }

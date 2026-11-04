@@ -17,39 +17,6 @@ pub fn console_lines(explanation: &Explanation) -> Vec<String> {
     usage.chain(example).chain(defined).collect()
 }
 
-/// An explanation for the editor's hover popup, which renders Markdown. The
-/// first line is the message.
-pub fn markdown(explanation: &Explanation) -> String {
-    let mut out = escape_markdown(&explanation.message);
-    let mut code = |label: &str, code: &Option<String>| {
-        if let Some(code) = code {
-            out.push_str(&format!("\n\n**{label}**\n\n```\n{code}\n```"));
-        }
-    };
-    code("Written like this", &explanation.usage);
-    code("Example", &explanation.example);
-    if let Some(line) = explanation.defined_on {
-        out.push_str(&format!("\n\nDefined on line {line}"));
-    }
-    out
-}
-
-/// A message's own punctuation, such as the brackets of "This ] has no
-/// matching [" or a `*` it quotes, isn't Markdown.
-fn escape_markdown(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for c in text.chars() {
-        if matches!(
-            c,
-            '\\' | '`' | '*' | '_' | '[' | ']' | '<' | '>' | '#' | '&' | '~'
-        ) {
-            out.push('\\');
-        }
-        out.push(c);
-    }
-    out
-}
-
 /// An error's call chain, one line per step, innermost first. A deep
 /// recursion has thousands of identical steps, so runs of the same call are
 /// collapsed into one line: "called from DOWN (line 2), 9,998 times".
@@ -140,25 +107,6 @@ mod tests {
     #[test]
     fn the_console_adds_nothing_to_a_bare_message() {
         assert!(console_lines(&Explanation::default()).is_empty());
-    }
-
-    #[test]
-    fn the_hover_puts_code_in_code_blocks() {
-        assert_eq!(
-            markdown(&explanation()),
-            "REPEAT needs 2 inputs, but got 1\n\n\
-             **Written like this**\n\n```\nREPEAT number [instructions]\n```\n\n\
-             **Example**\n\n```\nREPEAT 4 [FD 100 RT 90]\n```"
-        );
-    }
-
-    #[test]
-    fn a_message_is_not_read_as_markdown() {
-        let explanation = Explanation {
-            message: "This ] has no matching [".into(),
-            ..Explanation::default()
-        };
-        assert_eq!(markdown(&explanation), "This \\] has no matching \\[");
     }
 
     fn call(procedure: &str, line: u32) -> CallSite {

@@ -1,6 +1,6 @@
 # Smarter hints
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 05
 
@@ -28,3 +28,14 @@ Add a test of real-looking typos, and of words that must not get a suggestion, s
 - `cargo test --workspace` passes.
 
 ## Comments
+
+2026-11-04: Done. "Did you mean" is in `crates/pendown-logo/src/suggest.rs`, which counts a swapped pair of letters as one edit, as that's a common slip.
+
+- **Rules:** words under 4 letters get nothing, 7 or more can be 2 edits away, and the rest 1. So `FRWRD` gets nothing, which is a miss, but keeps `TREE` and the like quiet. No wrong suggestion in the test list.
+- **`FD100`** only for a command or procedure that takes an input, so `CS5` gets nothing.
+- **Leftover input:** a value that's the next instruction, on the same line as a call, says "Nothing uses 20. FORWARD takes 1 input". That includes a value from a call, so `FD 10 SUM 1 2` says "Nothing uses 3".
+- **`FOR` and `WHILE`:** `eval_args` checks the command's `usage` on the failure path only. Any command whose input there is `instructionlist` gets the bracket message, which adds `UNTIL`, `DO.WHILE`, `DO.UNTIL`, `CATCH`, `RUN` and others. An input called `tfexpression` doesn't, so `WHILE FD 5 [RT 1]` keeps "FD didn't output to WHILE".
+- `Error::unknown` now takes the procedures known at that point. The parser lists them only when a word is unknown.
+
+`cargo test --workspace` passes.
+

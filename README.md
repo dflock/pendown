@@ -12,7 +12,7 @@ Pendown speaks [UCBLogo](https://people.eecs.berkeley.edu/~bh/logo.html), the mo
 - **The whole core language:** words, lists and arrays, `FOR` and `WHILE`, `MAP`, `FILTER` and `FOREACH` with templates, and `CATCH` and `THROW`.
 - **Help built in:** every command is documented in the app, with examples you can run on the canvas. Press F1 for help on the word under the cursor.
 - **A tutorial,** where Kame the turtle teaches you Logo one step at a time.
-- **Errors that help:** an obsolete UCBLogo command says why it isn't here, and an error offers help on its command.
+- **Errors that help:** a card over your code says what's wrong, how the command is written, and shows an example that works. A typo gets "Did you mean", and an obsolete UCBLogo command says why it isn't here.
 
 ## A taste of Logo
 
@@ -62,7 +62,7 @@ On X11 the window shows Kame either way. Wayland needs the desktop file to find 
 
 To build for Windows from Linux, there's a Windows VM in Docker, and a quick check for Windows that doesn't need it: see [`scripts/windows-vm/README.md`](scripts/windows-vm/README.md). On Windows, Pendown logs warnings, errors and panics to `%LOCALAPPDATA%\Pendown\pendown.log`, started afresh each run. Elsewhere they go to stderr.
 
-`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, pausing, stepping, changing a paused program, breakpoints, Restart and Reset, ending runs, the gallery, the shortcuts, the console, files, errors, filled shapes, how often the window redraws, the counters and variables panels, and the help panel and tutorial. `PENDOWN_AUTOTEST_FROM="Phase 5"` starts it at the first section with that in its title. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
+`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, pausing, stepping, changing a paused program, breakpoints, Restart and Reset, ending runs, the gallery, the shortcuts, the console, files, errors and the error card, filled shapes, how often the window redraws, the counters and variables panels, and the help panel and tutorial. `PENDOWN_AUTOTEST_FROM="Phase 5"` starts it at the first section with that in its title. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
 
 Type a program in the editor and press **Run**. Use the speed slider to choose how fast the turtle draws. Try the console too: after a run, it knows every procedure your program defined, so you can type `FLOWER 80` and watch.
 

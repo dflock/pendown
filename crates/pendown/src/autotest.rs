@@ -80,6 +80,13 @@ const COUNTING: &str = "MAKE \"n 0\nFOREVER [MAKE \"n :n + 1]";
 
 const ERRORS: &str = "TO BOX :n\n  FD :n RT 90\n  FD \"far\n  PRINT 1\nEND\nBOX 100";
 
+/// What the error card says about `REPEAT 4`.
+const REPEAT_CARD: (&str, &str, &str) = (
+    "REPEAT needs 2 inputs, but got 1",
+    "REPEAT number [instructions]",
+    "REPEAT 4 [FD 100 RT 90]",
+);
+
 /// One step of the session.
 #[derive(Clone)]
 #[allow(clippy::enum_variant_names)]
@@ -264,6 +271,8 @@ enum Step {
     CheckColours(&'static str),
     /// Press F12.
     ToggleMetrics,
+    /// The error card shows this message, syntax and example, or nothing.
+    CheckErrorCard(Option<(&'static str, &'static str, &'static str)>),
     /// Phase 5: put the editor's cursor one character into the first
     /// `marker`.
     CursorAt(&'static str),
@@ -384,7 +393,8 @@ fn script() -> Vec<Step> {
         CheckDiagnostics(&[]),
         // The editor sends its change event once the edit is done.
         Type("FD 10\nFOOBAR 3\nREPEAT 4 [FD]"),
-        Wait(ms(100)),
+        // An error on the line being typed waits for a pause.
+        Wait(ms(1200)),
         CheckDiagnostics(&[
             "I don't know how to FOOBAR",
             "FD needs 1 input, but got none",
@@ -730,6 +740,54 @@ fn script() -> Vec<Step> {
         Run("FD 10\nRT", Speed::Instant),
         WaitFinished,
         CheckConsole("Line 2: RT needs 1 input, but got none"),
+        // A run's error shows wherever the cursor is.
+        CheckErrorCard(Some((
+            "RT needs 1 input, but got none",
+            "RT degrees",
+            "RT 90",
+        ))),
+        Screenshot("error-pinned"),
+        Say("An error's card waits for a pause, and Esc hides it"),
+        Type("REPEAT 4"),
+        Wait(ms(100)),
+        CheckDiagnostics(&[]),
+        CheckErrorCard(None),
+        Wait(ms(1200)),
+        CheckDiagnostics(&["REPEAT needs 2 inputs, but got 1"]),
+        CheckErrorCard(Some(REPEAT_CARD)),
+        Screenshot("error-card"),
+        // Moving away leaves the underline, and moving back shows it at once.
+        Type("REPEAT 4\nFD 50"),
+        CursorAt("FD 50"),
+        Wait(ms(100)),
+        CheckDiagnostics(&["REPEAT needs 2 inputs, but got 1"]),
+        CheckErrorCard(None),
+        Screenshot("error-elsewhere"),
+        CursorAt("REPEAT"),
+        Wait(ms(100)),
+        CheckErrorCard(Some(REPEAT_CARD)),
+        // Esc hides the card, until the line's text changes.
+        EditorKeys("escape"),
+        Wait(ms(100)),
+        CheckErrorCard(None),
+        CheckDiagnostics(&["REPEAT needs 2 inputs, but got 1"]),
+        CursorAt("FD 50"),
+        CursorAt("REPEAT"),
+        Wait(ms(100)),
+        CheckErrorCard(None),
+        // That's an edit on the cursor's line, so it waits for the pause.
+        Type("REPEAT 5\nFD 50"),
+        Wait(ms(1200)),
+        CheckErrorCard(Some(REPEAT_CARD)),
+        // A typo says what it means.
+        Type("FORWRD 10"),
+        Wait(ms(1200)),
+        CheckDiagnostics(&["I don't know how to FORWRD. Did you mean FORWARD?"]),
+        CheckErrorCard(Some((
+            "I don't know how to FORWRD. Did you mean FORWARD?",
+            "FORWARD distance",
+            "FD 100",
+        ))),
         Say("Phase 2: filled shapes, FOR and a template, animated"),
         Run(
             "FOR [i 3 1] [SETFC ITEM :i [red orange gold] CIRCLE :i * 50]\nPRINT MAP [? * 2] [1 2 3]",
@@ -2233,16 +2291,23 @@ impl App {
                     let found: Vec<String> = self.editor.update(cx, |state, _| {
                         state.diagnostics_mut().map_or(Vec::new(), |set| {
                             set.iter()
-                                .map(|d| {
-                                    // The message: the rest is the syntax
-                                    // and example.
-                                    let message = d.diagnostic.message.lines().next();
-                                    message.unwrap_or_default().to_string()
-                                })
+                                .map(|d| d.diagnostic.message.to_string())
                                 .collect()
                         })
                     });
                     self.check(found == expected, format!("the editor shows {found:?}"));
+                }
+                Step::CheckErrorCard(expected) => {
+                    let found = self.error_card.read(cx).on_show().map(|e| {
+                        (
+                            e.message.clone(),
+                            e.usage.clone().unwrap_or_default(),
+                            e.example.clone().unwrap_or_default(),
+                        )
+                    });
+                    let wanted =
+                        expected.map(|(m, u, x)| (m.to_string(), u.to_string(), x.to_string()));
+                    self.check(found == wanted, format!("the error card shows {found:?}"));
                 }
                 Step::CheckEditor(expected) => {
                     let text = self.editor.read(cx).value().to_string();

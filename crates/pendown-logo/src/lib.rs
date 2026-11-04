@@ -25,6 +25,7 @@ mod random;
 mod reader;
 pub mod reference;
 mod span;
+mod suggest;
 pub mod syntax;
 mod value;
 pub mod watch;

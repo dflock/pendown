@@ -4,11 +4,20 @@
 //! scroll offset and line height, as the gutter is, and measured text. Soft
 //! wrap and folding are off, so each row is one line. `range_to_bounds` won't
 //! do: it lags a frame, and puts lines scrolled above the view at the top.
+//!
+//! The editor's own hover popup is never drawn. The editor has no way to turn
+//! it off, so it serves as the signal for which error the pointer's on: after
+//! each mouse move, it's read and cleared, before the next frame.
 
 use std::{cell::Cell, rc::Rc};
 
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, button::Button, input::EditorState};
+use gpui_kit::component::{
+    ActiveTheme as _, IconName, Sizable as _,
+    button::{Button, ButtonVariants as _},
+    input::EditorState,
+};
 use gpui_kit::{prelude::FluentBuilder as _, *};
+use pendown::error_display::Shown;
 use pendown_logo::{Span, explain::Explanation, reference::reference};
 
 /// The editor's text starts this far from its top and left: gpui-kit's
@@ -33,12 +42,20 @@ const TITLE_LINE: f32 = 17.;
 const LABEL_LINE: f32 = 16.;
 const CODE_LINE: f32 = 19.;
 const FOOT: f32 = 24.;
+/// Room at the card's top right for its close button, which the message
+/// mustn't run under when it's in the card.
+const CLOSE_ROOM: f32 = 22.;
 
 /// The mockup's colours: dark red on pale red has good contrast, and it's
 /// never the only signal, as the line is underlined and the words say it.
 const ERROR_BG: u32 = 0xfef2f2;
 const ERROR_LINE: u32 = 0xfecaca;
 const ERROR_FG: u32 = 0x991b1b;
+
+/// The dot at the end of a line with an error.
+const DOT: u32 = 0xdc2626;
+const DOT_SIZE: f32 = 7.;
+const DOT_GAP: f32 = 10.;
 
 /// What `place` needs to know, in pixels from the top left of the pane.
 #[derive(Clone, Copy, Debug)]
@@ -171,16 +188,35 @@ impl LineError {
 /// The card's Help button was pressed, for this page.
 pub struct OpenHelp(pub usize);
 
+/// The card's close button was pressed.
+pub struct HideCard;
+
+/// The mouse moved.
+pub struct PointerMoved {
+    /// Where the error the pointer's on starts, in bytes into the text.
+    pub error: Option<usize>,
+    /// It's on the card showing or that card's line, so the card should
+    /// stay, for reaching its button.
+    pub near_card: bool,
+}
+
 pub struct ErrorCard {
     editor: Entity<EditorState>,
-    /// In the order they should be chosen in.
     errors: Vec<LineError>,
-    /// The pane's size, from its last layout.
-    pane: Rc<Cell<Size<Pixels>>>,
+    /// The error showing, as an index into `errors`.
+    showing: Option<usize>,
+    /// Lines with an error the card isn't on, for a red dot.
+    dots: Vec<usize>,
+    /// The pane, from its last layout.
+    pane: Rc<Cell<Bounds<Pixels>>>,
+    /// The line and card showing, in the pane.
+    near_card: Vec<Bounds<Pixels>>,
     _observe: Subscription,
 }
 
 impl EventEmitter<OpenHelp> for ErrorCard {}
+impl EventEmitter<PointerMoved> for ErrorCard {}
+impl EventEmitter<HideCard> for ErrorCard {}
 
 impl ErrorCard {
     pub fn new(editor: Entity<EditorState>, cx: &mut Context<Self>) -> ErrorCard {
@@ -189,21 +225,49 @@ impl ErrorCard {
         ErrorCard {
             editor,
             errors: Vec::new(),
+            showing: None,
+            dots: Vec::new(),
             pane: Rc::default(),
+            near_card: Vec::new(),
             _observe: observe,
         }
     }
 
-    pub fn set(&mut self, mut errors: Vec<LineError>, cx: &mut Context<Self>) {
-        errors.sort_by_key(|e| (e.line, e.column));
+    /// The errors on the code, and what to show of them.
+    pub fn set(&mut self, errors: Vec<LineError>, shown: &Shown, cx: &mut Context<Self>) {
         self.errors = errors;
+        self.show(shown, cx);
+    }
+
+    pub fn show(&mut self, shown: &Shown, cx: &mut Context<Self>) {
+        self.showing = shown.card;
+        self.dots.clone_from(&shown.dots);
         cx.notify();
     }
 
-    /// The error to show: for now, the first on the cursor's line.
-    fn showing(&self, cx: &App) -> Option<&LineError> {
-        let line = self.editor.read(cx).cursor_position().line as usize;
-        self.errors.iter().find(|e| e.line == line)
+    /// For the scripted session: the message, syntax and example on show.
+    pub fn on_show(&self) -> Option<&Explanation> {
+        Some(&self.errors.get(self.showing?)?.explanation)
+    }
+
+    /// After a mouse move: every listener has run, so the editor has set its
+    /// hover popup if the pointer's on an underline. Clearing it means the
+    /// popup isn't drawn, and that the editor sets it again on the next move.
+    fn pointer_moved(&mut self, position: Point<Pixels>, cx: &mut Context<Self>) {
+        if self.errors.is_empty() {
+            return;
+        }
+        let popup = self.editor.read(cx).diagnostic_popover();
+        if popup.is_some() {
+            self.editor
+                .update(cx, |state, cx| state.clear_diagnostic_popover(cx));
+        }
+        let origin = self.pane.get().origin;
+        let inside = point(position.x - origin.x, position.y - origin.y);
+        cx.emit(PointerMoved {
+            error: popup.map(|entry| entry.range.start),
+            near_card: self.near_card.iter().any(|b| b.contains(&inside)),
+        });
     }
 }
 
@@ -274,45 +338,86 @@ impl Render for ErrorCard {
         let root = div().absolute().inset_0().child({
             let pane = self.pane.clone();
             let view = cx.entity_id();
+            let card = cx.weak_entity();
             canvas(
                 move |bounds, _, cx| {
-                    if pane.replace(bounds.size) != bounds.size {
+                    if pane.replace(bounds).size != bounds.size {
                         cx.notify(view);
                     }
                 },
-                |_, _, _, _| {},
+                move |_, _, window, _| {
+                    let card = card.clone();
+                    window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
+                        if phase != DispatchPhase::Capture {
+                            return;
+                        }
+                        let (card, position) = (card.clone(), event.position);
+                        // Once every listener has run, including the editor's.
+                        cx.defer(move |cx| {
+                            card.update(cx, |card, cx| card.pointer_moved(position, cx))
+                                .ok();
+                        });
+                    });
+                },
             )
             .absolute()
             .size_full()
         });
-        let Some(error) = self.showing(cx) else {
+        self.near_card.clear();
+        if self.errors.is_empty() {
             return root;
-        };
+        }
         let theme = cx.theme().clone();
         let state = self.editor.read(cx);
         let line_height = f32::from(state.line_height().unwrap_or(px(20.)));
         let scroll = state.scroll_offset();
         let text = state.value().to_string();
-        let line = text.split('\n').nth(error.line).unwrap_or_default();
-        let line = line.strip_suffix('\r').unwrap_or(line);
-        let before = line.get(..error.column).unwrap_or(line);
-
+        let lines: Vec<&str> = text
+            .split('\n')
+            .map(|l| l.strip_suffix('\r').unwrap_or(l))
+            .collect();
         let mono = font(theme.mono_font_family.clone());
         let left = LEFT + f32::from(scroll.x);
+        let code_size = theme.mono_font_size;
+        let top_of = |line: usize| TOP + f32::from(scroll.y) + line_height * line as f32;
+
+        let pane_height = f32::from(self.pane.get().size.height);
+        let dots = self.dots.iter().filter_map(|&line| {
+            let top = top_of(line);
+            if top + line_height <= 0. || top >= pane_height {
+                return None;
+            }
+            let end = measure(lines.get(line)?, mono.clone(), code_size, window);
+            Some(
+                div()
+                    .absolute()
+                    .left(px(left + end + DOT_GAP))
+                    .top(px(top + (line_height - DOT_SIZE) / 2.))
+                    .size(px(DOT_SIZE))
+                    .rounded_full()
+                    .bg(rgb(DOT)),
+            )
+        });
+        let root = root.children(dots.collect::<Vec<_>>());
+        let Some(error) = self.showing.and_then(|i| self.errors.get(i)) else {
+            return root;
+        };
+        let line = lines.get(error.line).copied().unwrap_or_default();
+        let before = line.get(..error.column).unwrap_or(line);
+
         let mut bold = font(theme.font_family.clone());
         bold.weight = FontWeight::BOLD;
         let message = &error.explanation.message;
-        let pane = self.pane.get();
+        let pane = self.pane.get().size;
         let pane = (f32::from(pane.width), f32::from(pane.height));
-        let inner = (card_width(pane.0) - 2. - 2. * CARD_PADDING_X).max(1.);
+        let inner = (card_width(pane.0) - 2. - 2. * CARD_PADDING_X - CLOSE_ROOM).max(1.);
         let wrapped = lines_when_wrapped(message, bold.clone(), px(12.), inner, window);
-        let code_size = theme.mono_font_size;
         let placement = place(Layout {
             pane,
-            line_top: TOP + f32::from(scroll.y) + line_height * error.line as f32,
+            line_top: top_of(error.line),
             line_height,
             line_end: left + measure(line, mono.clone(), code_size, window),
-            error_start: left + measure(before, mono, code_size, window),
+            error_start: left + measure(before, mono.clone(), code_size, window),
             message_width: measure(message, bold.clone(), px(12.), window) + 2. * MESSAGE_PADDING,
             message_height: TITLE_LINE * wrapped as f32,
             rows_height: rows_height(&error.explanation),
@@ -321,6 +426,18 @@ impl Render for ErrorCard {
         let Some(placement) = placement else {
             return root;
         };
+        // On the way from an underline to the card's button, the pointer
+        // crosses the gap between them, so the line's row takes that in.
+        let mut near_card = vec![Bounds::new(
+            point(px(0.), px(top_of(error.line) - LINE_GAP)),
+            size(px(pane.0), px(line_height + 2. * LINE_GAP)),
+        )];
+        near_card.extend(placement.card.map(|place| {
+            Bounds::new(
+                point(px(place.at.0), px(place.at.1)),
+                size(px(place.width), px(place.height)),
+            )
+        }));
 
         let message_on_line = placement.message.map(|(x, y)| {
             div()
@@ -389,6 +506,7 @@ impl Render for ErrorCard {
                             .text_color(rgb(ERROR_FG))
                             .font_weight(FontWeight::BOLD)
                             .line_height(px(TITLE_LINE))
+                            .pr(px(CLOSE_ROOM))
                             .child(message.clone()),
                     )
                 })
@@ -398,6 +516,16 @@ impl Render for ErrorCard {
                 .when_some(example, |card, example| {
                     card.child(Self::row("Example", example, cx))
                 })
+                .child(
+                    div().absolute().top(px(4.)).right(px(4.)).child(
+                        Button::new("error-card-close")
+                            .xsmall()
+                            .ghost()
+                            .icon(IconName::Close)
+                            .tooltip("Hide this (Esc)")
+                            .on_click(cx.listener(|_, _, _, cx| cx.emit(HideCard))),
+                    ),
+                )
                 .child(
                     div()
                         .h(px(FOOT))
@@ -424,7 +552,9 @@ impl Render for ErrorCard {
                         }),
                 )
         });
-        root.children(message_on_line).children(card)
+        let root = root.children(message_on_line).children(card);
+        self.near_card = near_card;
+        root
     }
 }
 

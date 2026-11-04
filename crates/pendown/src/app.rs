@@ -13,7 +13,7 @@ use gpui_kit::component::{
     h_flex,
     highlighter::{Diagnostic, DiagnosticSeverity},
     input::{
-        EditorState, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position,
+        EditorState, Escape, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position,
         RangeDecoration, RangeDecorationCollection, RangeDecorationStyle, TextareaState, Undo,
     },
     resizable::{ResizableState, h_resizable, resizable_panel, v_resizable},
@@ -21,6 +21,7 @@ use gpui_kit::component::{
     v_flex,
 };
 use gpui_kit::{assets::IconName, prelude::FluentBuilder as _, *};
+use pendown::error_display::{Cursor, ErrorDisplay, Spot};
 use pendown::{
     animator::{Animator, MAX_FRAME_GAP, Mode, Replay, Speed, Thinking},
     config::{Config, ConfigFile, WindowState, WindowedSize},
@@ -41,7 +42,7 @@ use pendown_render::Mark;
 use crate::{
     autotest::Autotest,
     canvas::{Canvas, Overlay, TURTLE_SIZE},
-    error_card::{ErrorCard, LineError, OpenHelp},
+    error_card::{ErrorCard, HideCard, LineError, OpenHelp, PointerMoved},
     files::{
         After, ExportPicture, NewFile, OpenFile, PauseOrResume, Picture, ResetProgram, RunProgram,
         SaveFile, SaveFileAs, ShowHelp, SingleStep, ToggleMetrics,
@@ -83,6 +84,19 @@ pub(crate) fn position(text: &str, offset: usize) -> Position {
     let line = before.matches('\n').count() as u32;
     let line_start = before.rfind('\n').map_or(0, |i| i + 1);
     Position::new(line, before[line_start..].encode_utf16().count() as u32)
+}
+
+/// How long after the last edit an error on the line being typed shows.
+const ERROR_PAUSE: Duration = Duration::from_secs(1);
+
+/// How long the pointer stays on an underline before its card shows.
+const HOVER_DELAY: Duration = Duration::from_millis(300);
+
+/// Where the errors on the code came from, which says when they show.
+enum ErrorsFrom {
+    Editing,
+    Checking,
+    Run,
 }
 
 /// The live numbers shown over the canvas: each line covers about the last
@@ -168,7 +182,21 @@ pub struct App {
     breakpoint_tint: RangeDecorationCollection,
     /// The line numbers, which take breakpoints.
     pub(crate) gutter: Entity<Gutter>,
-    error_card: Entity<ErrorCard>,
+    pub(crate) error_card: Entity<ErrorCard>,
+    /// When the errors on the code show.
+    error_display: ErrorDisplay,
+    /// The errors on the code, for the underlines: what the editor has is
+    /// those `error_display` says to show now.
+    code_diagnostics: Vec<Diagnostic>,
+    /// Which of them the editor has, so the underlines aren't reset
+    /// needlessly.
+    underlined: Vec<usize>,
+    /// Waiting for the learner to pause.
+    error_pause: Option<Task<()>>,
+    /// The error the pointer has just reached, while it waits to show.
+    hover_coming: Option<(usize, Task<()>)>,
+    /// Where the editor's cursor was when `cursor_for_errors` last looked.
+    last_cursor: Cursor,
     speed_slider: Entity<SliderState>,
     pub(crate) speed: Speed,
     pub(crate) canvas: Rc<RefCell<Canvas>>,
@@ -328,7 +356,7 @@ impl App {
                     this.gutter.update(cx, |gutter, cx| gutter.follow(cx));
                     this.show_breakpoints(cx);
                     if !this.running() || this.paused() {
-                        this.check_program(cx);
+                        this.check_edit(cx);
                     }
                 }
             }),
@@ -342,6 +370,12 @@ impl App {
                     this.open_help(event.0, window, cx);
                 },
             ),
+            cx.subscribe(&error_card, |this, _, _: &HideCard, cx| {
+                this.escape_hides_card(cx);
+            }),
+            cx.subscribe(&error_card, |this, _, event: &PointerMoved, cx| {
+                this.pointer_moved(event, cx);
+            }),
             cx.subscribe_in(
                 &console_input,
                 window,
@@ -385,7 +419,10 @@ impl App {
         let mut subscriptions = subscriptions;
         // The editor notifies when its cursor moves, which the help panel
         // follows.
-        subscriptions.push(cx.observe(&editor, |this, _, cx| this.follow_cursor(cx)));
+        subscriptions.push(cx.observe(&editor, |this, _, cx| {
+            this.follow_cursor(cx);
+            this.cursor_for_errors(cx);
+        }));
         subscriptions.push(cx.observe_window_bounds(window, |this, window, cx| {
             if !window.is_maximized() && !window.is_fullscreen() {
                 this.windowed_size.resized(window_size(window));
@@ -436,6 +473,12 @@ impl App {
             console_input,
             editor_pane,
             error_card,
+            error_display: ErrorDisplay::default(),
+            code_diagnostics: Vec::new(),
+            underlined: Vec::new(),
+            error_pause: None,
+            hover_coming: None,
+            last_cursor: Cursor::default(),
             console_pane,
             toolbar_pane,
             main_split: cx.new(|_| ResizableState::default()),
@@ -641,7 +684,7 @@ impl App {
         self.canvas.borrow_mut().drawing.reset();
         self.console.clear();
         self.console_dirty = true;
-        self.set_code_errors(&[], "", cx);
+        self.clear_code_errors(cx);
         let job = Job::Program { text, seed };
         let replay = Some(Replay { to, then });
         let stops = self.gutter.read(cx).stops(cx);
@@ -702,7 +745,7 @@ impl App {
         {
             self.print(format!("{button} cleared the procedures you defined in the console. \"Copy to editor\" keeps them."));
         }
-        self.set_code_errors(&[], "", cx);
+        self.clear_code_errors(cx);
         // Run clears the variables (ADR 0006).
         self.show_watch(cx, |watched| watched.set(None));
     }
@@ -1202,28 +1245,137 @@ impl App {
         });
     }
 
-    /// Shows these errors on the code, underlined and on the card, in place
-    /// of any before. Their spans are in `text`.
+    /// Puts these errors on the code, in place of any before, for
+    /// `error_display` to decide when they show. Their spans are in `text`.
     fn set_code_errors(
         &mut self,
-        code_errors: &[(Span, Explanation)],
+        mut code_errors: Vec<(Span, Explanation)>,
         text: &str,
+        from: ErrorsFrom,
         cx: &mut Context<Self>,
     ) {
-        let diagnostics = code_errors
+        code_errors.sort_by_key(|(span, _)| span.start);
+        let spots: Vec<_> = code_errors
+            .iter()
+            .map(|(span, _)| Spot::new(text, *span))
+            .collect();
+        self.code_diagnostics = code_errors
             .iter()
             .map(|(span, explanation)| {
                 let range = position(text, span.start as usize)..position(text, span.end as usize);
-                Diagnostic::new(range, errors::markdown(explanation))
+                Diagnostic::new(range, explanation.message.clone())
                     .with_severity(DiagnosticSeverity::Error)
             })
             .collect();
-        let on_card = code_errors
-            .iter()
-            .map(|(span, explanation)| LineError::new(text, *span, explanation.clone()))
+        let on_card: Vec<_> = code_errors
+            .into_iter()
+            .map(|(span, explanation)| LineError::new(text, span, explanation))
             .collect();
-        self.error_card.update(cx, |card, cx| card.set(on_card, cx));
+        let cursor = self.editor_cursor(cx);
+        match from {
+            ErrorsFrom::Editing => self.error_display.edited(spots, text, cursor),
+            ErrorsFrom::Checking => self.error_display.checked(spots, text, cursor),
+            ErrorsFrom::Run => {
+                let pinned = self.error_display.run_stopped(spots, text, cursor);
+                if let Some(line) = pinned {
+                    self.scroll_line_into_view(line, text.matches('\n').count() + 1, cx);
+                }
+            }
+        }
+        let shown = self.error_display.shown();
+        self.error_card
+            .update(cx, |card, cx| card.set(on_card, &shown, cx));
+        self.apply_underlines(&shown.underlined, cx);
+    }
+
+    /// A run started, or something else took the errors away.
+    fn clear_code_errors(&mut self, cx: &mut Context<Self>) {
+        self.error_pause = None;
+        self.hover_coming = None;
+        self.error_display.clear();
+        self.code_diagnostics.clear();
+        let shown = self.error_display.shown();
+        self.error_card
+            .update(cx, |card, cx| card.set(Vec::new(), &shown, cx));
+        self.apply_underlines(&shown.underlined, cx);
+    }
+
+    fn editor_cursor(&self, cx: &gpui_kit::App) -> Cursor {
+        let state = self.editor.read(cx);
+        Cursor {
+            line: state.cursor_position().line as usize,
+            offset: state.cursor(),
+        }
+    }
+
+    /// The editor's underlines are these of `code_diagnostics`.
+    fn apply_underlines(&mut self, underlined: &[usize], cx: &mut Context<Self>) {
+        let diagnostics = underlined
+            .iter()
+            .filter_map(|&i| self.code_diagnostics.get(i).cloned())
+            .collect();
+        self.underlined = underlined.to_vec();
         self.set_diagnostics(diagnostics, cx);
+    }
+
+    /// What `error_display` says to show has changed, perhaps.
+    fn show_code_errors(&mut self, cx: &mut Context<Self>) {
+        let shown = self.error_display.shown();
+        self.error_card.update(cx, |card, cx| card.show(&shown, cx));
+        if shown.underlined != self.underlined {
+            self.apply_underlines(&shown.underlined, cx);
+        }
+    }
+
+    /// The editor changed: its cursor may have moved.
+    fn cursor_for_errors(&mut self, cx: &mut Context<Self>) {
+        let cursor = self.editor_cursor(cx);
+        if cursor != self.last_cursor {
+            self.last_cursor = cursor;
+            self.error_display.cursor_moved(cursor);
+            self.show_code_errors(cx);
+        }
+    }
+
+    /// The mouse moved: an error's card shows after a moment on its underline,
+    /// so one doesn't flash up as the pointer passes over.
+    fn pointer_moved(&mut self, event: &PointerMoved, cx: &mut Context<Self>) {
+        let error = event
+            .error
+            .and_then(|start| self.error_display.error_at(start));
+        let Some(error) = error else {
+            self.hover_coming = None;
+            if !event.near_card && self.error_display.hovered().is_some() {
+                self.error_display.set_hovered(None);
+                self.show_code_errors(cx);
+            }
+            return;
+        };
+        if self.error_display.hovered() == Some(error) {
+            self.hover_coming = None;
+        } else if self.hover_coming.as_ref().map(|(e, _)| *e) != Some(error) {
+            let task = cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(HOVER_DELAY).await;
+                this.update(cx, |this, cx| {
+                    this.hover_coming = None;
+                    this.error_display.set_hovered(Some(error));
+                    this.show_code_errors(cx);
+                })
+                .ok();
+            });
+            self.hover_coming = Some((error, task));
+        }
+    }
+
+    /// Esc in the editor: hides an error's card, if one's showing. A
+    /// selection doesn't get in the way, as Esc doesn't clear one. Says if
+    /// it did.
+    fn escape_hides_card(&mut self, cx: &mut Context<Self>) -> bool {
+        if !self.error_display.escape() {
+            return false;
+        }
+        self.show_code_errors(cx);
+        true
     }
 
     fn set_diagnostics(&mut self, diagnostics: Vec<Diagnostic>, cx: &mut Context<Self>) {
@@ -1267,6 +1419,26 @@ impl App {
 
     /// Shows the program's parse errors as it's typed, without running it.
     pub(crate) fn check_program(&mut self, cx: &mut Context<Self>) {
+        self.check_code(ErrorsFrom::Checking, cx);
+    }
+
+    /// The learner edited the program: errors on the line they're typing on
+    /// wait until they pause.
+    fn check_edit(&mut self, cx: &mut Context<Self>) {
+        self.check_code(ErrorsFrom::Editing, cx);
+        self.error_pause = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(ERROR_PAUSE).await;
+            this.update(cx, |this, cx| {
+                this.error_display.paused();
+                this.show_code_errors(cx);
+            })
+            .ok();
+        }));
+    }
+
+    fn check_code(&mut self, from: ErrorsFrom, cx: &mut Context<Self>) {
+        // Its error may not be there any more.
+        self.hover_coming = None;
         // Setting the text sends no change event, so the breakpoints follow
         // it here too.
         self.gutter.update(cx, |gutter, cx| gutter.follow(cx));
@@ -1283,7 +1455,7 @@ impl App {
             .into_iter()
             .filter_map(|e| Some((e.span?, explain(&e, &text))))
             .collect();
-        self.set_code_errors(&code_errors, &text, cx);
+        self.set_code_errors(code_errors, &text, from, cx);
     }
 
     /// Shows errors as diagnostics on the code, and in the console with
@@ -1319,7 +1491,7 @@ impl App {
         }
         if !code_errors.is_empty() {
             let text = self.run_text.clone();
-            self.set_code_errors(&code_errors, &text, cx);
+            self.set_code_errors(code_errors, &text, ErrorsFrom::Run, cx);
         }
     }
 
@@ -1348,8 +1520,12 @@ impl App {
             return;
         };
         self.set_editor_highlight(Some(span), cx);
-        let line = span.line as usize;
         let lines = self.run_text.matches('\n').count() + 1;
+        self.scroll_line_into_view(span.line as usize, lines, cx);
+    }
+
+    /// Scrolls the editor, of this many lines, so that `line` is in view.
+    fn scroll_line_into_view(&mut self, line: usize, lines: usize, cx: &mut Context<Self>) {
         self.editor.update(cx, |state, cx| {
             let (Some(rows), Some(line_height)) = (state.visible_row_range(), state.line_height())
             else {
@@ -1823,6 +1999,14 @@ impl App {
                                                     .flex_1()
                                                     .min_w_0()
                                                     .overflow_hidden()
+                                                    // Before the editor's own use of Esc, if there's a card.
+                                                    .capture_action(cx.listener(
+                                                        |this, _: &Escape, _, cx| {
+                                                            if this.escape_hides_card(cx) {
+                                                                cx.stop_propagation();
+                                                            }
+                                                        },
+                                                    ))
                                                     .child(self.editor_pane.clone().cached(
                                                         StyleRefinement::default().size_full(),
                                                     ))

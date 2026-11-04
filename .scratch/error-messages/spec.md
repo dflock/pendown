@@ -16,7 +16,8 @@ When the cursor rests on a line with an error, the message shows at the end of t
 |---|---|
 | Typing on the line | Nothing new until a pause of about a second, not even the underline. Other lines' errors stay as they are |
 | Cursor resting on the line | Underline, message at the end of the line, and the card |
-| Cursor on another line | Underline, and a red dot at the end of the line. Hovering shows the same content as the card |
+| Cursor on another line | Underline, and a red dot at the end of the line |
+| Pointer on an underline | That error's message and card, on any line, after a moment. They stay while the pointer's on the line or the card |
 | A run stops on an error | The card shows on that line wherever the cursor is, and the line scrolls into view, until the next edit or run |
 | Esc | Hides the card until that line is edited. The underline stays |
 | An error in a console entry or a help example | The console only, as now |
@@ -24,11 +25,11 @@ When the cursor rests on a line with an error, the message shows at the end of t
 - The card flips above the line when there isn't room below.
 - When the message doesn't fit beside the line, it moves into the card as its first line.
 - With several errors on a line, the message and card show the error the cursor is in, and switch at once when the cursor moves into another. With the cursor in none of them, they show the first. The cursor counts as in an error when it's anywhere in the underlined text, or just after it.
-- The card hides while the editor's own hover popup is up, so the two never show together.
+- The card is the only popup: the editor's own hover popup is never drawn.
 
 ### Messages
 
-The same message goes in the console, the card and the hover. Messages stay one short sentence, because programs can see them through `CATCH "ERROR` (ADR 0005). The syntax and example are kept apart from the message.
+The same message goes in the console and the card. Messages stay one short sentence, because programs can see them through `CATCH "ERROR` (ADR 0005). The syntax and example are kept apart from the message.
 
 | Program | Now | New |
 |---|---|---|

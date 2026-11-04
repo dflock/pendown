@@ -29,8 +29,8 @@ use crate::{app::App as PendownWindow, colours_page::ColoursPage};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Tab {
-    Help,
     Tutorial,
+    Help,
     /// Examples to run or load, with their pictures (`.scratch/gallery/`).
     Gallery,
     /// Every keyboard shortcut (`.scratch/shortcuts/`).
@@ -1331,20 +1331,20 @@ impl Render for HelpPanel {
             .border_b_1()
             .border_color(theme.border)
             .child(
-                tab("tab-help", "Help", self.tab == Tab::Help, cx).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.tab = Tab::Help;
-                        cx.notify();
-                    },
-                )),
-            )
-            .child(
                 tab("tab-tutorial", "Tutorial", self.tab == Tab::Tutorial, cx).on_click(
                     cx.listener(|this, _, _, cx| {
                         this.tab = Tab::Tutorial;
                         cx.notify();
                     }),
                 ),
+            )
+            .child(
+                tab("tab-help", "Help", self.tab == Tab::Help, cx).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.tab = Tab::Help;
+                        cx.notify();
+                    },
+                )),
             )
             .child(
                 tab("tab-gallery", "Gallery", self.tab == Tab::Gallery, cx).on_click(cx.listener(

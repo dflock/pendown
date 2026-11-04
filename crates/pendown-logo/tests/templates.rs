@@ -103,12 +103,12 @@ fn template_errors() {
     );
     assert_eq!(
         error("SHOW APPLY \"FORWARD [1 2]"),
-        "Too many inputs to FORWARD"
+        "FORWARD takes 1 input, but got 2"
     );
     assert_eq!(error("SHOW APPLY \"SUM 5"), "APPLY doesn't like 5 as input");
     assert_eq!(
         error("SHOW APPLY [[a b] :a] [1]"),
-        "Not enough inputs to THE TEMPLATE"
+        "The template needs 2 inputs, but got 1"
     );
     assert_eq!(
         error("SHOW REDUCE \"SUM []"),

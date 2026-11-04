@@ -51,7 +51,7 @@ pub(super) fn members(a: &Args, i: usize) -> Result<Vec<Value>, Flow> {
     match parts(&a.vals[i]) {
         Parts::Letters(l) => Ok(l.iter().map(|c| word(&[*c])).collect()),
         Parts::Items(l) => Ok(l.items.clone()),
-        Parts::Array(_) => Err(a.doesnt_like(i)),
+        Parts::Array(_) => Err(a.wanted(i, "a word or a list")),
     }
 }
 

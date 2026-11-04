@@ -19,7 +19,7 @@ impl Args<'_> {
     pub(super) fn runnable(&self, i: usize) -> Result<Rc<List>, Flow> {
         match &self.vals[i] {
             Value::List(list) => Ok(list.clone()),
-            Value::Array(_) => Err(self.doesnt_like(i)),
+            Value::Array(_) => Err(self.wanted(i, "a list of instructions")),
             word => Ok(Rc::new(List::new(vec![word.clone()]))),
         }
     }
@@ -27,7 +27,7 @@ impl Args<'_> {
     pub(super) fn list(&self, i: usize) -> Result<Rc<List>, Flow> {
         match &self.vals[i] {
             Value::List(list) => Ok(list.clone()),
-            _ => Err(self.doesnt_like(i)),
+            _ => Err(self.wanted(i, "a list")),
         }
     }
 }

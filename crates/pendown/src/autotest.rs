@@ -80,6 +80,13 @@ const COUNTING: &str = "MAKE \"n 0\nFOREVER [MAKE \"n :n + 1]";
 
 const ERRORS: &str = "TO BOX :n\n  FD :n RT 90\n  FD \"far\n  PRINT 1\nEND\nBOX 100";
 
+/// What the error card says about `REPEAT 4`.
+const REPEAT_CARD: (&str, &str, &str) = (
+    "REPEAT needs 2 inputs, but got 1",
+    "REPEAT number [instructions]",
+    "REPEAT 4 [FD 100 RT 90]",
+);
+
 /// One step of the session.
 #[derive(Clone)]
 #[allow(clippy::enum_variant_names)]
@@ -185,8 +192,14 @@ enum Step {
     SetThinking(bool),
     /// Turn Drive on or off.
     Drive(bool),
-    /// Press keys while driving: up, down, left, right, space, undo, escape.
+    /// Press and let go of keys while driving: up, down, left, right, space,
+    /// undo, escape.
     DriveKeys(&'static [&'static str]),
+    /// Keys coming down with no key-up, as when the keyboard repeats a key
+    /// that's held.
+    DriveKeysDown(&'static [&'static str]),
+    /// A key held while driving comes up.
+    DriveKeyUp(&'static str),
     /// Wait until every press has played.
     WaitDriven,
     /// Driving is on, or not.
@@ -195,7 +208,7 @@ enum Step {
     DriveSteps(f64, f64),
     /// How many presses are waiting to play.
     CheckDriveQueue(usize),
-    /// What Kame is thinking about while driving, as `thinking()` gives it.
+    /// What Kame is thinking about, and while driving what the entry shows.
     CheckDriveThinking(&'static str),
     /// Scroll the help page this far down, in logical pixels.
     ScrollHelp(f32),
@@ -258,6 +271,8 @@ enum Step {
     CheckColours(&'static str),
     /// Press F12.
     ToggleMetrics,
+    /// The error card shows this message, syntax and example, or nothing.
+    CheckErrorCard(Option<(&'static str, &'static str, &'static str)>),
     /// Phase 5: put the editor's cursor one character into the first
     /// `marker`.
     CursorAt(&'static str),
@@ -378,8 +393,12 @@ fn script() -> Vec<Step> {
         CheckDiagnostics(&[]),
         // The editor sends its change event once the edit is done.
         Type("FD 10\nFOOBAR 3\nREPEAT 4 [FD]"),
-        Wait(ms(100)),
-        CheckDiagnostics(&["I don't know how to FOOBAR", "Not enough inputs to FD"]),
+        // An error on the line being typed waits for a pause.
+        Wait(ms(1200)),
+        CheckDiagnostics(&[
+            "I don't know how to FOOBAR",
+            "FD needs 1 input, but got none",
+        ]),
         Screenshot("errors-while-typing"),
         Type("REPEAT 4 [FD 10 RT 90]"),
         Wait(ms(100)),
@@ -679,7 +698,7 @@ fn script() -> Vec<Step> {
         CheckCurrentLine(None),
         Console("PRINT :x"),
         WaitFinished,
-        CheckConsole("In the console: :x has no value"),
+        CheckConsole("In the console: :x has no value yet. Give it one with MAKE \"x 100"),
         CheckButtons("Run", true),
         SetSpeed(Speed::Animated(20.0)),
         Console("FOREVER [FD 1 RT 1]"),
@@ -714,11 +733,61 @@ fn script() -> Vec<Step> {
         Say("Errors show with their call chain"),
         Run(ERRORS, Speed::Instant),
         WaitFinished,
-        CheckConsole("Line 3: FD doesn't like far as input"),
+        CheckConsole("Line 3: FD needs a number, but got the word far"),
+        CheckConsole("    Written like this: FD distance"),
+        CheckConsole("    Example: FD 100"),
         CheckConsole("    in BOX (line 6)"),
         Run("FD 10\nRT", Speed::Instant),
         WaitFinished,
-        CheckConsole("Line 2: Not enough inputs to RT"),
+        CheckConsole("Line 2: RT needs 1 input, but got none"),
+        // A run's error shows wherever the cursor is.
+        CheckErrorCard(Some((
+            "RT needs 1 input, but got none",
+            "RT degrees",
+            "RT 90",
+        ))),
+        Screenshot("error-pinned"),
+        Say("An error's card waits for a pause, and Esc hides it"),
+        Type("REPEAT 4"),
+        Wait(ms(100)),
+        CheckDiagnostics(&[]),
+        CheckErrorCard(None),
+        Wait(ms(1200)),
+        CheckDiagnostics(&["REPEAT needs 2 inputs, but got 1"]),
+        CheckErrorCard(Some(REPEAT_CARD)),
+        Screenshot("error-card"),
+        // Moving away leaves the underline, and moving back shows it at once.
+        Type("REPEAT 4\nFD 50"),
+        CursorAt("FD 50"),
+        Wait(ms(100)),
+        CheckDiagnostics(&["REPEAT needs 2 inputs, but got 1"]),
+        CheckErrorCard(None),
+        Screenshot("error-elsewhere"),
+        CursorAt("REPEAT"),
+        Wait(ms(100)),
+        CheckErrorCard(Some(REPEAT_CARD)),
+        // Esc hides the card, until the line's text changes.
+        EditorKeys("escape"),
+        Wait(ms(100)),
+        CheckErrorCard(None),
+        CheckDiagnostics(&["REPEAT needs 2 inputs, but got 1"]),
+        CursorAt("FD 50"),
+        CursorAt("REPEAT"),
+        Wait(ms(100)),
+        CheckErrorCard(None),
+        // That's an edit on the cursor's line, so it waits for the pause.
+        Type("REPEAT 5\nFD 50"),
+        Wait(ms(1200)),
+        CheckErrorCard(Some(REPEAT_CARD)),
+        // A typo says what it means.
+        Type("FORWRD 10"),
+        Wait(ms(1200)),
+        CheckDiagnostics(&["I don't know how to FORWRD. Did you mean FORWARD?"]),
+        CheckErrorCard(Some((
+            "I don't know how to FORWRD. Did you mean FORWARD?",
+            "FORWARD distance",
+            "FD 100",
+        ))),
         Say("Phase 2: filled shapes, FOR and a template, animated"),
         Run(
             "FOR [i 3 1] [SETFC ITEM :i [red orange gold] CIRCLE :i * 50]\nPRINT MAP [? * 2] [1 2 3]",
@@ -731,7 +800,7 @@ fn script() -> Vec<Step> {
         Say("Phase 2: CATCH \"ERROR, and an error made by THROW"),
         Run(CATCHING, Speed::Instant),
         WaitFinished,
-        CheckConsole("[0 FD doesn't like x as input [] 1]"),
+        CheckConsole("[0 FD needs a number, but got the word x [] 1]"),
         CheckConsole("Line 6: CHECK needs a positive number"),
         Say("Phase 3: a slow run draws only the frames that change"),
         Run(SLOW, level_speed(3)),
@@ -1174,7 +1243,7 @@ fn script() -> Vec<Step> {
         OpenTeach,
         Wait(ms(800)),
         CheckTeachRows(
-            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | x TRI 40 (uses TRI) | - FD (Not enough inputs to FD) | x RT 30",
+            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | x TRI 40 (uses TRI) | - FD (FD needs 1 input, but got none) | x RT 30",
         ),
         CheckTeachPicture,
         TeachName("tri"),
@@ -1183,11 +1252,11 @@ fn script() -> Vec<Step> {
         Screenshot("teach-rows"),
         TeachAll(false),
         CheckTeachRows(
-            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | - TRI 40 (uses TRI) | - FD (Not enough inputs to FD) | - RT 30",
+            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | - TRI 40 (uses TRI) | - FD (FD needs 1 input, but got none) | - RT 30",
         ),
         TeachAll(true),
         CheckTeachRows(
-            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | x TRI 40 (uses TRI) | x FD (Not enough inputs to FD) | x RT 30",
+            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | x TRI 40 (uses TRI) | x FD (FD needs 1 input, but got none) | x RT 30",
         ),
         Say("Teach Kame: Escape closes the dialog, and nothing changes"),
         Keys("escape"),
@@ -1298,6 +1367,15 @@ fn script() -> Vec<Step> {
         Screenshot("thinking-light"),
         SetSpeed(Speed::Instant),
         WaitFinished,
+        Say("When a run ends, the highlight and Kame's thinking go"),
+        Run("FD 20 RT 90", Speed::Animated(80.0)),
+        Wait(ms(100)),
+        CheckEditorHighlight(true),
+        WaitFinished,
+        Wait(ms(500)),
+        CheckEditorHighlight(false),
+        CheckDriveThinking("nothing"),
+        Screenshot("run-ended"),
         SetThinking(false),
         Say("Drive Kame: the keys make console entries, and the same key joins up"),
         Run("", Speed::Instant),
@@ -1380,6 +1458,32 @@ fn script() -> Vec<Step> {
         WaitDriven,
         Wait(ms(500)),
         CheckDriveThinking("turn 15"),
+        Say("Drive Kame: a held key builds up no queue, and letting go stops Kame"),
+        DriveSteps(50.0, 90.0),
+        DriveKeysDown(&["up", "up", "up", "up", "up", "up"]),
+        CheckDriveQueue(1),
+        DriveKeyUp("up"),
+        CheckDriveQueue(0),
+        WaitDriven,
+        CheckConsole("> FD 50"),
+        // Still held when the press ends: its repeat plays, and only that.
+        DriveKeysDown(&["up", "up", "up", "up", "up", "up"]),
+        WaitDriven,
+        CheckConsole("> FD 150"),
+        DriveKeyUp("up"),
+        // Holding Space flips the pen once.
+        DriveKeysDown(&["space", "space", "space"]),
+        WaitDriven,
+        CheckConsole("> PU"),
+        DriveKeyUp("space"),
+        DriveKeys(&["space"]),
+        WaitDriven,
+        CheckConsole("> PD"),
+        // Holding Backspace takes back one entry.
+        DriveKeysDown(&["backspace", "backspace", "backspace"]),
+        WaitDriven,
+        CheckUndoLabel("PU"),
+        DriveKeyUp("backspace"),
         DriveKeys(&["escape"]),
         Quit,
     ]
@@ -1499,7 +1603,10 @@ impl App {
                     Step::Wait(d) => since.elapsed() >= d,
                     Step::WaitDriven => {
                         (self.animator.as_ref().is_none_or(|a| a.finished())
-                            && self.driving.as_ref().is_none_or(|d| d.queue.is_empty()))
+                            && self
+                                .driving
+                                .as_ref()
+                                .is_none_or(|d| d.presses.waiting() == 0))
                             || since.elapsed() > Duration::from_secs(20)
                     }
                     Step::WaitFinished => {
@@ -1802,13 +1909,24 @@ impl App {
                         let keystroke = crate::driving::keystroke(key, cx);
                         let handled = self.drive_keystroke(&keystroke, window, cx);
                         self.check(handled, format!("{key} is a drive key"));
+                        self.drive_key_up(&keystroke);
                     }
+                }
+                Step::DriveKeysDown(keys) => {
+                    for key in keys {
+                        let keystroke = crate::driving::keystroke(key, cx);
+                        let handled = self.drive_keystroke(&keystroke, window, cx);
+                        self.check(handled, format!("{key} is a drive key"));
+                    }
+                }
+                Step::DriveKeyUp(key) => {
+                    self.drive_key_up(&crate::driving::keystroke(key, cx));
                 }
                 Step::DriveSteps(moves, turns) => {
                     self.drive_steps = pendown::drive::Steps { moves, turns };
                 }
                 Step::CheckDriveQueue(expected) => {
-                    let found = self.driving.as_ref().map_or(0, |d| d.queue.len());
+                    let found = self.driving.as_ref().map_or(0, |d| d.presses.waiting());
                     self.check(found == expected, format!("{found} presses waiting"));
                 }
                 Step::CheckDriveThinking(expected) => {
@@ -2178,6 +2296,18 @@ impl App {
                         })
                     });
                     self.check(found == expected, format!("the editor shows {found:?}"));
+                }
+                Step::CheckErrorCard(expected) => {
+                    let found = self.error_card.read(cx).on_show().map(|e| {
+                        (
+                            e.message.clone(),
+                            e.usage.clone().unwrap_or_default(),
+                            e.example.clone().unwrap_or_default(),
+                        )
+                    });
+                    let wanted =
+                        expected.map(|(m, u, x)| (m.to_string(), u.to_string(), x.to_string()));
+                    self.check(found == wanted, format!("the error card shows {found:?}"));
                 }
                 Step::CheckEditor(expected) => {
                     let text = self.editor.read(cx).value().to_string();

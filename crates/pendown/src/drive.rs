@@ -2,6 +2,8 @@
 //! console entry, and presses of the same key in a row joining into one.
 //! The parts that don't need a window.
 
+use std::collections::VecDeque;
+
 /// The steps a move can take, and a turn, with the ones driving starts with.
 pub const MOVE_STEPS: [f64; 5] = [1.0, 5.0, 10.0, 25.0, 50.0];
 pub const TURN_STEPS: [f64; 6] = [1.0, 5.0, 15.0, 30.0, 45.0, 90.0];
@@ -111,6 +113,78 @@ pub fn press(open: Option<Joined>, key: Key, steps: Steps) -> Press {
     }
 }
 
+/// What a key asks driving to do.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Input {
+    Key(Key),
+    /// Space: the pen up or down.
+    Pen,
+    /// Backspace or Ctrl+Z.
+    Undo,
+}
+
+/// The keys down and the presses waiting to play. A key that comes down again
+/// with no key-up between is the keyboard repeating it, which can be far
+/// faster than Kame moves, so repeats never build up: at most one waits, and
+/// letting go of the key takes it back. Separate presses all wait their turn.
+/// This goes by key-ups as not every platform says which presses are repeats.
+#[derive(Debug, Default)]
+pub struct Presses {
+    /// The names of the keys down.
+    held: Vec<String>,
+    queue: VecDeque<Input>,
+    /// The repeat waiting, and the name of its key.
+    again: Option<(String, Input)>,
+}
+
+impl Presses {
+    /// `key` came down, asking for `input`, with a press still playing if
+    /// `busy`. Returns what to play now, if anything.
+    pub fn down(&mut self, key: &str, input: Input, busy: bool) -> Option<Input> {
+        let repeat = self.held.iter().any(|k| k == key);
+        if !repeat {
+            self.held.push(key.to_string());
+        }
+        if repeat && matches!(input, Input::Pen | Input::Undo) {
+            // Holding Space would only flip the pen over and over, and
+            // holding Undo would soon take back everything.
+            return None;
+        }
+        if !busy {
+            return Some(input);
+        }
+        if !repeat {
+            // The keyboard repeats only the last key down, so a repeat of an
+            // earlier key that's still waiting is out of date.
+            self.again = None;
+            self.queue.push_back(input);
+        } else if self.queue.is_empty() {
+            self.again = Some((key.to_string(), input));
+        }
+        None
+    }
+
+    /// `key` came up.
+    pub fn up(&mut self, key: &str) {
+        self.held.retain(|k| k != key);
+        if self.again.as_ref().is_some_and(|(k, _)| k == key) {
+            self.again = None;
+        }
+    }
+
+    /// The next press to play, now that the last has finished.
+    pub fn next(&mut self) -> Option<Input> {
+        self.queue
+            .pop_front()
+            .or_else(|| self.again.take().map(|(_, input)| input))
+    }
+
+    /// How many presses are waiting to play.
+    pub fn waiting(&self) -> usize {
+        self.queue.len() + usize::from(self.again.is_some())
+    }
+}
+
 /// What Space runs: lifts the pen if it's down, and puts it down if not.
 pub fn pen(up: bool) -> &'static str {
     if up { "PD" } else { "PU" }
@@ -175,6 +249,115 @@ mod tests {
             ("RT 180".to_string(), "RT 90".to_string())
         );
         assert_eq!(steps.of(Key::Back), 50.0);
+    }
+
+    const UP: Input = Input::Key(Key::Forward);
+    const RIGHT: Input = Input::Key(Key::Right);
+
+    #[test]
+    fn holding_a_key_never_builds_up_a_queue() {
+        let mut presses = Presses::default();
+        assert_eq!(presses.down("up", UP, false), Some(UP));
+        for _ in 0..100 {
+            assert_eq!(presses.down("up", UP, true), None);
+        }
+        assert_eq!(presses.waiting(), 1);
+        // Still held when that press ends: the next plays straight away.
+        assert_eq!(presses.next(), Some(UP));
+        assert_eq!(presses.next(), None);
+        // A repeat with nothing playing plays.
+        assert_eq!(presses.down("up", UP, false), Some(UP));
+    }
+
+    #[test]
+    fn letting_go_takes_back_the_repeat_waiting() {
+        let mut presses = Presses::default();
+        presses.down("up", UP, false);
+        presses.down("up", UP, true);
+        presses.up("up");
+        assert_eq!(presses.waiting(), 0);
+        assert_eq!(presses.next(), None);
+    }
+
+    #[test]
+    fn separate_presses_all_wait_their_turn() {
+        let mut presses = Presses::default();
+        presses.down("up", UP, false);
+        presses.up("up");
+        for _ in 0..3 {
+            assert_eq!(presses.down("up", UP, true), None);
+            // Letting go doesn't take back a press.
+            presses.up("up");
+        }
+        assert_eq!(presses.waiting(), 3);
+        assert_eq!(
+            [presses.next(), presses.next(), presses.next()],
+            [Some(UP); 3]
+        );
+        assert_eq!(presses.next(), None);
+    }
+
+    #[test]
+    fn a_press_goes_before_any_repeat() {
+        let mut presses = Presses::default();
+        presses.down("up", UP, false);
+        presses.down("up", UP, true);
+        // Another key: Up's repeat is out of date.
+        presses.down("right", RIGHT, true);
+        assert_eq!(presses.waiting(), 1);
+        // Right's own repeat doesn't jump in behind its press.
+        presses.down("right", RIGHT, true);
+        assert_eq!(presses.waiting(), 1);
+        assert_eq!(presses.next(), Some(RIGHT));
+        // Letting go of Up doesn't touch Right's repeat.
+        presses.down("right", RIGHT, true);
+        presses.up("up");
+        assert_eq!(presses.next(), Some(RIGHT));
+    }
+
+    #[test]
+    fn holding_space_flips_the_pen_once() {
+        let mut presses = Presses::default();
+        assert_eq!(presses.down("space", Input::Pen, false), Some(Input::Pen));
+        assert_eq!(presses.down("space", Input::Pen, false), None);
+        assert_eq!(presses.down("space", Input::Pen, true), None);
+        assert_eq!(presses.waiting(), 0);
+        presses.up("space");
+        assert_eq!(presses.down("space", Input::Pen, false), Some(Input::Pen));
+    }
+
+    #[test]
+    fn holding_undo_takes_back_one_entry() {
+        let mut presses = Presses::default();
+        assert_eq!(
+            presses.down("backspace", Input::Undo, false),
+            Some(Input::Undo)
+        );
+        assert_eq!(presses.down("backspace", Input::Undo, false), None);
+        assert_eq!(presses.down("backspace", Input::Undo, true), None);
+        assert_eq!(presses.waiting(), 0);
+        presses.up("backspace");
+        assert_eq!(
+            presses.down("backspace", Input::Undo, false),
+            Some(Input::Undo)
+        );
+    }
+
+    #[test]
+    fn a_lost_key_up_costs_one_press_at_most() {
+        let mut presses = Presses::default();
+        presses.down("up", UP, false);
+        // Its key-up never came. Tapping it again looks like a repeat, which
+        // still plays with nothing else playing.
+        assert_eq!(presses.down("up", UP, false), Some(UP));
+        // Tapped while a press plays, it's lost when its key-up comes...
+        assert_eq!(presses.down("up", UP, true), None);
+        presses.up("up");
+        assert_eq!(presses.waiting(), 0);
+        // ...and that key-up puts things right.
+        assert_eq!(presses.down("up", UP, true), None);
+        presses.up("up");
+        assert_eq!(presses.waiting(), 1);
     }
 
     #[test]

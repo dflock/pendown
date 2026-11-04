@@ -15,7 +15,7 @@ use smallvec::SmallVec;
 
 use crate::{
     colour::{PALETTE, Rgba},
-    error::{CallSite, Error, RunError},
+    error::{CallSite, Error, RunError, nothing_uses},
     event::{Event, EventSink, Pen, Point, SyncPoint},
     geometry::{Area, TurtleMode},
     metrics::InterpreterMetrics,
@@ -23,6 +23,7 @@ use crate::{
     parse::{self, Arity, Block, Call, Cx, Expr, Instr, Target},
     prims::{self, Args, Imp, PRIMS},
     random::Random,
+    reference::reference,
     span::{SourceId, Span},
     value::{List, Style, Value},
     watch::{self, Scope, ScopeKind, Variable, Watch},
@@ -335,16 +336,66 @@ fn uncaught(tag: &str, value: Option<Value>, span: Span) -> Error {
     Error::new(message, Some(span))
 }
 
+const DONT_SAY: &str = "You don't say what to do with ";
+
 fn dont_say(v: &Value, span: Span) -> Flow {
-    Error::new(
-        format!("You don't say what to do with {}", v.show()),
-        Some(span),
-    )
-    .into()
+    Error::new(format!("{DONT_SAY}{}", v.show()), Some(span)).into()
 }
 
-fn didnt_output(name: &str, to: &str, span: Span) -> Flow {
-    let message = if to.is_empty() {
+/// `FORWARD 10 20`: an error from instruction `i` of `block` that it's a
+/// value nothing uses, when it comes straight after a call on the same line,
+/// says that call had all the inputs it takes.
+fn after_a_call(block: &[Instr], i: usize, flow: Flow) -> Flow {
+    let Flow::Error(error) = flow else {
+        return flow;
+    };
+    let previous = i.checked_sub(1).map(|p| &block[p].expr);
+    let value = error.message.strip_prefix(DONT_SAY);
+    match (previous, value, error.span) {
+        (Some(Expr::Call(call)), Some(value), Some(span))
+            if error.calls.is_empty()
+                && !matches!(call.target, Target::Infix(_))
+                && span == block[i].expr.span()
+                && span.line == call.span.line =>
+        {
+            let message = nothing_uses(value, &call.name, call.args.len());
+            Error::new(message, error.span).about(&call.name).into()
+        }
+        _ => Flow::Error(error),
+    }
+}
+
+/// Whether input `i` of the command called `name` is a list of instructions,
+/// going by how its reference page says it's written.
+fn wants_instructions(name: &str, i: usize) -> bool {
+    let Some(command) = reference().find(name) else {
+        return false;
+    };
+    command.usage_lines().iter().any(|line| {
+        let mut words = line.split_whitespace();
+        words.next().is_some_and(|w| w.eq_ignore_ascii_case(name))
+            && words
+                .nth(i)
+                .is_some_and(|w| w.starts_with("instructionlist"))
+    })
+}
+
+/// The error for a call given to `name`, which needed a list of instructions:
+/// they have no brackets, so the first was taken as the input.
+fn put_in_brackets(name: &str, span: Option<Span>) -> Flow {
+    let message = format!(
+        "{} needs a list of instructions here. Put them in [ ]",
+        name.to_uppercase()
+    );
+    Error::new(message, span).about(name).into()
+}
+
+fn no_value_message(name: &str) -> String {
+    format!(":{name} has no value yet. Give it one with MAKE \"{name} 100")
+}
+
+fn didnt_output_message(name: &str, to: &str) -> String {
+    if to.is_empty() {
         format!("{} didn't output a value", name.to_uppercase())
     } else {
         format!(
@@ -352,8 +403,19 @@ fn didnt_output(name: &str, to: &str, span: Span) -> Flow {
             name.to_uppercase(),
             to.to_uppercase()
         )
+    }
+}
+
+fn didnt_output(name: &str, to: &str, span: Span) -> Flow {
+    Error::new(didnt_output_message(name, to), Some(span)).into()
+}
+
+/// Whether `error` is `input`, a call, not outputting to `to`.
+fn forgot_brackets(error: &Error, input: &Expr, to: &str) -> bool {
+    let Expr::Call(call) = input else {
+        return false;
     };
-    Error::new(message, Some(span)).into()
+    error.span == Some(call.span) && error.message == didnt_output_message(&call.name, to)
 }
 
 impl Interpreter {
@@ -643,8 +705,11 @@ impl Interpreter {
             }));
         }
         self.stack_base = stack_addr();
-        for instr in &program.top {
-            match self.exec_instr(instr, false) {
+        for (i, instr) in program.top.iter().enumerate() {
+            match self
+                .exec_instr(instr, false)
+                .map_err(|flow| after_a_call(&program.top, i, flow))
+            {
                 Ok(_) => {}
                 Err(Flow::Halt) => return Err(RunError::Halted),
                 Err(Flow::Error(e)) => {
@@ -1076,18 +1141,24 @@ impl Interpreter {
                 call,
                 vals: std::slice::from_ref(&v),
             }
-            .doesnt_like(0)
+            .wanted(0, "TRUE or FALSE")
         })
     }
 
+    /// Input `i` of `call`, a list of instructions to run.
     fn eval_list(&mut self, call: &Call, i: usize) -> Result<Rc<List>, Flow> {
-        match self.eval(&call.args[i], &call.name)? {
-            Value::List(list) => Ok(list),
-            v => {
+        match self.eval(&call.args[i], &call.name) {
+            Ok(Value::List(list)) => Ok(list),
+            Ok(v) => {
                 let mut vals = vec![Value::Num(0.0); i];
                 vals.push(v);
-                Err(Args { call, vals: &vals }.doesnt_like(i))
+                Err(Args { call, vals: &vals }.wanted(i, "a list of instructions"))
             }
+            // `REPEAT 4 FD 50`.
+            Err(Flow::Error(e)) if forgot_brackets(&e, &call.args[i], &call.name) => {
+                Err(put_in_brackets(&call.name, e.span))
+            }
+            Err(flow) => Err(flow),
         }
     }
 
@@ -1327,7 +1398,8 @@ impl Interpreter {
     fn run_block(&mut self, block: &Block, tail: bool) -> Result<Option<Tail>, Flow> {
         let last = block.len().wrapping_sub(1);
         for (i, instr) in block.iter().enumerate() {
-            if let Some(t) = self.exec_instr(instr, tail && i == last)? {
+            let result = self.exec_instr(instr, tail && i == last);
+            if let Some(t) = result.map_err(|flow| after_a_call(block, i, flow))? {
                 return Ok(Some(t));
             }
         }
@@ -1360,8 +1432,9 @@ impl Interpreter {
     }
 
     fn run_block_slice(&mut self, instrs: &[Instr]) -> Result<(), Flow> {
-        for instr in instrs {
-            self.exec_instr(instr, false)?;
+        for (i, instr) in instrs.iter().enumerate() {
+            self.exec_instr(instr, false)
+                .map_err(|flow| after_a_call(instrs, i, flow))?;
         }
         Ok(())
     }
@@ -1400,18 +1473,16 @@ impl Interpreter {
             Expr::Lit(v, _) => Ok(v.clone()),
             Expr::Var(sym, span) => match &self.vars[*sym as usize] {
                 Some(v) => Ok(v.clone()),
-                None => Err(Error::new(
-                    format!(":{} has no value", self.names.spelling(*sym)),
-                    Some(*span),
-                )
-                .into()),
+                None => {
+                    Err(Error::new(no_value_message(self.names.spelling(*sym)), Some(*span)).into())
+                }
             },
             Expr::Neg(operand, span) => {
                 let v = self.eval(operand, "-")?;
                 match v.as_num() {
                     Some(n) => Ok(Value::Num(-n)),
                     None => Err(Error::new(
-                        format!("- doesn't like {} as input", v.show()),
+                        format!("- needs a number, but got {}", v.described()),
                         Some(*span),
                     )
                     .into()),
@@ -1463,8 +1534,18 @@ impl Interpreter {
 
     fn eval_args(&mut self, call: &Call) -> Result<ArgVec, Flow> {
         let mut args = ArgVec::new();
-        for arg in &call.args {
-            args.push(self.eval(arg, &call.name)?);
+        for (i, arg) in call.args.iter().enumerate() {
+            match self.eval(arg, &call.name) {
+                Ok(value) => args.push(value),
+                // `FOR [i 1 3] FD 5`.
+                Err(Flow::Error(e))
+                    if forgot_brackets(&e, arg, &call.name)
+                        && wants_instructions(&call.name, i) =>
+                {
+                    return Err(put_in_brackets(&call.name, e.span));
+                }
+                Err(flow) => return Err(flow),
+            }
         }
         Ok(args)
     }
@@ -1472,7 +1553,15 @@ impl Interpreter {
     fn lookup(&self, sym: Sym, call: &Call) -> Result<Rc<Proc>, Flow> {
         match &self.procs[sym as usize] {
             Some(proc) => Ok(proc.clone()),
-            None => Err(Error::unknown(&call.name, Some(call.span)).into()),
+            None => {
+                let procedures: Vec<_> = self
+                    .procs
+                    .iter()
+                    .flatten()
+                    .map(|proc| (proc.name.to_string(), Arity::fixed(proc.inputs.len())))
+                    .collect();
+                Err(Error::unknown(&call.name, Some(call.span), &procedures).into())
+            }
         }
     }
 

@@ -13,6 +13,7 @@
 mod colour;
 mod error;
 mod event;
+pub mod explain;
 mod geometry;
 mod interp;
 pub mod metrics;
@@ -24,6 +25,7 @@ mod random;
 mod reader;
 pub mod reference;
 mod span;
+mod suggest;
 pub mod syntax;
 mod value;
 pub mod watch;

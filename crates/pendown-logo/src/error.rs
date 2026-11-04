@@ -1,6 +1,10 @@
 use std::fmt;
 
-use crate::span::Span;
+use crate::{
+    parse::Arity,
+    span::Span,
+    suggest::{Suggestion, suggest},
+};
 
 /// A parse or runtime error, pointing at the code that caused it (ADR 0005).
 #[derive(Clone, Debug, PartialEq)]
@@ -13,6 +17,43 @@ pub struct Error {
     /// The command the error is about, as it was called, such as `FD`, for
     /// help on it.
     pub command: Option<String>,
+}
+
+/// "1 input", "2 inputs" or "no inputs".
+fn inputs(n: usize) -> String {
+    match n {
+        0 => "no inputs".to_string(),
+        1 => "1 input".to_string(),
+        n => format!("{n} inputs"),
+    }
+}
+
+/// What to say when a call has too few inputs: `name` as it should read,
+/// and whether it can only take `needs`, or could take more.
+pub fn not_enough_inputs(name: &str, needs: usize, exactly: bool, got: usize) -> String {
+    let at_least = if exactly { "" } else { "at least " };
+    let got = match got {
+        0 => "none".to_string(),
+        n => n.to_string(),
+    };
+    format!("{name} needs {at_least}{}, but got {got}", inputs(needs))
+}
+
+/// What to say when a call has too many inputs: `name` as it should read,
+/// and whether it can only take `max`, or could take fewer.
+pub fn too_many_inputs(name: &str, max: usize, exactly: bool, got: usize) -> String {
+    let at_most = if exactly { "" } else { "at most " };
+    format!("{name} takes {at_most}{}, but got {got}", inputs(max))
+}
+
+/// What to say about a value nothing uses, straight after a call that had
+/// all the inputs it takes.
+pub fn nothing_uses(value: &str, name: &str, takes: usize) -> String {
+    format!(
+        "Nothing uses {value}. {} takes {}",
+        name.to_uppercase(),
+        inputs(takes)
+    )
 }
 
 /// One step of an error's call chain: `procedure` was called at `span`.
@@ -39,13 +80,19 @@ impl Error {
     }
 
     /// For a name that isn't a procedure: why, if it's an obsolete command,
-    /// and otherwise "I don't know how to".
-    pub fn unknown(name: &str, span: Option<Span>) -> Error {
+    /// and otherwise "I don't know how to", with what it might have been
+    /// meant as, from the commands and these procedures.
+    pub fn unknown(name: &str, span: Option<Span>, procedures: &[(String, Arity)]) -> Error {
         let upper = name.to_uppercase();
-        match crate::reference::reference().obsolete_reason(name) {
-            Some(reason) => {
-                Error::new(format!("{upper} isn't in Pendown: {reason}"), span).about(name)
-            }
+        if let Some(reason) = crate::reference::reference().obsolete_reason(name) {
+            return Error::new(format!("{upper} isn't in Pendown: {reason}"), span).about(name);
+        }
+        match suggest(name, procedures) {
+            Some(Suggestion { text, command }) => Error::new(
+                format!("I don't know how to {upper}. Did you mean {text}?"),
+                span,
+            )
+            .about(&command),
             None => Error::new(format!("I don't know how to {upper}"), span),
         }
     }
@@ -76,4 +123,41 @@ pub enum RunError {
     /// Stopped from outside, by the cancel flag or because the event
     /// receiver went away.
     Halted,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn too_few_inputs_read_well() {
+        assert_eq!(
+            not_enough_inputs("REPEAT", 2, true, 1),
+            "REPEAT needs 2 inputs, but got 1"
+        );
+        assert_eq!(
+            not_enough_inputs("FD", 1, true, 0),
+            "FD needs 1 input, but got none"
+        );
+        assert_eq!(
+            not_enough_inputs("IF", 2, false, 1),
+            "IF needs at least 2 inputs, but got 1"
+        );
+    }
+
+    #[test]
+    fn too_many_inputs_read_well() {
+        assert_eq!(
+            too_many_inputs("FD", 1, true, 2),
+            "FD takes 1 input, but got 2"
+        );
+        assert_eq!(
+            too_many_inputs("CS", 0, true, 1),
+            "CS takes no inputs, but got 1"
+        );
+        assert_eq!(
+            too_many_inputs("IF", 3, false, 4),
+            "IF takes at most 3 inputs, but got 4"
+        );
+    }
 }

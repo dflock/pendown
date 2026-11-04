@@ -12,13 +12,13 @@ use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{
     ActiveTheme, Disableable as _, Icon, Selectable as _, Sizable as _,
     button::{Button, ButtonVariants as _},
-    checkbox::Checkbox,
     h_flex,
     input::{Input, InputEvent, InputState},
     v_flex,
 };
 use gpui_kit::{assets::IconName, prelude::FluentBuilder as _, *};
 use pendown::{
+    config::HelpConfig,
     help::{PICTURE_SIZE, lesson_picture_options, picture_options},
     markup::{self, Block, Inline},
     tutorial::{Kind as CodeKind, kind},
@@ -27,15 +27,7 @@ use pendown_logo::reference::{Command, Kind, reference};
 
 use crate::{app::App as PendownWindow, colours_page::ColoursPage};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Tab {
-    Help,
-    Tutorial,
-    /// Examples to run or load, with their pictures (`.scratch/gallery/`).
-    Gallery,
-    /// Every keyboard shortcut (`.scratch/shortcuts/`).
-    Shortcuts,
-}
+pub use pendown::config::Tab;
 
 /// A help page.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -114,23 +106,10 @@ pub struct HelpPanel {
     /// Each lesson's scroll, so each keeps its place.
     pub lesson_scrolls: Vec<ScrollHandle>,
     pub shortcuts_scroll: ScrollHandle,
+    /// The tab brought back from the last run, and how far down it was,
+    /// until it can be scrolled that far.
+    restoring_scroll: Option<(Tab, f64)>,
     _subscriptions: Vec<Subscription>,
-}
-
-/// Lines of `eg` without the manual's notes, such as `(library procedure)`.
-fn usage_lines(usage: &str) -> Vec<String> {
-    usage
-        .lines()
-        .map(|l| {
-            let l = l.trim();
-            ["(library procedure)", "(special form)", "(variable)"]
-                .iter()
-                .fold(l.to_string(), |l, note| l.replace(note, ""))
-                .trim()
-                .to_string()
-        })
-        .filter(|l| !l.is_empty())
-        .collect()
 }
 
 /// How many commands a list of indexes holds that the panel lists.
@@ -183,7 +162,86 @@ impl HelpPanel {
                 .map(|_| ScrollHandle::new())
                 .collect(),
             shortcuts_scroll: ScrollHandle::new(),
+            restoring_scroll: None,
             _subscriptions: subscriptions,
+        }
+    }
+
+    /// Puts the panel back as `config` remembers it, from the last run.
+    pub fn restore(
+        &mut self,
+        config: &HelpConfig,
+        show_obsolete: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.show_obsolete = show_obsolete;
+        self.tab = config.tab;
+        self.pinned = config.pinned;
+        self.lesson = config
+            .lesson
+            .min(self.lesson_scrolls.len().saturating_sub(1));
+        if let Some(i) = config
+            .page
+            .as_ref()
+            .and_then(|key| reference().commands.iter().position(|c| &c.key == key))
+        {
+            self.page = Page::Command(i);
+            self.show_in_contents(self.page);
+        }
+        if !config.search.is_empty() {
+            self.search
+                .update(cx, |s, cx| s.set_value(config.search.as_str(), window, cx));
+        }
+        self.restoring_scroll = Some((self.tab, config.scroll));
+    }
+
+    /// What scrolls the tab that's showing.
+    fn tab_scroll(&self) -> Option<&ScrollHandle> {
+        match self.tab {
+            Tab::Help => Some(&self.page_scroll),
+            Tab::Tutorial => self.lesson_scrolls.get(self.lesson),
+            Tab::Gallery => Some(&self.gallery_scroll),
+            Tab::Shortcuts => Some(&self.shortcuts_scroll),
+        }
+    }
+
+    /// Scrolls a tab brought back from the last run to where it was. A page
+    /// is too short for that until its pictures are drawn, and each layout
+    /// limits how far it's scrolled, so this goes on until they are.
+    fn scroll_restored_tab(&mut self) {
+        let Some((tab, down)) = self.restoring_scroll else {
+            return;
+        };
+        if tab != self.tab {
+            self.restoring_scroll = None;
+        } else if let Some(handle) = self.tab_scroll() {
+            handle.set_offset(point(px(0.), px(-down as f32)));
+        }
+    }
+
+    /// Done with `scroll_restored_tab` if no pictures are still to come.
+    fn scroll_restored_if_drawn(&mut self) {
+        if self.pictures_waiting.is_empty() && !self.drawing_picture {
+            self.restoring_scroll = None;
+        }
+    }
+
+    /// What's worth keeping for the next run.
+    pub fn remembered(&self, open: bool, cx: &App) -> HelpConfig {
+        HelpConfig {
+            open,
+            tab: self.tab,
+            page: match self.page {
+                Page::Contents => None,
+                Page::Command(i) => Some(reference().commands[i].key.clone()),
+            },
+            search: self.query(cx),
+            pinned: self.pinned,
+            lesson: self.lesson,
+            scroll: self
+                .tab_scroll()
+                .map_or(0.0, |handle| f64::from(-handle.offset().y.as_f32())),
         }
     }
 
@@ -833,7 +891,7 @@ impl HelpPanel {
         }
 
         // How to call it.
-        let usage = usage_lines(&command.usage);
+        let usage = command.usage_lines();
         if !usage.is_empty() {
             out.push(
                 v_flex()
@@ -1331,20 +1389,20 @@ impl Render for HelpPanel {
             .border_b_1()
             .border_color(theme.border)
             .child(
-                tab("tab-help", "Help", self.tab == Tab::Help, cx).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.tab = Tab::Help;
-                        cx.notify();
-                    },
-                )),
-            )
-            .child(
                 tab("tab-tutorial", "Tutorial", self.tab == Tab::Tutorial, cx).on_click(
                     cx.listener(|this, _, _, cx| {
                         this.tab = Tab::Tutorial;
                         cx.notify();
                     }),
                 ),
+            )
+            .child(
+                tab("tab-help", "Help", self.tab == Tab::Help, cx).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.tab = Tab::Help;
+                        cx.notify();
+                    },
+                )),
             )
             .child(
                 tab("tab-gallery", "Gallery", self.tab == Tab::Gallery, cx).on_click(cx.listener(
@@ -1374,12 +1432,14 @@ impl Render for HelpPanel {
                     }),
             );
 
+        self.scroll_restored_tab();
         let body = match self.tab {
             Tab::Help => self.render_help(&query, window, cx),
             Tab::Tutorial => self.render_tutorial(window, cx),
             Tab::Gallery => self.render_gallery(cx),
             Tab::Shortcuts => self.render_shortcuts(window, cx),
         };
+        self.scroll_restored_if_drawn();
         v_flex()
             .size_full()
             .bg(theme.background)
@@ -1496,15 +1556,6 @@ impl HelpPanel {
             .border_t_1()
             .border_color(theme.border)
             .text_xs()
-            .child(
-                Checkbox::new("show-obsolete")
-                    .label("Show obsolete commands")
-                    .checked(self.show_obsolete)
-                    .on_click(cx.listener(|this, checked: &bool, _, cx| {
-                        this.show_obsolete = *checked;
-                        cx.notify();
-                    })),
-            )
             .child(div().flex_1())
             .child(
                 div()
@@ -1872,7 +1923,7 @@ impl PendownWindow {
     }
 
     /// What the editor's cursor is on, and its line.
-    fn word_at_cursor(&self, cx: &App) -> Option<(String, u32)> {
+    pub(crate) fn word_at_cursor(&self, cx: &App) -> Option<(String, u32)> {
         let editor = self.editor.read(cx);
         let text = editor.value();
         let offset = editor.cursor();
@@ -1883,7 +1934,7 @@ impl PendownWindow {
 
     /// The editor changed or its cursor moved: the panel follows it.
     pub(crate) fn follow_cursor(&mut self, cx: &mut Context<Self>) {
-        if !self.help_open {
+        if !self.help_open || !self.checked {
             return;
         }
         let word = self.word_at_cursor(cx);

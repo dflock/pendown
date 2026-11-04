@@ -338,6 +338,23 @@ impl Animator {
         }
     }
 
+    /// The run is over, so Kame stops thinking about its last move or turn,
+    /// which starts to fade. Driving keeps it, for the entry it shows.
+    pub fn stop_thinking(&mut self) {
+        if let Some(last) = self.thought.take() {
+            self.fading = Some((last, FADE));
+        }
+    }
+
+    /// Fades the last thought by `dt`. `frame` does this while a run plays,
+    /// and the window once it's over, when there are no more frames.
+    pub fn fade_thinking(&mut self, dt: Duration) {
+        if let Some((thought, left)) = self.fading {
+            let left = left - dt.as_secs_f64();
+            self.fading = (left > 0.0).then_some((thought, left));
+        }
+    }
+
     /// A move or turn starts: it's what Kame thinks about now, and the last
     /// thought starts to fade.
     fn think(&mut self, thought: Thought) {
@@ -463,9 +480,8 @@ impl Animator {
         let mut replied = false;
         if instant {
             (self.thought, self.fading) = (None, None);
-        } else if let Some((thought, left)) = self.fading {
-            let left = left - dt.as_secs_f64();
-            self.fading = (left > 0.0).then_some((thought, left));
+        } else {
+            self.fade_thinking(dt);
         }
 
         loop {

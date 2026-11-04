@@ -121,6 +121,19 @@ impl Value {
         }
     }
 
+    /// What it is, for an error: "the word x", or "the list [90]".
+    pub fn described(&self) -> String {
+        let shown = self.show();
+        match self {
+            Value::Num(_) => shown,
+            Value::Word(w) if w.is_empty() => "the empty word".to_string(),
+            Value::Word(_) => format!("the word {shown}"),
+            Value::List(l) if l.items.is_empty() => "the empty list".to_string(),
+            Value::List(_) => format!("the list {shown}"),
+            Value::Array(_) => format!("the array {shown}"),
+        }
+    }
+
     /// How `SHOW` prints it: lists keep their brackets.
     pub fn show(&self) -> String {
         self.show_styled(Style::default())

@@ -13,16 +13,18 @@ use gpui_kit::component::{
     h_flex,
     highlighter::{Diagnostic, DiagnosticSeverity},
     input::{
-        EditorState, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position,
+        EditorState, Escape, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position,
         RangeDecoration, RangeDecorationCollection, RangeDecorationStyle, TextareaState, Undo,
     },
-    resizable::{h_resizable, resizable_panel},
+    resizable::{ResizableState, h_resizable, resizable_panel, v_resizable},
     slider::{SliderEvent, SliderState},
     v_flex,
 };
 use gpui_kit::{assets::IconName, prelude::FluentBuilder as _, *};
+use pendown::error_display::{Cursor, ErrorDisplay, Spot};
 use pendown::{
     animator::{Animator, MAX_FRAME_GAP, Mode, Replay, Speed, Thinking},
+    config::{Config, ConfigFile, WindowState, WindowedSize},
     console::{ConsoleInput, Ending, Submit, defines, label},
     document::Document,
     errors,
@@ -31,12 +33,16 @@ use pendown::{
     speed::{INSTANT_LEVEL, level_speed, speed_level},
     teach,
 };
-use pendown_logo::{Point, RunError, SourceId};
+use pendown_logo::{
+    Point, RunError, SourceId, Span,
+    explain::{Explanation, explain},
+};
 use pendown_render::Mark;
 
 use crate::{
     autotest::Autotest,
     canvas::{Canvas, Overlay, TURTLE_SIZE},
+    error_card::{ErrorCard, HideCard, LineError, OpenHelp, PointerMoved},
     files::{
         After, ExportPicture, NewFile, OpenFile, PauseOrResume, Picture, ResetProgram, RunProgram,
         SaveFile, SaveFileAs, ShowHelp, SingleStep, ToggleMetrics,
@@ -80,6 +86,19 @@ pub(crate) fn position(text: &str, offset: usize) -> Position {
     Position::new(line, before[line_start..].encode_utf16().count() as u32)
 }
 
+/// How long after the last edit an error on the line being typed shows.
+const ERROR_PAUSE: Duration = Duration::from_secs(1);
+
+/// How long the pointer stays on an underline before its card shows.
+const HOVER_DELAY: Duration = Duration::from_millis(300);
+
+/// Where the errors on the code came from, which says when they show.
+enum ErrorsFrom {
+    Editing,
+    Checking,
+    Run,
+}
+
 /// The live numbers shown over the canvas: each line covers about the last
 /// `OVERLAY_EVERY`.
 pub(crate) struct MetricsOverlay {
@@ -121,7 +140,6 @@ struct Before {
 
 /// The console area's height, with the counters and variables beside the
 /// console.
-const CONSOLE_HEIGHT: f32 = 190.0;
 
 /// A change due sooner than this is left to the next animation frame.
 const FRAME_SOON: Duration = Duration::from_millis(12);
@@ -164,6 +182,21 @@ pub struct App {
     breakpoint_tint: RangeDecorationCollection,
     /// The line numbers, which take breakpoints.
     pub(crate) gutter: Entity<Gutter>,
+    pub(crate) error_card: Entity<ErrorCard>,
+    /// When the errors on the code show.
+    error_display: ErrorDisplay,
+    /// The errors on the code, for the underlines: what the editor has is
+    /// those `error_display` says to show now.
+    code_diagnostics: Vec<Diagnostic>,
+    /// Which of them the editor has, so the underlines aren't reset
+    /// needlessly.
+    underlined: Vec<usize>,
+    /// Waiting for the learner to pause.
+    error_pause: Option<Task<()>>,
+    /// The error the pointer has just reached, while it waits to show.
+    hover_coming: Option<(usize, Task<()>)>,
+    /// Where the editor's cursor was when `cursor_for_errors` last looked.
+    last_cursor: Cursor,
     speed_slider: Entity<SliderState>,
     pub(crate) speed: Speed,
     pub(crate) canvas: Rc<RefCell<Canvas>>,
@@ -181,7 +214,7 @@ pub struct App {
     /// The user has said the window can close.
     pub(crate) closing: bool,
     /// The program has been checked for errors since the window opened.
-    checked: bool,
+    pub(crate) checked: bool,
     /// Console output, one line each.
     pub(crate) console: Vec<SharedString>,
     pub(crate) console_dirty: bool,
@@ -191,6 +224,18 @@ pub struct App {
     pub(crate) editor_pane: Entity<EditorPane>,
     console_pane: Entity<ConsolePane>,
     toolbar_pane: Entity<ToolbarPane>,
+    /// What's remembered between runs, as it was at the start.
+    /// `save_config` adds the rest.
+    pub(crate) config: Config,
+    windowed_size: WindowedSize,
+    config_file: ConfigFile,
+    /// The sizes of the panes: the two layouts above the console, and the
+    /// console and what's above it.
+    main_split: Entity<ResizableState>,
+    main_help_split: Entity<ResizableState>,
+    console_split: Entity<ResizableState>,
+    /// When the last thought last faded, once the run is over.
+    last_fade: Option<Instant>,
     /// What the counters and variables panels show (phase 4).
     pub(crate) watched: Entity<Watched>,
     pub(crate) counters_pane: Entity<CountersPane>,
@@ -252,7 +297,12 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> App {
+    pub fn new(
+        config: Config,
+        config_file: ConfigFile,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> App {
         let editor = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("logo")
@@ -276,11 +326,12 @@ impl App {
             (tint, state.create_range_decorations_collection(vec![], cx))
         });
         let gutter = cx.new(|cx| Gutter::new(editor.clone(), cx));
+        let error_card = cx.new(|cx| ErrorCard::new(editor.clone(), cx));
         let console_output = cx.new(|cx| TextareaState::new(window, cx));
         let console_input = cx.new(|cx| {
             InputState::new(window, cx).placeholder("Type an instruction and press Enter")
         });
-        let speed = level_speed(5);
+        let speed = level_speed(config.speed);
         let speed_slider = cx.new(|_| {
             SliderState::new()
                 .min(1.0)
@@ -305,12 +356,25 @@ impl App {
                     this.gutter.update(cx, |gutter, cx| gutter.follow(cx));
                     this.show_breakpoints(cx);
                     if !this.running() || this.paused() {
-                        this.check_program(cx);
+                        this.check_edit(cx);
                     }
                 }
             }),
             cx.subscribe(&gutter, |this, _, _: &BreakpointsChanged, cx| {
                 this.breakpoints_changed(cx);
+            }),
+            cx.subscribe_in(
+                &error_card,
+                window,
+                |this, _, event: &OpenHelp, window, cx| {
+                    this.open_help(event.0, window, cx);
+                },
+            ),
+            cx.subscribe(&error_card, |this, _, _: &HideCard, cx| {
+                this.escape_hides_card(cx);
+            }),
+            cx.subscribe(&error_card, |this, _, event: &PointerMoved, cx| {
+                this.pointer_moved(event, cx);
             }),
             cx.subscribe_in(
                 &console_input,
@@ -346,11 +410,25 @@ impl App {
         let watched = cx.new(|_| Watched::default());
         let counters_pane = cx.new(|_| CountersPane::new(watched.clone()));
         let variables_pane = cx.new(|_| VariablesPane::new(watched.clone()));
-        let help_panel = cx.new(|cx| HelpPanel::new(app.clone(), window, cx));
+        let help_open = config.help.open;
+        let help_panel = cx.new(|cx| {
+            let mut panel = HelpPanel::new(app.clone(), window, cx);
+            panel.restore(&config.help, config.show_obsolete, window, cx);
+            panel
+        });
         let mut subscriptions = subscriptions;
         // The editor notifies when its cursor moves, which the help panel
         // follows.
-        subscriptions.push(cx.observe(&editor, |this, _, cx| this.follow_cursor(cx)));
+        subscriptions.push(cx.observe(&editor, |this, _, cx| {
+            this.follow_cursor(cx);
+            this.cursor_for_errors(cx);
+        }));
+        subscriptions.push(cx.observe_window_bounds(window, |this, window, cx| {
+            if !window.is_maximized() && !window.is_fullscreen() {
+                this.windowed_size.resized(window_size(window));
+            }
+            this.keep_panes_in_window(window, cx);
+        }));
         window.on_window_should_close(cx, move |window, cx| {
             app.update(cx, |this, cx| this.should_close(window, cx))
                 .unwrap_or(true)
@@ -394,13 +472,27 @@ impl App {
             console_output,
             console_input,
             editor_pane,
+            error_card,
+            error_display: ErrorDisplay::default(),
+            code_diagnostics: Vec::new(),
+            underlined: Vec::new(),
+            error_pause: None,
+            hover_coming: None,
+            last_cursor: Cursor::default(),
             console_pane,
             toolbar_pane,
+            main_split: cx.new(|_| ResizableState::default()),
+            main_help_split: cx.new(|_| ResizableState::default()),
+            console_split: cx.new(|_| ResizableState::default()),
+            windowed_size: WindowedSize::new(config.window),
+            config,
+            config_file,
+            last_fade: None,
             watched,
             counters_pane,
             variables_pane,
             help_panel,
-            help_open: false,
+            help_open,
             cursor_word: None,
             example: None,
             error_help: None,
@@ -452,6 +544,89 @@ impl App {
         cx.notify();
     }
 
+    /// The panes keep their sizes as the window changes, so a small enough
+    /// window would push the canvas, and the dividers, out of it. This cuts
+    /// them down to leave room, as `Config::fit_panes` does at the start.
+    fn keep_panes_in_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let size = |p: Pixels| f64::from(p.as_f32());
+        let viewport = window.viewport_size();
+        let split = if self.help_open {
+            &self.main_help_split
+        } else {
+            &self.main_split
+        }
+        .clone();
+        let sizes = split.read(cx).sizes().clone();
+        let console = self.console_split.read(cx).sizes().get(1).copied();
+        let mut fitted = self.config.clone();
+        fitted.editor_width = sizes.first().map_or(0.0, |p| size(*p));
+        fitted.help_width = match sizes[..] {
+            [_, _, help] => size(help),
+            _ => 0.0,
+        };
+        fitted.console_height = console.map_or(0.0, size);
+        let wanted = fitted.clone();
+        fitted.fit_panes((size(viewport.width), size(viewport.height)));
+        let mut changes = Vec::new();
+        if fitted.help_width < wanted.help_width {
+            changes.push((split.clone(), 2, fitted.help_width));
+        }
+        if fitted.editor_width < wanted.editor_width {
+            changes.push((split.clone(), 0, fitted.editor_width));
+        }
+        if fitted.console_height < wanted.console_height {
+            changes.push((self.console_split.clone(), 1, fitted.console_height));
+        }
+        for (split, panel, to) in changes {
+            split.update(cx, |split, cx| {
+                split.resize_panel(panel, px(to as f32), window, cx);
+            });
+        }
+    }
+
+    /// `file` was just opened or saved: its folder is where the next file
+    /// dialog starts, saved at once.
+    pub(crate) fn remember_folder(&mut self, file: &std::path::Path) {
+        self.config.remember_folder(file);
+        self.config_file.save_last_folder(&self.config);
+    }
+
+    /// Saves what's remembered between runs, as the window closes.
+    pub(crate) fn save_config(&mut self, window: &Window, cx: &gpui_kit::App) {
+        let size = |p: Pixels| f64::from(p.as_f32());
+        let mut config = self.config.clone();
+        config.window_state = if window.is_fullscreen() {
+            WindowState::Fullscreen
+        } else if window.is_maximized() {
+            WindowState::Maximized
+        } else {
+            WindowState::Windowed
+        };
+        config.window = match config.window_state {
+            WindowState::Windowed => window_size(window),
+            _ => self.windowed_size.restored(window_size(window)),
+        };
+        config.speed = speed_level(self.speed);
+        config.help = self.help_panel.read(cx).remembered(self.help_open, cx);
+        // A layout that hasn't been shown has no sizes yet.
+        let main_help = self.main_help_split.read(cx).sizes();
+        if let [editor, _, help] = main_help[..] {
+            config.help_width = size(help);
+            if self.help_open {
+                config.editor_width = size(editor);
+            }
+        }
+        if !self.help_open
+            && let [editor, _] = self.main_split.read(cx).sizes()[..]
+        {
+            config.editor_width = size(editor);
+        }
+        if let [_, console] = self.console_split.read(cx).sizes()[..] {
+            config.console_height = size(console);
+        }
+        self.config_file.save(&config);
+    }
+
     pub(crate) fn running(&self) -> bool {
         self.animator.as_ref().is_some_and(|a| !a.finished())
     }
@@ -487,6 +662,9 @@ impl App {
                     .span
                     .map_or(String::new(), |s| format!("Line {}: ", s.line + 1));
                 self.print(format!("{where_}{}", e.message));
+                for line in errors::console_lines(&explain(e, &text)) {
+                    self.print(format!("    {line}"));
+                }
             }
             self.check_program(cx);
             return;
@@ -506,7 +684,7 @@ impl App {
         self.canvas.borrow_mut().drawing.reset();
         self.console.clear();
         self.console_dirty = true;
-        self.set_diagnostics(Vec::new(), cx);
+        self.clear_code_errors(cx);
         let job = Job::Program { text, seed };
         let replay = Some(Replay { to, then });
         let stops = self.gutter.read(cx).stops(cx);
@@ -567,7 +745,7 @@ impl App {
         {
             self.print(format!("{button} cleared the procedures you defined in the console. \"Copy to editor\" keeps them."));
         }
-        self.set_diagnostics(Vec::new(), cx);
+        self.clear_code_errors(cx);
         // Run clears the variables (ADR 0006).
         self.show_watch(cx, |watched| watched.set(None));
     }
@@ -821,6 +999,8 @@ impl App {
             self.stop_at = Some(Instant::now());
             self.print("Stopped.");
             self.report();
+            self.show_highlight(cx);
+            self.end_thinking();
             self.example_finished(cx);
         }
         cx.notify();
@@ -1065,6 +1245,139 @@ impl App {
         });
     }
 
+    /// Puts these errors on the code, in place of any before, for
+    /// `error_display` to decide when they show. Their spans are in `text`.
+    fn set_code_errors(
+        &mut self,
+        mut code_errors: Vec<(Span, Explanation)>,
+        text: &str,
+        from: ErrorsFrom,
+        cx: &mut Context<Self>,
+    ) {
+        code_errors.sort_by_key(|(span, _)| span.start);
+        let spots: Vec<_> = code_errors
+            .iter()
+            .map(|(span, _)| Spot::new(text, *span))
+            .collect();
+        self.code_diagnostics = code_errors
+            .iter()
+            .map(|(span, explanation)| {
+                let range = position(text, span.start as usize)..position(text, span.end as usize);
+                Diagnostic::new(range, explanation.message.clone())
+                    .with_severity(DiagnosticSeverity::Error)
+            })
+            .collect();
+        let on_card: Vec<_> = code_errors
+            .into_iter()
+            .map(|(span, explanation)| LineError::new(text, span, explanation))
+            .collect();
+        let cursor = self.editor_cursor(cx);
+        match from {
+            ErrorsFrom::Editing => self.error_display.edited(spots, text, cursor),
+            ErrorsFrom::Checking => self.error_display.checked(spots, text, cursor),
+            ErrorsFrom::Run => {
+                let pinned = self.error_display.run_stopped(spots, text, cursor);
+                if let Some(line) = pinned {
+                    self.scroll_line_into_view(line, text.matches('\n').count() + 1, cx);
+                }
+            }
+        }
+        let shown = self.error_display.shown();
+        self.error_card
+            .update(cx, |card, cx| card.set(on_card, &shown, cx));
+        self.apply_underlines(&shown.underlined, cx);
+    }
+
+    /// A run started, or something else took the errors away.
+    fn clear_code_errors(&mut self, cx: &mut Context<Self>) {
+        self.error_pause = None;
+        self.hover_coming = None;
+        self.error_display.clear();
+        self.code_diagnostics.clear();
+        let shown = self.error_display.shown();
+        self.error_card
+            .update(cx, |card, cx| card.set(Vec::new(), &shown, cx));
+        self.apply_underlines(&shown.underlined, cx);
+    }
+
+    fn editor_cursor(&self, cx: &gpui_kit::App) -> Cursor {
+        let state = self.editor.read(cx);
+        Cursor {
+            line: state.cursor_position().line as usize,
+            offset: state.cursor(),
+        }
+    }
+
+    /// The editor's underlines are these of `code_diagnostics`.
+    fn apply_underlines(&mut self, underlined: &[usize], cx: &mut Context<Self>) {
+        let diagnostics = underlined
+            .iter()
+            .filter_map(|&i| self.code_diagnostics.get(i).cloned())
+            .collect();
+        self.underlined = underlined.to_vec();
+        self.set_diagnostics(diagnostics, cx);
+    }
+
+    /// What `error_display` says to show has changed, perhaps.
+    fn show_code_errors(&mut self, cx: &mut Context<Self>) {
+        let shown = self.error_display.shown();
+        self.error_card.update(cx, |card, cx| card.show(&shown, cx));
+        if shown.underlined != self.underlined {
+            self.apply_underlines(&shown.underlined, cx);
+        }
+    }
+
+    /// The editor changed: its cursor may have moved.
+    fn cursor_for_errors(&mut self, cx: &mut Context<Self>) {
+        let cursor = self.editor_cursor(cx);
+        if cursor != self.last_cursor {
+            self.last_cursor = cursor;
+            self.error_display.cursor_moved(cursor);
+            self.show_code_errors(cx);
+        }
+    }
+
+    /// The mouse moved: an error's card shows after a moment on its underline,
+    /// so one doesn't flash up as the pointer passes over.
+    fn pointer_moved(&mut self, event: &PointerMoved, cx: &mut Context<Self>) {
+        let error = event
+            .error
+            .and_then(|start| self.error_display.error_at(start));
+        let Some(error) = error else {
+            self.hover_coming = None;
+            if !event.near_card && self.error_display.hovered().is_some() {
+                self.error_display.set_hovered(None);
+                self.show_code_errors(cx);
+            }
+            return;
+        };
+        if self.error_display.hovered() == Some(error) {
+            self.hover_coming = None;
+        } else if self.hover_coming.as_ref().map(|(e, _)| *e) != Some(error) {
+            let task = cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(HOVER_DELAY).await;
+                this.update(cx, |this, cx| {
+                    this.hover_coming = None;
+                    this.error_display.set_hovered(Some(error));
+                    this.show_code_errors(cx);
+                })
+                .ok();
+            });
+            self.hover_coming = Some((error, task));
+        }
+    }
+
+    /// Esc in the editor: hides an error's card, if one's showing. A
+    /// selection doesn't get in the way, as Esc doesn't clear one. Says if
+    /// it did.
+    fn escape_hides_card(&mut self, cx: &mut Context<Self>) -> bool {
+        if !self.error_display.escape() {
+            return false;
+        }
+        self.show_code_errors(cx);
+        true
+    }
+
     fn set_diagnostics(&mut self, diagnostics: Vec<Diagnostic>, cx: &mut Context<Self>) {
         self.editor.update(cx, |state, cx| {
             let text = state.text().clone();
@@ -1074,10 +1387,6 @@ impl App {
             }
             cx.notify();
         });
-    }
-
-    fn position(&self, offset: usize) -> Position {
-        position(&self.run_text, offset)
     }
 
     /// For the scripted session: where the editor's highlight is.
@@ -1110,6 +1419,26 @@ impl App {
 
     /// Shows the program's parse errors as it's typed, without running it.
     pub(crate) fn check_program(&mut self, cx: &mut Context<Self>) {
+        self.check_code(ErrorsFrom::Checking, cx);
+    }
+
+    /// The learner edited the program: errors on the line they're typing on
+    /// wait until they pause.
+    fn check_edit(&mut self, cx: &mut Context<Self>) {
+        self.check_code(ErrorsFrom::Editing, cx);
+        self.error_pause = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(ERROR_PAUSE).await;
+            this.update(cx, |this, cx| {
+                this.error_display.paused();
+                this.show_code_errors(cx);
+            })
+            .ok();
+        }));
+    }
+
+    fn check_code(&mut self, from: ErrorsFrom, cx: &mut Context<Self>) {
+        // Its error may not be there any more.
+        self.hover_coming = None;
         // Setting the text sends no change event, so the breakpoints follow
         // it here too.
         self.gutter.update(cx, |gutter, cx| gutter.follow(cx));
@@ -1122,16 +1451,11 @@ impl App {
             self.clear_editor_highlight(cx);
         }
         let text = self.editor.read(cx).value().to_string();
-        let diagnostics = pendown_logo::syntax::check(&text)
+        let code_errors: Vec<_> = pendown_logo::syntax::check(&text)
             .into_iter()
-            .filter_map(|e| {
-                let span = e.span?;
-                let range =
-                    position(&text, span.start as usize)..position(&text, span.end as usize);
-                Some(Diagnostic::new(range, e.message).with_severity(DiagnosticSeverity::Error))
-            })
+            .filter_map(|e| Some((e.span?, explain(&e, &text))))
             .collect();
-        self.set_diagnostics(diagnostics, cx);
+        self.set_code_errors(code_errors, &text, from, cx);
     }
 
     /// Shows errors as diagnostics on the code, and in the console with
@@ -1139,14 +1463,11 @@ impl App {
     /// An error in a console entry shows only in the console; one in the
     /// editor's program also shows on the code.
     fn show_errors(&mut self, errors: Vec<pendown_logo::Error>, cx: &mut Context<Self>) {
-        let mut diagnostics = Vec::new();
+        let mut code_errors = Vec::new();
         let example = self.example.is_some();
-        let reference = pendown_logo::reference::reference();
-        self.error_help = errors
-            .iter()
-            .filter_map(|e| reference.find_index(e.command.as_deref()?))
-            .next();
-        for e in &errors {
+        let explanations: Vec<_> = errors.iter().map(|e| explain(e, &self.run_text)).collect();
+        self.error_help = explanations.iter().find_map(|e| e.help);
+        for (e, explanation) in errors.iter().zip(&explanations) {
             let where_ = match e.span {
                 // An example's spans are in its own text, not the editor's.
                 Some(s) if example => format!("In the example, line {}: ", s.line + 1),
@@ -1155,6 +1476,9 @@ impl App {
                 None => String::new(),
             };
             self.print(format!("{where_}{}", e.message));
+            for line in errors::console_lines(explanation) {
+                self.print(format!("    {line}"));
+            }
             for step in errors::chain(e) {
                 self.print(format!("    {step}"));
             }
@@ -1162,15 +1486,12 @@ impl App {
                 && span.source == SourceId::Editor
                 && !example
             {
-                let range = self.position(span.start as usize)..self.position(span.end as usize);
-                diagnostics.push(
-                    Diagnostic::new(range, e.message.clone())
-                        .with_severity(DiagnosticSeverity::Error),
-                );
+                code_errors.push((span, explanation.clone()));
             }
         }
-        if !diagnostics.is_empty() {
-            self.set_diagnostics(diagnostics, cx);
+        if !code_errors.is_empty() {
+            let text = self.run_text.clone();
+            self.set_code_errors(code_errors, &text, ErrorsFrom::Run, cx);
         }
     }
 
@@ -1190,6 +1511,8 @@ impl App {
         let Some(span) = self
             .animator
             .as_ref()
+            // Once it's over, a highlight would look like it's still going.
+            .filter(|a| !a.finished())
             .and_then(|a| a.highlight)
             .filter(|s| s.source == SourceId::Editor && same_text)
         else {
@@ -1197,8 +1520,12 @@ impl App {
             return;
         };
         self.set_editor_highlight(Some(span), cx);
-        let line = span.line as usize;
         let lines = self.run_text.matches('\n').count() + 1;
+        self.scroll_line_into_view(span.line as usize, lines, cx);
+    }
+
+    /// Scrolls the editor, of this many lines, so that `line` is in view.
+    fn scroll_line_into_view(&mut self, line: usize, lines: usize, cx: &mut Context<Self>) {
         self.editor.update(cx, |state, cx| {
             let (Some(rows), Some(line_height)) = (state.visible_row_range(), state.line_height())
             else {
@@ -1288,8 +1615,12 @@ impl App {
                 // A replay that never got there showed nothing on the way.
                 let watch = animator.watch.clone();
                 self.show_watch(cx, |watched| watched.set(watch));
-                self.show_highlight(cx);
             }
+            self.show_highlight(cx);
+            self.end_thinking();
+            // The editor was notified mid-draw, so it redraws in the next
+            // frame: make sure there is one.
+            window.request_animation_frame();
             self.finished_at = Some(now);
             self.example_finished(cx);
             self.report();
@@ -1322,6 +1653,38 @@ impl App {
             // A press made while this one played.
             self.drive_next(cx);
         }
+        self.fade_last_thought(now, window);
+    }
+
+    /// The run is over: Kame's last thought fades, except while driving,
+    /// when it goes on showing the entry (ADR 0026).
+    pub(crate) fn end_thinking(&mut self) {
+        if self.driving.is_none()
+            && let Some(animator) = &mut self.animator
+        {
+            animator.stop_thinking();
+        }
+    }
+
+    /// With the run over there are no frames for the last thought to fade
+    /// in, so this asks for them, if it's showing.
+    fn fade_last_thought(&mut self, now: Instant, window: &mut Window) {
+        let fading = self.show_thinking
+            && self.driving.is_none()
+            && self
+                .animator
+                .as_ref()
+                .is_some_and(|a| a.finished() && a.thinking().fading.is_some());
+        if !fading {
+            self.last_fade = None;
+            return;
+        }
+        let dt = self.last_fade.map_or(Duration::ZERO, |t| now - t);
+        self.last_fade = Some(now);
+        if let Some(animator) = &mut self.animator {
+            animator.fade_thinking(dt);
+        }
+        window.request_animation_frame();
     }
 
     fn status(&self) -> String {
@@ -1393,6 +1756,15 @@ impl App {
     }
 }
 
+/// The window's size, as `WindowOptions` wants it next time.
+fn window_size(window: &Window) -> (f64, f64) {
+    let size = window.window_bounds().get_bounds().size;
+    (
+        f64::from(size.width.as_f32()),
+        f64::from(size.height.as_f32()),
+    )
+}
+
 impl Render for App {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let metrics = self.metrics.clone();
@@ -1411,6 +1783,9 @@ impl App {
     ) -> impl IntoElement + use<> {
         if !std::mem::replace(&mut self.checked, true) {
             self.check_program(cx);
+            // A help page brought back from the last run stays until the
+            // cursor moves to another word.
+            self.cursor_word = self.word_at_cursor(cx);
         }
         self.tick(window, cx);
         self.update_overlay();
@@ -1482,8 +1857,14 @@ impl App {
             thinking: self.show_thinking,
             driving: self.driving.is_some(),
         };
-        self.toolbar_pane
-            .update(cx, |pane, cx| pane.set(toolbar, cx));
+        if self
+            .toolbar_pane
+            .update(cx, |pane, cx| pane.set(toolbar, cx))
+        {
+            // Notified mid-draw, so it redraws in the next frame: make sure
+            // there is one, as nothing else may ask for it when a run ends.
+            window.request_animation_frame();
+        }
 
         let canvas_area = div()
             .relative()
@@ -1522,6 +1903,9 @@ impl App {
                 if this.drive_key(event, window, cx) {
                     cx.stop_propagation();
                 }
+            }))
+            .on_key_up(cx.listener(|this, event: &KeyUpEvent, _, _| {
+                this.drive_key_up(&event.keystroke);
             }))
             .on_mouse_down(
                 MouseButton::Left,
@@ -1587,57 +1971,104 @@ impl App {
                             .cached(StyleRefinement::default().h_full().flex_1()),
                     ),
             )
-            .child(div().flex_1().min_h_0().child({
-                let editor = resizable_panel().size(px(460.)).child(
-                    h_flex()
-                        .size_full()
-                        // Not cached: it sets its own width, from the
-                        // number of lines.
-                        .child(self.gutter.clone())
-                        .child(
-                            self.editor_pane
-                                .clone()
-                                .cached(StyleRefinement::default().h_full().flex_1().min_w_0()),
-                        ),
-                );
-                let canvas = resizable_panel().child(canvas_area);
-                // The side panel, when it's open (phase 5). Each layout
-                // has its own id, so each remembers its sizes.
-                if self.help_open {
-                    h_resizable("main-help").child(editor).child(canvas).child(
-                        resizable_panel().size(px(380.)).child(
-                            self.help_panel
-                                .clone()
-                                .cached(StyleRefinement::default().size_full()),
-                        ),
-                    )
-                } else {
-                    h_resizable("main").child(editor).child(canvas)
-                }
-            }))
             .child(
-                div()
-                    .h(px(CONSOLE_HEIGHT))
-                    .border_t_1()
-                    .border_color(theme.border)
-                    .child(
-                        h_resizable("console-area")
-                            .child(resizable_panel().child(self.render_console(running, cx)))
-                            .child(
-                                resizable_panel().size(px(220.)).child(
-                                    self.counters_pane
-                                        .clone()
-                                        .cached(StyleRefinement::default().size_full()),
+                div().flex_1().min_h_0().child(
+                    v_resizable("main-and-console")
+                        .with_state(&self.console_split)
+                        .child(resizable_panel().size_range(px(160.)..Pixels::MAX).child({
+                            // Fixed, like the help panel, so that the canvas
+                            // takes up any change in the window's size. Scaled
+                            // with the window, they'd grow each time a
+                            // maximized window opened.
+                            let editor =
+                                resizable_panel()
+                                    .size(px(self.config.editor_width as f32))
+                                    .fixed()
+                                    .child(
+                                        h_flex()
+                                            .size_full()
+                                            // Not cached: it sets its own width,
+                                            // from the number of lines.
+                                            .child(self.gutter.clone())
+                                            .child(
+                                                // Keeps the error card in the
+                                                // pane, and gives it its corner.
+                                                div()
+                                                    .relative()
+                                                    .h_full()
+                                                    .flex_1()
+                                                    .min_w_0()
+                                                    .overflow_hidden()
+                                                    // Before the editor's own use of Esc, if there's a card.
+                                                    .capture_action(cx.listener(
+                                                        |this, _: &Escape, _, cx| {
+                                                            if this.escape_hides_card(cx) {
+                                                                cx.stop_propagation();
+                                                            }
+                                                        },
+                                                    ))
+                                                    .child(self.editor_pane.clone().cached(
+                                                        StyleRefinement::default().size_full(),
+                                                    ))
+                                                    .child(self.error_card.clone()),
+                                            ),
+                                    );
+                            let canvas = resizable_panel().child(canvas_area);
+                            // The side panel, when it's open (phase 5). Each
+                            // layout has its own id, so each remembers its
+                            // sizes.
+                            if self.help_open {
+                                h_resizable("main-help")
+                                    .with_state(&self.main_help_split)
+                                    .child(editor)
+                                    .child(canvas)
+                                    .child(
+                                        resizable_panel()
+                                            .size(px(self.config.help_width as f32))
+                                            .fixed()
+                                            .child(
+                                                self.help_panel
+                                                    .clone()
+                                                    .cached(StyleRefinement::default().size_full()),
+                                            ),
+                                    )
+                            } else {
+                                h_resizable("main")
+                                    .with_state(&self.main_split)
+                                    .child(editor)
+                                    .child(canvas)
+                            }
+                        }))
+                        .child(
+                            // Fixed, so that resizing the window changes the
+                            // canvas, and the console stays as it was left.
+                            resizable_panel()
+                                .size(px(self.config.console_height as f32))
+                                .size_range(px(80.)..Pixels::MAX)
+                                .fixed()
+                                .child(
+                                    h_resizable("console-area")
+                                        .child(
+                                            resizable_panel()
+                                                .child(self.render_console(running, cx)),
+                                        )
+                                        .child(
+                                            resizable_panel().size(px(220.)).child(
+                                                self.counters_pane
+                                                    .clone()
+                                                    .cached(StyleRefinement::default().size_full()),
+                                            ),
+                                        )
+                                        .child(
+                                            resizable_panel().size(px(340.)).child(
+                                                self.variables_pane
+                                                    .clone()
+                                                    .cached(StyleRefinement::default().size_full()),
+                                            ),
+                                        ),
                                 ),
-                            )
-                            .child(
-                                resizable_panel().size(px(340.)).child(
-                                    self.variables_pane
-                                        .clone()
-                                        .cached(StyleRefinement::default().size_full()),
-                                ),
-                            ),
-                    ),
+                        ),
+                ),
             )
             // The status bar: how the run is going.
             .child(

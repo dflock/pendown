@@ -21,3 +21,4 @@ Logo's traditional error messages are just text printed at the prompt, such as "
 - A tail call replaces its caller, so it leaves no entry in the chain, as in UCBLogo.
 - An error from a deep recursion has a chain of thousands of identical entries. The GUI should collapse repeats, such as "called from DOWN, 10,000 times".
 - `CATCH "ERROR` and `ERROR` (phase 2) must expose the same information to Logo programs, as UCBLogo's error list.
+- **How errors show on the code has moved on (2026-11-04).** A card over the editor explains them, and an error on the line being typed waits for a pause: see ADR 0033.

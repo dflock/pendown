@@ -37,7 +37,7 @@ RT 90
 
 Slow Kame down with the speed slider, and watch the highlight in the editor move from line to line as Kame goes, with a green arrow on its line number. **Pause** lets Kame finish what it's doing, then waits, and **Single Step** goes one instruction at a time.
 
-While Kame's paused, you can change your program. **Resume** runs the changed version from the start, quickly, up to where you were, then carries on. While a program runs, **Run** says **Restart**: it starts again from the top. The button after **Single Step**, with ⏮ on it, is **Reset**: it stops the program and puts everything back as it was before you pressed Run, without running anything. Use it to end a program that would go on forever.
+While Kame's paused, you can change your program. **Resume** runs the changed version from the start, quickly, up to where you were, then carries on. While a program runs, **Run** says **Restart**: it starts again, from the start. The button after **Single Step**, with ⏮ on it, is **Reset**: it stops the program and puts everything back as it was before you pressed Run, without running anything. Use it to end a program that would go on forever.
 
 Click a line's number and it turns red: Kame stops when it gets to that line, so you can watch closely from there. Click the number again to take it away.
 

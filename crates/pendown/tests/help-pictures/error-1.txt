@@ -1,2 +1,2 @@
-[0 FD doesn't like far as input [] 1]
+[0 FD needs a number, but got the word far [] 1]
 []

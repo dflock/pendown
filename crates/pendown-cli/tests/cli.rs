@@ -105,7 +105,7 @@ fn parse_errors_are_reported_and_nothing_is_saved() {
     assert_eq!(r.status, 1);
     assert_eq!(
         r.stderr,
-        "p.logo:2:1: Not enough inputs to RT\np.logo:3:1: I don't know how to FOO\n"
+        "p.logo:2:1: RT needs 1 input, but got none\np.logo:3:1: I don't know how to FOO\n"
     );
     assert!(!d.join("p.png").exists());
 }
@@ -119,7 +119,7 @@ fn runtime_errors_save_the_picture_so_far() {
     assert_eq!(r.status, 1);
     assert_eq!(
         r.stderr,
-        "p.logo:3:6: FD doesn't like far as input\n  in BOX (line 6)\nSaved the drawing as far as it got to p.png\n"
+        "p.logo:3:6: FD needs a number, but got the word far\n  in BOX (line 6)\nSaved the drawing as far as it got to p.png\n"
     );
     assert!(d.join("p.png").exists());
 }

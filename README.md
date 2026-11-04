@@ -12,7 +12,7 @@ Pendown speaks [UCBLogo](https://people.eecs.berkeley.edu/~bh/logo.html), the mo
 - **The whole core language:** words, lists and arrays, `FOR` and `WHILE`, `MAP`, `FILTER` and `FOREACH` with templates, and `CATCH` and `THROW`.
 - **Help built in:** every command is documented in the app, with examples you can run on the canvas. Press F1 for help on the word under the cursor.
 - **A tutorial,** where Kame the turtle teaches you Logo one step at a time.
-- **Errors that help:** an obsolete UCBLogo command says why it isn't here, and an error offers help on its command.
+- **Errors that help:** a card over your code says what's wrong, how the command is written, and shows an example that works. A typo gets "Did you mean", and an obsolete UCBLogo command says why it isn't here.
 
 ## A taste of Logo
 
@@ -62,15 +62,34 @@ On X11 the window shows Kame either way. Wayland needs the desktop file to find 
 
 To build for Windows from Linux, there's a Windows VM in Docker, and a quick check for Windows that doesn't need it: see [`scripts/windows-vm/README.md`](scripts/windows-vm/README.md). On Windows, Pendown logs warnings, errors and panics to `%LOCALAPPDATA%\Pendown\pendown.log`, started afresh each run. Elsewhere they go to stderr.
 
-`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, pausing, stepping, changing a paused program, breakpoints, Restart and Reset, ending runs, the gallery, the shortcuts, the console, files, errors, filled shapes, how often the window redraws, the counters and variables panels, and the help panel and tutorial. `PENDOWN_AUTOTEST_FROM="Phase 5"` starts it at the first section with that in its title. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
+`PENDOWN_AUTOTEST=1 cargo run --release -p pendown` runs a scripted session in the app: running, pausing, stepping, changing a paused program, breakpoints, Restart and Reset, ending runs, the gallery, the shortcuts, the console, files, errors and the error card, filled shapes, how often the window redraws, the counters and variables panels, and the help panel and tutorial. `PENDOWN_AUTOTEST_FROM="Phase 5"` starts it at the first section with that in its title. It writes a log and screenshots to `target/autotest/`, and fails if any of its checks do.
 
 Type a program in the editor and press **Run**. Use the speed slider to choose how fast the turtle draws. Try the console too: after a run, it knows every procedure your program defined, so you can type `FLOWER 80` and watch.
 
 While a program runs, the **Repeat counters** panel shows every `REPEAT`, `FOREVER`, `FOR` and `FOREACH` running, outermost first, such as `REPEAT 3 of 12`, and marks the one `REPCOUNT` would give. The **Variables** panel shows the globals, then each procedure in the call chain with its inputs and locals; a variable hidden by a later one with the same name is greyed out. Below them are the pen, fill and background colours, as they were set, each with a square of the colour. At animated speeds, and when paused or stepping, they show exactly what the highlighted instruction sees. At Instant they keep up as best they can.
 
+### Settings
+
+Pendown remembers how you left it in `config.kdl`, in `~/.config/pendown` (or `$XDG_CONFIG_HOME/pendown`), or `%APPDATA%\pendown` on Windows. It's read when Pendown starts, and saved when the window closes, except `last-folder`, which is saved as soon as you open or save a file:
+
+```kdl
+show-obsolete #false
+last-folder "/home/me/drawings"
+window width=1400 height=900 state=windowed
+panes editor=460 console=190 help=380
+speed 5
+help open=#true tab=tutorial page=forward search="" pinned=#false lesson=3 scroll=840
+```
+
+`show-obsolete` is only set here. Pendown leaves it alone, and keeps your comments, when it saves. It won't save over a file that isn't valid KDL: it logs a warning and uses the defaults until the file's fixed.
+
+- `pendown --no-config` starts with the defaults and saves nothing.
+- `pendown --config FILE` uses another file.
+- The scripted session uses no file unless it's given `--config`.
+
 ### Help and the tutorial
 
-The **Help** button, or **F1**, opens a panel beside the canvas. Help follows the editor's cursor: put it on `FD`, or on `:size`, and the panel explains it. Each page has our description, examples with a picture of what they draw, and links to the rest. **Run** plays an example on the canvas, with its code highlighted in the panel, and **Back to my drawing** brings yours back. **Copy to editor** adds it to your program. Browse the contents by chapter, search by name, and tick **Show obsolete commands** to see the UCBLogo commands Pendown leaves out, and why.
+The **Help** button, or **F1**, opens a panel beside the canvas. Help follows the editor's cursor: put it on `FD`, or on `:size`, and the panel explains it. Each page has our description, examples with a picture of what they draw, and links to the rest. **Run** plays an example on the canvas, with its code highlighted in the panel, and **Back to my drawing** brings yours back. **Copy to editor** adds it to your program. Browse the contents by chapter, and search by name. To list the UCBLogo commands Pendown leaves out, and why, set `show-obsolete #true` in `config.kdl` (see below).
 
 The **Tutorial** tab has eight lessons with Kame: moving and turning, `REPEAT`, procedures, helping Kame fix a bug, inputs and variables, recursion, colours and shapes, and exploring L-systems. Each program in them loads into the editor or runs on the canvas.
 

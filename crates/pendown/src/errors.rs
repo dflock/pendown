@@ -1,6 +1,21 @@
 //! How errors read in the console (ADR 0005).
 
-use pendown_logo::Error;
+use pendown_logo::{Error, explain::Explanation};
+
+/// What the console prints under an error's message: the lines that say how
+/// the command is written.
+pub fn console_lines(explanation: &Explanation) -> Vec<String> {
+    let usage = explanation
+        .usage
+        .iter()
+        .map(|u| format!("Written like this: {u}"));
+    let example = explanation.example.iter().map(|e| format!("Example: {e}"));
+    let defined = explanation
+        .defined_on
+        .iter()
+        .map(|line| format!("Defined on line {line}"));
+    usage.chain(example).chain(defined).collect()
+}
 
 /// An error's call chain, one line per step, innermost first. A deep
 /// recursion has thousands of identical steps, so runs of the same call are
@@ -54,6 +69,45 @@ mod tests {
     use pendown_logo::{CallSite, SourceId, Span};
 
     use super::*;
+
+    fn explanation() -> Explanation {
+        Explanation {
+            message: "REPEAT needs 2 inputs, but got 1".into(),
+            usage: Some("REPEAT number [instructions]".into()),
+            example: Some("REPEAT 4 [FD 100 RT 90]".into()),
+            ..Explanation::default()
+        }
+    }
+
+    #[test]
+    fn the_console_says_how_a_command_is_written() {
+        assert_eq!(
+            console_lines(&explanation()),
+            [
+                "Written like this: REPEAT number [instructions]",
+                "Example: REPEAT 4 [FD 100 RT 90]",
+            ]
+        );
+    }
+
+    #[test]
+    fn the_console_says_where_a_procedure_is() {
+        let explanation = Explanation {
+            message: "SQ needs 1 input, but got none".into(),
+            usage: Some("SQ :n".into()),
+            defined_on: Some(3),
+            ..Explanation::default()
+        };
+        assert_eq!(
+            console_lines(&explanation),
+            ["Written like this: SQ :n", "Defined on line 3"]
+        );
+    }
+
+    #[test]
+    fn the_console_adds_nothing_to_a_bare_message() {
+        assert!(console_lines(&Explanation::default()).is_empty());
+    }
 
     fn call(procedure: &str, line: u32) -> CallSite {
         CallSite {

@@ -4,7 +4,7 @@
 use std::{collections::HashMap, ops::Range, rc::Rc};
 
 use crate::{
-    error::Error,
+    error::{Error, not_enough_inputs, too_many_inputs},
     names::{Names, Sym},
     number::{format_number, parse_number},
     prims::{self, PrimId},
@@ -314,7 +314,10 @@ pub fn parse_program_partly(text: &str, source: SourceId, cx: &mut Cx) -> (Progr
             }
             None => {
                 let name = name.unwrap_or("TO").to_uppercase();
-                errors.push(Error::new(format!("{name} has no END"), Some(title)));
+                errors.push(Error::new(
+                    format!("{name} has no END. Add END after its last line"),
+                    Some(title),
+                ));
                 i = j;
             }
         }
@@ -651,7 +654,7 @@ impl Parser<'_, '_, '_> {
                 Err(Error::new("A variable name is missing after :", Some(span)))
             }
             Tok::Var(name) => Ok(Expr::Var(self.cx.names.intern(name), span)),
-            Tok::RParen => Err(Error::new("Unexpected )", Some(span))),
+            Tok::RParen => Err(Error::new("This ) has no matching (", Some(span))),
             // `?2` is `(? 2)`, the second slot of a template.
             Tok::Word(name) if slot_number(name).is_some() => {
                 let n = slot_number(name).expect("checked");
@@ -670,7 +673,12 @@ impl Parser<'_, '_, '_> {
                 let mut args = Vec::with_capacity(arity.default);
                 for _ in 0..arity.default {
                     if matches!(self.peek(), None | Some(Tok::RParen)) {
-                        let message = format!("Not enough inputs to {}", name.to_uppercase());
+                        let message = not_enough_inputs(
+                            &name.to_uppercase(),
+                            arity.default,
+                            true,
+                            args.len(),
+                        );
                         return Err(Error::new(message, Some(span)).about(&name));
                     }
                     args.push(self.expr(1)?);
@@ -708,18 +716,14 @@ impl Parser<'_, '_, '_> {
             let close = self.tokens[self.pos].span;
             self.pos += 1;
             let upper = name.to_uppercase();
+            let exactly = arity.max == Some(arity.min);
             if args.len() < arity.min {
-                return Err(
-                    Error::new(format!("Not enough inputs to {upper}"), Some(name_span))
-                        .about(&name),
-                );
+                let message = not_enough_inputs(&upper, arity.min, exactly, args.len());
+                return Err(Error::new(message, Some(name_span)).about(&name));
             }
-            if arity.max.is_some_and(|max| args.len() > max) {
-                return Err(Error::new(
-                    format!("Too many inputs to {upper}"),
-                    Some(open.to(close)),
-                )
-                .about(&name));
+            if let Some(max) = arity.max.filter(|max| args.len() > *max) {
+                let message = too_many_inputs(&upper, max, exactly, args.len());
+                return Err(Error::new(message, Some(open.to(close))).about(&name));
             }
             return Ok(Expr::Call(Box::new(Call {
                 target,
@@ -752,7 +756,15 @@ impl Parser<'_, '_, '_> {
         let sym = self.cx.names.intern(name);
         match self.cx.arity(sym) {
             Some(arity) => Ok((Target::User(sym), arity)),
-            None => Err(Error::unknown(name, Some(span))),
+            None => {
+                let procedures: Vec<_> = (0..self.cx.names.len() as Sym)
+                    .filter_map(|sym| {
+                        let name = self.cx.names.spelling(sym).to_string();
+                        Some((name, self.cx.arity(sym)?))
+                    })
+                    .collect();
+                Err(Error::unknown(name, Some(span), &procedures))
+            }
         }
     }
 }

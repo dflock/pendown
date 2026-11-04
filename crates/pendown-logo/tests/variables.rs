@@ -14,7 +14,10 @@ fn local_hides_a_global_until_the_procedure_ends() {
 #[test]
 fn a_local_has_no_value_until_made() {
     let r = run("TO F\n LOCAL \"x\n PRINT :x\nEND\nMAKE \"x 5\nF");
-    assert_eq!(r.error().message, ":x has no value");
+    assert_eq!(
+        r.error().message,
+        ":x has no value yet. Give it one with MAKE \"x 100"
+    );
 }
 
 #[test]
@@ -46,7 +49,11 @@ TO C\n PRINT :v\nEND
 A";
     assert_eq!(output(src), "b\na\n");
     let r = run("TO A\n LOCALMAKE \"v 5\nEND\nA\nPRINT :v");
-    assert_eq!(r.error().message, ":v has no value", "gone once A ends");
+    assert_eq!(
+        r.error().message,
+        ":v has no value yet. Give it one with MAKE \"v 100",
+        "gone once A ends"
+    );
 }
 
 #[test]
@@ -58,7 +65,10 @@ fn locals_in_tail_calls_share_the_frame() {
     let r = run(
         "TO COUNTDOWN :n\n LOCALMAKE \"last :n\n IF :n = 0 [STOP]\n COUNTDOWN :n - 1\nEND\nCOUNTDOWN 3\nPRINT :last",
     );
-    assert_eq!(r.error().message, ":last has no value");
+    assert_eq!(
+        r.error().message,
+        ":last has no value yet. Give it one with MAKE \"last 100"
+    );
 }
 
 #[test]
@@ -123,7 +133,7 @@ fn control() {
     );
     assert_eq!(
         error("IF \"maybe [PRINT 1]"),
-        "IF doesn't like maybe as input"
+        "IF needs TRUE or FALSE, but got the word maybe"
     );
     assert_eq!(
         error("REPEAT -1 [PRINT 1]"),

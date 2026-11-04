@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use gpui_kit::*;
-use pendown::document::{Document, last_folder, remember_folder};
+use pendown::document::Document;
 
 use crate::app::App;
 
@@ -63,7 +63,7 @@ impl App {
             .path
             .as_ref()
             .and_then(|p| p.parent().map(Path::to_path_buf))
-            .or_else(last_folder)
+            .or_else(|| self.config.last_folder())
             .or_else(|| std::env::current_dir().ok())
             .unwrap_or_else(|| PathBuf::from("."))
     }
@@ -136,6 +136,7 @@ impl App {
             }
             After::Close => {
                 self.closing = true;
+                self.save_config(window, cx);
                 window.remove_window();
             }
             After::Load(source) => {
@@ -161,7 +162,7 @@ impl App {
                 // Setting the text sends no change event, so check it here.
                 self.clear_breakpoints(cx);
                 self.check_program(cx);
-                remember_folder(path);
+                self.remember_folder(path);
                 self.print(format!("Opened {}", path.display()));
             }
             Err(e) => self.print(format!("Couldn't open {}: {e}", path.display())),
@@ -204,7 +205,7 @@ impl App {
         let text = self.text(cx);
         let saved = match self.document.save_as(path, &text) {
             Ok(saved) => {
-                remember_folder(&saved);
+                self.remember_folder(&saved);
                 self.print(format!("Saved {}", saved.display()));
                 true
             }
@@ -266,7 +267,7 @@ impl App {
         };
         match std::fs::write(&path, bytes) {
             Ok(()) => {
-                remember_folder(&path);
+                self.remember_folder(&path);
                 self.print(format!("Saved the drawing to {}", path.display()));
             }
             Err(e) => self.print(format!(
@@ -281,6 +282,7 @@ impl App {
     /// until the user has answered.
     pub(crate) fn should_close(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         if self.closing || !self.document.changed(&self.text(cx)) {
+            self.save_config(window, cx);
             return true;
         }
         self.then(After::Close, window, cx);

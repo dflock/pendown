@@ -70,9 +70,9 @@ pub fn read(text: &str, source: SourceId) -> Result<Rc<List>, Error> {
                 let array = close == b'}';
                 if stack.len() == 1 || stack.last().is_some_and(|top| top.array != array) {
                     let message = if array {
-                        "Unexpected }"
+                        "This } has no matching {"
                     } else {
-                        "Unexpected ]"
+                        "This ] has no matching ["
                     };
                     return Err(Error::new(message, Some(span(i, i + 1, line))));
                 }

@@ -108,7 +108,7 @@ The UI design is on a canvas of mockups: https://claude.ai/artifact/Pcqcncf1iK6d
   - **The top of the panel:** Back and Forward through the pages visited, a Contents button, and a search box.
   - **Following the cursor:** while the search box is empty, the panel shows help for the command under the editor's cursor, aliases included, so `FD` shows FORWARD. A strip says what it's following ("Following the cursor: FD, line 3"), with **Pin** to keep the page open while you type elsewhere.
   - **A command's page:**
-    - where it sits, as links (Graphics › Turtle motion), its name and aliases, and the usage from `eg`;
+    - where it sits, as links (Graphics › Turtle motion), its name and aliases, and the `usage`;
     - our description;
     - the examples, each with its picture;
     - "See also": the other commands in the same section.

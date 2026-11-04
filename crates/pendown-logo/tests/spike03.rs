@@ -357,8 +357,8 @@ fn parse_errors_are_collected_and_nothing_runs() {
     assert_eq!(
         messages,
         [
-            "BOX has no END",
-            "Not enough inputs to FD",
+            "BOX has no END. Add END after its last line",
+            "FD needs 1 input, but got none",
             "I don't know how to FOO"
         ]
     );
@@ -448,7 +448,7 @@ fn minus_sign_errors() {
     let Err(RunError::Parse(errors)) = r.result else {
         panic!()
     };
-    assert_eq!(errors[0].message, "Not enough inputs to SUM");
+    assert_eq!(errors[0].message, "SUM needs 2 inputs, but got 1");
 }
 
 // 5. Spans.
@@ -522,7 +522,7 @@ fn runtime_error_spans_and_call_chain() {
     let src = "TO A\n B\n PRINT 1\nEND\nTO B\n FD \"far\n PRINT 2\nEND\nA";
     let r = run(src);
     let e = r.error();
-    assert_eq!(e.message, "FD doesn't like far as input");
+    assert_eq!(e.message, "FD needs a number, but got the word far");
     assert_eq!(&src[e.span.unwrap().range()], "\"far");
     let chain: Vec<_> = e
         .calls
@@ -532,7 +532,7 @@ fn runtime_error_spans_and_call_chain() {
     assert_eq!(chain, [("B", "B", 1), ("A", "A", 8)]);
     assert_eq!(
         e.to_string(),
-        "FD doesn't like far as input, in B (line 2), called from A (line 9)"
+        "FD needs a number, but got the word far, in B (line 2), called from A (line 9)"
     );
 }
 
@@ -557,7 +557,7 @@ fn parse_error_spans() {
     assert_eq!(
         found,
         [
-            ("Not enough inputs to RT", "RT"),
+            ("RT needs 1 input, but got none", "RT"),
             ("This ( has no matching )", "(")
         ]
     );
@@ -662,9 +662,12 @@ fn number_errors() {
     let cases = [
         ("PRINT 1 / 0", "Can't divide by zero"),
         ("PRINT 1e300 * 1e300", "That number is too big"),
-        ("REPEAT 2.5 [FD 1]", "REPEAT doesn't like 2.5 as input"),
-        ("PRINT \"abc + 1", "+ doesn't like abc as input"),
-        ("PRINT - \"abc", "- doesn't like abc as input"),
+        (
+            "REPEAT 2.5 [FD 1]",
+            "REPEAT needs a whole number, but got 2.5",
+        ),
+        ("PRINT \"abc + 1", "+ needs a number, but got the word abc"),
+        ("PRINT - \"abc", "- needs a number, but got the word abc"),
     ];
     for (src, expected) in cases {
         assert_eq!(run(src).error().message, expected, "{src}");

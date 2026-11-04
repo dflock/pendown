@@ -26,3 +26,7 @@ A headline feature is a direct visual link between what the turtle is doing and 
 - Spike 04's tests check after every Step that the interpreter has started exactly as many lines as the highlight has reached.
 - The Step button was later labelled **Step line**, to set it apart from Step instruction (2026-10-23).
 - **Step line and Step instruction became one button, Single Step** (2026-10-31), which does what Step instruction did. With one instruction per line, which is how beginners write, the two did the same thing, and testing with real users found having both confusing. Single Step can do everything Step line could, and Step line couldn't step inside a one-line loop. What went is stepping a whole line of several instructions in one press. The animator no longer holds a `Sync`: paused, it doesn't take the next line's one, so the interpreter still waits there, and pausing is still exact. See ADR 0028, which also makes Pause finish the current instruction first.
+
+## Note
+
+2026-11-03: The highlight now goes when a run ends, however it ends, as one left on the last instruction made a finished program look paused or hung. An error is still marked in the editor and the console.

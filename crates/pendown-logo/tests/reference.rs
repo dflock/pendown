@@ -1,5 +1,7 @@
 //! The language reference, from `content/reference.kdl` (phase 5 issue 01).
 
+mod common;
+
 use pendown_logo::reference::{Kind, reference};
 
 fn title(i: usize) -> &'static str {
@@ -184,4 +186,46 @@ fn erract_s_example_fails_on_purpose() {
     let r = reference();
     assert!(r.find("erract").unwrap().examples[0].fails);
     assert!(!r.find("forward").unwrap().examples[0].fails);
+}
+
+#[test]
+fn short_examples_are_short_and_run() {
+    let r = reference();
+    let examples: Vec<_> = r
+        .commands
+        .iter()
+        .filter_map(|c| Some((c, c.short_example.as_deref()?)))
+        .collect();
+    assert!(examples.len() >= 40, "only {} found", examples.len());
+    for (command, code) in examples {
+        assert!(command.implemented, "{}: not implemented", command.key);
+        assert!(!code.contains('\n'), "{}: more than one line", command.key);
+        assert!(
+            code.chars().count() <= 40,
+            "{}: more than 40 characters: {code}",
+            command.key
+        );
+        if let Err(e) = common::run(code).result {
+            panic!("{}: {code}: {e:?}", command.key);
+        }
+    }
+}
+
+#[test]
+fn a_short_example_uses_its_own_command() {
+    let r = reference();
+    for c in r.commands.iter() {
+        let Some(code) = &c.short_example else {
+            continue;
+        };
+        let words: Vec<_> = code.split([' ', '[', ']']).collect();
+        assert!(
+            c.names
+                .iter()
+                .chain(&c.operators)
+                .any(|n| words.contains(&n.as_str())),
+            "{}: {code}",
+            c.key
+        );
+    }
 }

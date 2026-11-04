@@ -162,11 +162,14 @@ impl ToolbarPane {
         ToolbarPane { app, slider, state }
     }
 
-    pub fn set(&mut self, state: ToolbarState, cx: &mut Context<Self>) {
-        if self.state != state {
+    /// Returns whether that changes it.
+    pub fn set(&mut self, state: ToolbarState, cx: &mut Context<Self>) -> bool {
+        let changed = self.state != state;
+        if changed {
             self.state = state;
             cx.notify();
         }
+        changed
     }
 
     /// A button with only an icon, named by its tooltip, that calls `f` on

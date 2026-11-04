@@ -80,25 +80,8 @@ impl Document {
     }
 }
 
-/// The folder last opened from or saved to, kept between sessions in
-/// Pendown's settings folder.
-pub fn last_folder() -> Option<PathBuf> {
-    let saved = std::fs::read_to_string(settings_dir()?.join("last-folder")).ok()?;
-    let folder = PathBuf::from(saved.trim());
-    folder.is_dir().then_some(folder)
-}
-
-pub fn remember_folder(file: &Path) {
-    let (Some(dir), Some(folder)) = (settings_dir(), file.parent()) else {
-        return;
-    };
-    if std::fs::create_dir_all(&dir).is_ok() {
-        let _ = std::fs::write(dir.join("last-folder"), folder.to_string_lossy().as_bytes());
-    }
-}
-
 /// `$XDG_CONFIG_HOME/pendown`, `~/.config/pendown`, or `%APPDATA%\pendown`.
-fn settings_dir() -> Option<PathBuf> {
+pub(crate) fn settings_dir() -> Option<PathBuf> {
     let base = std::env::var_os("PENDOWN_SETTINGS")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("XDG_CONFIG_HOME").map(|d| PathBuf::from(d).join("pendown")))

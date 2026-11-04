@@ -5,6 +5,7 @@
 pub mod animator;
 pub mod breakpoints;
 pub mod colours;
+pub mod config;
 pub mod console;
 pub mod document;
 pub mod drive;

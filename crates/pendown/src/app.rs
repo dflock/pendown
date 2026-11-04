@@ -16,13 +16,14 @@ use gpui_kit::component::{
         EditorState, InputEvent, InputHighlighter, InputState, MoveDown, MoveUp, Position,
         RangeDecoration, RangeDecorationCollection, RangeDecorationStyle, TextareaState, Undo,
     },
-    resizable::{h_resizable, resizable_panel},
+    resizable::{ResizableState, h_resizable, resizable_panel, v_resizable},
     slider::{SliderEvent, SliderState},
     v_flex,
 };
 use gpui_kit::{assets::IconName, prelude::FluentBuilder as _, *};
 use pendown::{
     animator::{Animator, MAX_FRAME_GAP, Mode, Replay, Speed, Thinking},
+    config::{Config, ConfigFile, WindowState, WindowedSize},
     console::{ConsoleInput, Ending, Submit, defines, label},
     document::Document,
     errors,
@@ -121,7 +122,6 @@ struct Before {
 
 /// The console area's height, with the counters and variables beside the
 /// console.
-const CONSOLE_HEIGHT: f32 = 190.0;
 
 /// A change due sooner than this is left to the next animation frame.
 const FRAME_SOON: Duration = Duration::from_millis(12);
@@ -181,7 +181,7 @@ pub struct App {
     /// The user has said the window can close.
     pub(crate) closing: bool,
     /// The program has been checked for errors since the window opened.
-    checked: bool,
+    pub(crate) checked: bool,
     /// Console output, one line each.
     pub(crate) console: Vec<SharedString>,
     pub(crate) console_dirty: bool,
@@ -191,6 +191,16 @@ pub struct App {
     pub(crate) editor_pane: Entity<EditorPane>,
     console_pane: Entity<ConsolePane>,
     toolbar_pane: Entity<ToolbarPane>,
+    /// What's remembered between runs, as it was at the start.
+    /// `save_config` adds the rest.
+    pub(crate) config: Config,
+    windowed_size: WindowedSize,
+    config_file: ConfigFile,
+    /// The sizes of the panes: the two layouts above the console, and the
+    /// console and what's above it.
+    main_split: Entity<ResizableState>,
+    main_help_split: Entity<ResizableState>,
+    console_split: Entity<ResizableState>,
     /// When the last thought last faded, once the run is over.
     last_fade: Option<Instant>,
     /// What the counters and variables panels show (phase 4).
@@ -254,7 +264,12 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> App {
+    pub fn new(
+        config: Config,
+        config_file: ConfigFile,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> App {
         let editor = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("logo")
@@ -282,7 +297,7 @@ impl App {
         let console_input = cx.new(|cx| {
             InputState::new(window, cx).placeholder("Type an instruction and press Enter")
         });
-        let speed = level_speed(5);
+        let speed = level_speed(config.speed);
         let speed_slider = cx.new(|_| {
             SliderState::new()
                 .min(1.0)
@@ -348,11 +363,22 @@ impl App {
         let watched = cx.new(|_| Watched::default());
         let counters_pane = cx.new(|_| CountersPane::new(watched.clone()));
         let variables_pane = cx.new(|_| VariablesPane::new(watched.clone()));
-        let help_panel = cx.new(|cx| HelpPanel::new(app.clone(), window, cx));
+        let help_open = config.help.open;
+        let help_panel = cx.new(|cx| {
+            let mut panel = HelpPanel::new(app.clone(), window, cx);
+            panel.restore(&config.help, config.show_obsolete, window, cx);
+            panel
+        });
         let mut subscriptions = subscriptions;
         // The editor notifies when its cursor moves, which the help panel
         // follows.
         subscriptions.push(cx.observe(&editor, |this, _, cx| this.follow_cursor(cx)));
+        subscriptions.push(cx.observe_window_bounds(window, |this, window, cx| {
+            if !window.is_maximized() && !window.is_fullscreen() {
+                this.windowed_size.resized(window_size(window));
+            }
+            this.keep_panes_in_window(window, cx);
+        }));
         window.on_window_should_close(cx, move |window, cx| {
             app.update(cx, |this, cx| this.should_close(window, cx))
                 .unwrap_or(true)
@@ -398,12 +424,18 @@ impl App {
             editor_pane,
             console_pane,
             toolbar_pane,
+            main_split: cx.new(|_| ResizableState::default()),
+            main_help_split: cx.new(|_| ResizableState::default()),
+            console_split: cx.new(|_| ResizableState::default()),
+            windowed_size: WindowedSize::new(config.window),
+            config,
+            config_file,
             last_fade: None,
             watched,
             counters_pane,
             variables_pane,
             help_panel,
-            help_open: false,
+            help_open,
             cursor_word: None,
             example: None,
             error_help: None,
@@ -453,6 +485,82 @@ impl App {
     pub(crate) fn toggle_thinking(&mut self, cx: &mut Context<Self>) {
         self.show_thinking = !self.show_thinking;
         cx.notify();
+    }
+
+    /// The panes keep their sizes as the window changes, so a small enough
+    /// window would push the canvas, and the dividers, out of it. This cuts
+    /// them down to leave room, as `Config::fit_panes` does at the start.
+    fn keep_panes_in_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let size = |p: Pixels| f64::from(p.as_f32());
+        let viewport = window.viewport_size();
+        let split = if self.help_open {
+            &self.main_help_split
+        } else {
+            &self.main_split
+        }
+        .clone();
+        let sizes = split.read(cx).sizes().clone();
+        let console = self.console_split.read(cx).sizes().get(1).copied();
+        let mut fitted = self.config.clone();
+        fitted.editor_width = sizes.first().map_or(0.0, |p| size(*p));
+        fitted.help_width = match sizes[..] {
+            [_, _, help] => size(help),
+            _ => 0.0,
+        };
+        fitted.console_height = console.map_or(0.0, size);
+        let wanted = fitted.clone();
+        fitted.fit_panes((size(viewport.width), size(viewport.height)));
+        let mut changes = Vec::new();
+        if fitted.help_width < wanted.help_width {
+            changes.push((split.clone(), 2, fitted.help_width));
+        }
+        if fitted.editor_width < wanted.editor_width {
+            changes.push((split.clone(), 0, fitted.editor_width));
+        }
+        if fitted.console_height < wanted.console_height {
+            changes.push((self.console_split.clone(), 1, fitted.console_height));
+        }
+        for (split, panel, to) in changes {
+            split.update(cx, |split, cx| {
+                split.resize_panel(panel, px(to as f32), window, cx);
+            });
+        }
+    }
+
+    /// Saves what's remembered between runs, as the window closes.
+    pub(crate) fn save_config(&mut self, window: &Window, cx: &gpui_kit::App) {
+        let size = |p: Pixels| f64::from(p.as_f32());
+        let mut config = self.config.clone();
+        config.window_state = if window.is_fullscreen() {
+            WindowState::Fullscreen
+        } else if window.is_maximized() {
+            WindowState::Maximized
+        } else {
+            WindowState::Windowed
+        };
+        config.window = match config.window_state {
+            WindowState::Windowed => window_size(window),
+            _ => self.windowed_size.restored(window_size(window)),
+        };
+        config.speed = speed_level(self.speed);
+        config.help = self.help_panel.read(cx).remembered(self.help_open, cx);
+        // A layout that hasn't been shown has no sizes yet.
+        let main_help = self.main_help_split.read(cx).sizes();
+        if let [editor, _, help] = main_help[..] {
+            config.help_width = size(help);
+            if self.help_open {
+                config.editor_width = size(editor);
+            }
+        }
+        if !self.help_open
+            && let [editor, _] = self.main_split.read(cx).sizes()[..]
+        {
+            config.editor_width = size(editor);
+        }
+        if let [_, console] = self.console_split.read(cx).sizes()[..] {
+            config.console_height = size(console);
+        }
+        self.config_file.save(&config);
     }
 
     pub(crate) fn running(&self) -> bool {
@@ -1436,6 +1544,15 @@ impl App {
     }
 }
 
+/// The window's size, as `WindowOptions` wants it next time.
+fn window_size(window: &Window) -> (f64, f64) {
+    let size = window.window_bounds().get_bounds().size;
+    (
+        f64::from(size.width.as_f32()),
+        f64::from(size.height.as_f32()),
+    )
+}
+
 impl Render for App {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let metrics = self.metrics.clone();
@@ -1454,6 +1571,9 @@ impl App {
     ) -> impl IntoElement + use<> {
         if !std::mem::replace(&mut self.checked, true) {
             self.check_program(cx);
+            // A help page brought back from the last run stays until the
+            // cursor moves to another word.
+            self.cursor_word = self.word_at_cursor(cx);
         }
         self.tick(window, cx);
         self.update_overlay();
@@ -1639,57 +1759,84 @@ impl App {
                             .cached(StyleRefinement::default().h_full().flex_1()),
                     ),
             )
-            .child(div().flex_1().min_h_0().child({
-                let editor = resizable_panel().size(px(460.)).child(
-                    h_flex()
-                        .size_full()
-                        // Not cached: it sets its own width, from the
-                        // number of lines.
-                        .child(self.gutter.clone())
-                        .child(
-                            self.editor_pane
-                                .clone()
-                                .cached(StyleRefinement::default().h_full().flex_1().min_w_0()),
-                        ),
-                );
-                let canvas = resizable_panel().child(canvas_area);
-                // The side panel, when it's open (phase 5). Each layout
-                // has its own id, so each remembers its sizes.
-                if self.help_open {
-                    h_resizable("main-help").child(editor).child(canvas).child(
-                        resizable_panel().size(px(380.)).child(
-                            self.help_panel
-                                .clone()
-                                .cached(StyleRefinement::default().size_full()),
-                        ),
-                    )
-                } else {
-                    h_resizable("main").child(editor).child(canvas)
-                }
-            }))
             .child(
-                div()
-                    .h(px(CONSOLE_HEIGHT))
-                    .border_t_1()
-                    .border_color(theme.border)
-                    .child(
-                        h_resizable("console-area")
-                            .child(resizable_panel().child(self.render_console(running, cx)))
-                            .child(
-                                resizable_panel().size(px(220.)).child(
-                                    self.counters_pane
-                                        .clone()
-                                        .cached(StyleRefinement::default().size_full()),
+                div().flex_1().min_h_0().child(
+                    v_resizable("main-and-console")
+                        .with_state(&self.console_split)
+                        .child(resizable_panel().size_range(px(160.)..Pixels::MAX).child({
+                            // Fixed, like the help panel, so that the canvas
+                            // takes up any change in the window's size. Scaled
+                            // with the window, they'd grow each time a
+                            // maximized window opened.
+                            let editor = resizable_panel()
+                                .size(px(self.config.editor_width as f32))
+                                .fixed()
+                                .child(
+                                    h_flex()
+                                        .size_full()
+                                        // Not cached: it sets its own width,
+                                        // from the number of lines.
+                                        .child(self.gutter.clone())
+                                        .child(self.editor_pane.clone().cached(
+                                            StyleRefinement::default().h_full().flex_1().min_w_0(),
+                                        )),
+                                );
+                            let canvas = resizable_panel().child(canvas_area);
+                            // The side panel, when it's open (phase 5). Each
+                            // layout has its own id, so each remembers its
+                            // sizes.
+                            if self.help_open {
+                                h_resizable("main-help")
+                                    .with_state(&self.main_help_split)
+                                    .child(editor)
+                                    .child(canvas)
+                                    .child(
+                                        resizable_panel()
+                                            .size(px(self.config.help_width as f32))
+                                            .fixed()
+                                            .child(
+                                                self.help_panel
+                                                    .clone()
+                                                    .cached(StyleRefinement::default().size_full()),
+                                            ),
+                                    )
+                            } else {
+                                h_resizable("main")
+                                    .with_state(&self.main_split)
+                                    .child(editor)
+                                    .child(canvas)
+                            }
+                        }))
+                        .child(
+                            // Fixed, so that resizing the window changes the
+                            // canvas, and the console stays as it was left.
+                            resizable_panel()
+                                .size(px(self.config.console_height as f32))
+                                .size_range(px(80.)..Pixels::MAX)
+                                .fixed()
+                                .child(
+                                    h_resizable("console-area")
+                                        .child(
+                                            resizable_panel()
+                                                .child(self.render_console(running, cx)),
+                                        )
+                                        .child(
+                                            resizable_panel().size(px(220.)).child(
+                                                self.counters_pane
+                                                    .clone()
+                                                    .cached(StyleRefinement::default().size_full()),
+                                            ),
+                                        )
+                                        .child(
+                                            resizable_panel().size(px(340.)).child(
+                                                self.variables_pane
+                                                    .clone()
+                                                    .cached(StyleRefinement::default().size_full()),
+                                            ),
+                                        ),
                                 ),
-                            )
-                            .child(
-                                resizable_panel().size(px(340.)).child(
-                                    self.variables_pane
-                                        .clone()
-                                        .cached(StyleRefinement::default().size_full()),
-                                ),
-                            ),
-                    ),
+                        ),
+                ),
             )
             // The status bar: how the run is going.
             .child(

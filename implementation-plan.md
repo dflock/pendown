@@ -96,7 +96,7 @@ Done: see `.scratch/phase-5/` and ADR 0023. The reference lives in `pendown-logo
 - The pictures are drawn when a page shows them, the same way the examples test draws them, rather than embedded in the app.
 - Errors offer help with a button in the console's title bar, since the console's lines can't hold links.
 - The tutorial's lesson picker is a bar of the lessons, and the search results don't take ↑ and ↓.
-- The grammar is in `tree-sitter-logo/`, ready for a repository of its own, and leaves UCBLogo's optional inputs out.
+- The grammar is in its own repository, [tree-sitter-logo](https://github.com/dflock/tree-sitter-logo), with the Zed extension in [zed-logo](https://github.com/dflock/zed-logo), and leaves UCBLogo's optional inputs out.
 
 Two of the headline features. They come after phase 2 so they cover the complete core language, and so the commands they document have settled down.
 

@@ -3,6 +3,9 @@
 // it against the interpreter. Generated from
 // content/ucblogo/Berkeley-Logo-Reference-Manual.html, then edited by hand.
 //
+// After adding a command, update the grammar's list of built-in commands: see
+// "Updating the Logo grammar" in the README.
+//
 // Layout
 //   syntax { entry }    Syntax that isn't a command, which is in the manual's chapter 1.
 //   logo { chapter { section { command } } }

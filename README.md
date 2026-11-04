@@ -166,7 +166,27 @@ The crates are in `crates/`. `spikes/` holds the experiments made before phase 1
 - `examples/phase-1/` and `examples/phase-2/` have programs that between them use every command Pendown supports so far.
 - `content/reference.kdl` lists every Logo command, which ones Pendown supports, and how ours differ from UCBLogo.
 - `docs/adr/` records the design decisions and why we made them.
-- `tree-sitter-logo/` is a tree-sitter grammar for Logo, with a Zed extension, ready to become a repository of its own.
+- [tree-sitter-logo](https://github.com/dflock/tree-sitter-logo) is a tree-sitter grammar for Logo, and [zed-logo](https://github.com/dflock/zed-logo) is a Zed extension that uses it.
+
+## Updating the Logo grammar
+
+The grammar's `queries/highlights.scm` lists Pendown's built-in commands, generated from `content/reference.kdl`, and zed-logo has a copy of the grammar's queries. When tree-sitter-logo and zed-logo are checked out next to this repository, `cargo test` checks they're up to date, and this updates them after adding commands:
+
+```sh
+UPDATE_HIGHLIGHTS=1 cargo test -p pendown-logo --test tree_sitter
+```
+
+Without those checkouts, the tests pass without checking. To update by hand:
+
+1. Run `cargo run -p pendown-logo --example highlights` to print the list.
+2. In tree-sitter-logo, paste it into `queries/highlights.scm`, between `; BEGIN GENERATED` and `; END GENERATED`.
+3. In zed-logo, copy that file to `languages/logo/highlights.scm`.
+
+Then commit and push tree-sitter-logo, and zed-logo too. A change to only the queries needs no change to `rev` in zed-logo's `extension.toml`, which matters only when the grammar's parser changes.
+
+## Licence
+
+Pendown is under the GNU General Public License, version 3 or later: see `LICENSE`.
 
 ## Credits
 

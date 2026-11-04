@@ -238,6 +238,25 @@ fn implemented(key: &str, kind: Kind) -> bool {
     }
 }
 
+impl Command {
+    /// The lines of `usage` without the manual's notes, such as
+    /// `(library procedure)`.
+    pub fn usage_lines(&self) -> Vec<String> {
+        self.usage
+            .lines()
+            .map(|l| {
+                let l = l.trim();
+                ["(library procedure)", "(special form)", "(variable)"]
+                    .iter()
+                    .fold(l.to_string(), |l, note| l.replace(note, ""))
+                    .trim()
+                    .to_string()
+            })
+            .filter(|l| !l.is_empty())
+            .collect()
+    }
+}
+
 impl Reference {
     pub fn parse(source: &str) -> Result<Reference, String> {
         let document: KdlDocument = source.parse().map_err(|e| format!("{e:?}"))?;

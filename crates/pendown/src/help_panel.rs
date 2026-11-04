@@ -112,22 +112,6 @@ pub struct HelpPanel {
     _subscriptions: Vec<Subscription>,
 }
 
-/// Lines of `eg` without the manual's notes, such as `(library procedure)`.
-fn usage_lines(usage: &str) -> Vec<String> {
-    usage
-        .lines()
-        .map(|l| {
-            let l = l.trim();
-            ["(library procedure)", "(special form)", "(variable)"]
-                .iter()
-                .fold(l.to_string(), |l, note| l.replace(note, ""))
-                .trim()
-                .to_string()
-        })
-        .filter(|l| !l.is_empty())
-        .collect()
-}
-
 /// How many commands a list of indexes holds that the panel lists.
 fn listed(indexes: impl Iterator<Item = usize>, obsolete: bool) -> usize {
     let r = reference();
@@ -907,7 +891,7 @@ impl HelpPanel {
         }
 
         // How to call it.
-        let usage = usage_lines(&command.usage);
+        let usage = command.usage_lines();
         if !usage.is_empty() {
             out.push(
                 v_flex()

@@ -1,6 +1,6 @@
 # Explaining an error, in the console and the hover
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 Blocked by: 02, 04
 
@@ -44,3 +44,17 @@ pub fn explain(error: &Error, source: &str) -> Explanation
 - `cargo test --workspace` and the scripted session pass.
 
 ## Comments
+
+2026-11-04: Done. `explain` is in `crates/pendown-logo/src/explain.rs`, with tests in `tests/explain.rs`. `errors.rs` in the app turns an `Explanation` into console lines and the hover's Markdown.
+
+- **Input names:** beyond the issue's list, the table covers `varname` (`MAKE "name value`), `pos` (`SETPOS [x y]`), `xcor`, `ycor`, colours, `wordorlist` and a few more. `thing` reads as "value" and `tf` as "condition". Others stay as the manual has them, such as `RT degrees`.
+- **Not in the issue:**
+  - An operator gets its own line, so `+` shows `number + number`.
+  - An obsolete command offers Help, as it did, but no syntax, since it can't be used. A learner's procedure with that name is treated as theirs.
+  - The hover escapes Markdown in the message, or "This ] has no matching [" could be read as markup.
+  - `usage_lines` moved from `help_panel.rs` to `Command`, as both need it.
+  - Replaying a paused program prints the syntax and example too, like `show_errors`, but still doesn't set `error_help`, as before.
+- **Which text procedures are looked for in:** `run_text` for a run's errors, so a help example finds its own, and the editor's text while typing. A procedure defined only in a console entry has no `TO` in either, so its error shows the message alone.
+- **Finding `TO`** looks at the first two words of each line, after any `;`. A line continued with `~` isn't followed.
+
+Checked on the private display: hovering `REPEAT 4`, a procedure's `SQ` and a stray `]` shows the right content, and the console shows it after Run, before the call chain. `cargo test --workspace` passes, 434 tests. In the scripted session the only failure is "frame intervals" on the 131,070-move tree, as in issues 02 and 03.

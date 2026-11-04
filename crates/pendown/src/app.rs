@@ -32,7 +32,7 @@ use pendown::{
     speed::{INSTANT_LEVEL, level_speed, speed_level},
     teach,
 };
-use pendown_logo::{Point, RunError, SourceId};
+use pendown_logo::{Point, RunError, SourceId, explain::explain};
 use pendown_render::Mark;
 
 use crate::{
@@ -605,6 +605,9 @@ impl App {
                     .span
                     .map_or(String::new(), |s| format!("Line {}: ", s.line + 1));
                 self.print(format!("{where_}{}", e.message));
+                for line in errors::console_lines(&explain(e, &text)) {
+                    self.print(format!("    {line}"));
+                }
             }
             self.check_program(cx);
             return;
@@ -1248,7 +1251,8 @@ impl App {
                 let span = e.span?;
                 let range =
                     position(&text, span.start as usize)..position(&text, span.end as usize);
-                Some(Diagnostic::new(range, e.message).with_severity(DiagnosticSeverity::Error))
+                let message = errors::markdown(&explain(&e, &text));
+                Some(Diagnostic::new(range, message).with_severity(DiagnosticSeverity::Error))
             })
             .collect();
         self.set_diagnostics(diagnostics, cx);
@@ -1261,12 +1265,9 @@ impl App {
     fn show_errors(&mut self, errors: Vec<pendown_logo::Error>, cx: &mut Context<Self>) {
         let mut diagnostics = Vec::new();
         let example = self.example.is_some();
-        let reference = pendown_logo::reference::reference();
-        self.error_help = errors
-            .iter()
-            .filter_map(|e| reference.find_index(e.command.as_deref()?))
-            .next();
-        for e in &errors {
+        let explanations: Vec<_> = errors.iter().map(|e| explain(e, &self.run_text)).collect();
+        self.error_help = explanations.iter().find_map(|e| e.help);
+        for (e, explanation) in errors.iter().zip(&explanations) {
             let where_ = match e.span {
                 // An example's spans are in its own text, not the editor's.
                 Some(s) if example => format!("In the example, line {}: ", s.line + 1),
@@ -1275,6 +1276,9 @@ impl App {
                 None => String::new(),
             };
             self.print(format!("{where_}{}", e.message));
+            for line in errors::console_lines(explanation) {
+                self.print(format!("    {line}"));
+            }
             for step in errors::chain(e) {
                 self.print(format!("    {step}"));
             }
@@ -1284,7 +1288,7 @@ impl App {
             {
                 let range = self.position(span.start as usize)..self.position(span.end as usize);
                 diagnostics.push(
-                    Diagnostic::new(range, e.message.clone())
+                    Diagnostic::new(range, errors::markdown(explanation))
                         .with_severity(DiagnosticSeverity::Error),
                 );
             }

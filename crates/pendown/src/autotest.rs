@@ -724,6 +724,8 @@ fn script() -> Vec<Step> {
         Run(ERRORS, Speed::Instant),
         WaitFinished,
         CheckConsole("Line 3: FD needs a number, but got the word far"),
+        CheckConsole("    Written like this: FD distance"),
+        CheckConsole("    Example: FD 100"),
         CheckConsole("    in BOX (line 6)"),
         Run("FD 10\nRT", Speed::Instant),
         WaitFinished,
@@ -2231,7 +2233,12 @@ impl App {
                     let found: Vec<String> = self.editor.update(cx, |state, _| {
                         state.diagnostics_mut().map_or(Vec::new(), |set| {
                             set.iter()
-                                .map(|d| d.diagnostic.message.to_string())
+                                .map(|d| {
+                                    // The message: the rest is the syntax
+                                    // and example.
+                                    let message = d.diagnostic.message.lines().next();
+                                    message.unwrap_or_default().to_string()
+                                })
                                 .collect()
                         })
                     });

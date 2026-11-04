@@ -13,6 +13,7 @@
 mod colour;
 mod error;
 mod event;
+pub mod explain;
 mod geometry;
 mod interp;
 pub mod metrics;

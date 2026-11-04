@@ -23,6 +23,10 @@
 //   example "..."    A short runnable program, any number, with title="..." and,
 //                    for one that stops with an error on purpose, fails=#true.
 //                    They're tests: crates/pendown/tests/examples.rs.
+//   try "..."        The one-line example on an error's card: at most 40 characters,
+//                    and it runs without an error on an empty program. A separate
+//                    test runs them (crates/pendown-logo/tests/reference.rs), and
+//                    they need no saved picture. Only some commands have one.
 //   see "name" ...   More for "See also" than the rest of the section.
 //   names "..." ...  More names the help panel finds it by, such as "#".
 // Syntax that isn't a command in the manual (it's in the manual's chapter 1,
@@ -212,6 +216,7 @@ logo {
         WORD word1 word2
         (WORD word1 word2 word3 ...)
         """
+        try "PRINT WORD \"sun \"flower"
         desc "outputs a word formed by concatenating its inputs."
         supported #true
         obsolete #false
@@ -232,6 +237,7 @@ logo {
         LIST thing1 thing2
         (LIST thing1 thing2 thing3 ...)
         """
+        try "SHOW LIST 1 2"
         desc "outputs a list whose members are its inputs, which can be any Logo datum (word, list, or array)."
         supported #true
         obsolete #false
@@ -255,6 +261,7 @@ logo {
         (SENTENCE thing1 thing2 thing3 ...)
         (SE thing1 thing2 thing3 ...)
         """
+        try "SHOW SENTENCE [a b] [c]"
         desc "outputs a list whose members are its inputs, if those inputs are not lists, or the members of its inputs, if those inputs are lists."
         supported #true
         obsolete #false
@@ -326,6 +333,7 @@ logo {
         MDARRAY sizelist  (library procedure)
         (MDARRAY sizelist origin)
         """
+        try "SHOW MDARRAY [2 3]"
         desc """
         outputs a multi-dimensional array. The first input must be a list of one or more positive integers. The second input, if present, must be a single integer that applies to every dimension of the array.
 
@@ -419,6 +427,7 @@ logo {
     data-selectors {
       first {
         eg "FIRST thing"
+        try "PRINT FIRST [a b c]"
         desc "if the input is a word, outputs the first character of the word. If the input is a list, outputs the first member of the list. If the input is an array, outputs the origin of the array (that is, the index of the first member of the array)."
         supported #true
         obsolete #false
@@ -482,6 +491,7 @@ logo {
         BUTFIRST wordorlist
         BF wordorlist
         """
+        try "SHOW BF [a b c]"
         desc "if the input is a word, outputs a word containing all but the first character of the input. If the input is a list, outputs a list containing all but the first member of the input."
         supported #true
         obsolete #false
@@ -550,6 +560,7 @@ logo {
       }
       item {
         eg "ITEM index thing"
+        try "PRINT ITEM 2 [a b c]"
         desc "if the thing is a word, outputs the indexth character of the word. If the thing is a list, outputs the indexth member of the list. If the thing is an array, outputs the indexth member of the array. Index starts at 1 for words and lists; the starting index of an array is specified when the array is created."
         supported #true
         obsolete #false
@@ -650,6 +661,7 @@ logo {
     data-mutators {
       setitem {
         eg "SETITEM index array value"
+        try "SETITEM 1 ARRAY 3 \"x"
         desc "command. Replaces the indexth member of array with the new value. Ensures that the resulting array is not circular, i.e., value may not be a list or array that contains array."
         supported #true
         obsolete #false
@@ -668,6 +680,7 @@ logo {
       }
       mdsetitem {
         eg "MDSETITEM indexlist array value  (library procedure)"
+        try "MDSETITEM [1 1] MDARRAY [2 2] \"x"
         desc "command. Replaces the member of array chosen by indexlist with the new value."
         supported #true
         obsolete #false
@@ -743,6 +756,7 @@ logo {
       }
       pop {
         eg "POP stackname  (library procedure)"
+        try "MAKE \"s [1 2] PRINT POP \"s"
         desc "outputs the most recently PUSHed member of the stack that is the value of the variable whose name is stackname and removes that member from the stack."
         supported #true
         obsolete #false
@@ -883,6 +897,7 @@ logo {
         EQUAL? thing1 thing2
         thing1 = thing2
         """
+        try "PRINT 2 = 2"
         desc "outputs TRUE if the inputs are equal, FALSE otherwise. Two numbers are equal if they have the same numeric value. Two non-numeric words are equal if they contain the same characters in the same order. If there is a variable named CASEIGNOREDP whose value is TRUE, then an upper case letter is considered the same as the corresponding lower case letter. (This is the case by default.) Two lists are equal if their members are equal. An array is only equal to itself; two separately created arrays are never equal even if their members are equal. (It is important to be able to know if two expressions have the same array as their value because arrays are mutable; if, for example, two variables have the same array as their values then performing SETITEM on one of them will also change the other.)"
         differs "Numbers are compared rounded to 15 significant digits, so two numbers are equal exactly when they print the same: 0.1 + 0.2 = 0.3 is TRUE. In UCBLogo it is FALSE, because the two differ in the 17th digit."
         supported #true
@@ -1407,6 +1422,7 @@ logo {
         (PRINT thing1 thing2 ...)
         (PR thing1 thing2 ...)
         """
+        try "PRINT \"hello"
         desc "command. Prints the input or inputs to the current write stream (initially the screen). All the inputs are printed on a single line, separated by spaces, ending with a newline. If an input is a list, square brackets are not printed around it, but brackets are printed around sublists. Braces are always printed around arrays."
         supported #true
         obsolete #false
@@ -1428,6 +1444,7 @@ logo {
         TYPE thing
         (TYPE thing1 thing2 ...)
         """
+        try "TYPE \"hello"
         desc "command. Prints the input or inputs like PRINT, except that no newline character is printed at the end and multiple inputs are not separated by spaces. Note: printing to the screen is ordinarily line buffered; that is, the characters you print using TYPE will not actually appear on the screen until either a newline character is printed (for example, by PRINT or SHOW) or Logo tries to read from the keyboard (either at the request of your program or after an instruction prompt). This buffering makes the program much faster than it would be if each character appeared immediately, and in most cases the effect is not disconcerting. To accommodate programs that do a lot of positioned text display using TYPE, Logo will force printing whenever SETCURSOR is invoked. This solves most buffering problems. Still, on occasion you may find it necessary to force the buffered characters to be printed explicitly; this can be done using the WAIT command. WAIT 0 will force printing without actually waiting."
         supported #true
         obsolete #false
@@ -1446,6 +1463,7 @@ logo {
         SHOW thing
         (SHOW thing1 thing2 ...)
         """
+        try "SHOW [1 2 3]"
         desc "command. Prints the input or inputs like PRINT, except that if an input is a list it is printed inside square brackets."
         supported #true
         obsolete #false
@@ -1863,6 +1881,7 @@ logo {
         (SUM num1 num2 num3 ...)
         num1 + num2
         """
+        try "PRINT 3 + 4"
         desc "outputs the sum of its inputs."
         supported #true
         obsolete #false
@@ -1886,6 +1905,7 @@ logo {
         DIFFERENCE num1 num2
         num1 - num2
         """
+        try "PRINT 10 - 4"
         desc "outputs the difference of its inputs. Minus sign means infix difference in ambiguous contexts (when preceded by a complete expression), unless it is preceded by a space and followed by a nonspace. (See also MINUS.)"
         supported #true
         obsolete #false
@@ -1933,6 +1953,7 @@ logo {
         (PRODUCT num1 num2 num3 ...)
         num1 * num2
         """
+        try "PRINT 6 * 7"
         desc "outputs the product of its inputs."
         supported #true
         obsolete #false
@@ -1953,6 +1974,7 @@ logo {
         (QUOTIENT num)
         num1 / num2
         """
+        try "PRINT 360 / 5"
         desc "outputs the quotient of its inputs. The quotient of two integers is an integer if and only if the dividend is a multiple of the divisor. (In other words, QUOTIENT 5 2 is 2.5, not 2, but QUOTIENT 4 2 is 2, not 2.0 — it does the right thing.) With a single input, QUOTIENT outputs the reciprocal of the input."
         supported #true
         obsolete #false
@@ -2227,6 +2249,7 @@ logo {
       }
       iseq {
         eg "ISEQ from to  (library procedure)"
+        try "SHOW ISEQ 1 5"
         desc """
         outputs a list of the integers from from to to, inclusive.
 
@@ -2282,6 +2305,7 @@ logo {
         LESS? num1 num2
         num1 < num2
         """
+        try "PRINT 3 < 4"
         desc "outputs TRUE if its first input is strictly less than its second."
         differs "Numbers are compared rounded to 15 significant digits, as EQUALP does, so this always agrees with =."
         supported #true
@@ -2306,6 +2330,7 @@ logo {
         GREATER? num1 num2
         num1 > num2
         """
+        try "PRINT 4 > 3"
         desc "outputs TRUE if its first input is strictly greater than its second."
         differs "Numbers are compared rounded to 15 significant digits, as EQUALP does, so this always agrees with =."
         supported #true
@@ -2581,6 +2606,7 @@ logo {
         FORWARD dist
         FD dist
         """
+        try "FD 100"
         desc "moves the turtle forward, in the direction that it’s facing, by the specified distance (measured in turtle steps)."
         supported #true
         obsolete #false
@@ -2603,6 +2629,7 @@ logo {
         BACK dist
         BK dist
         """
+        try "BK 50"
         desc "moves the turtle backward, i.e., exactly opposite to the direction that it’s facing, by the specified distance. (The heading of the turtle does not change.)"
         supported #true
         obsolete #false
@@ -2620,6 +2647,7 @@ logo {
         LEFT degrees
         LT degrees
         """
+        try "LT 90"
         desc "turns the turtle counterclockwise by the specified angle, measured in degrees (1/360 of a circle)."
         supported #true
         obsolete #false
@@ -2637,6 +2665,7 @@ logo {
         RIGHT degrees
         RT degrees
         """
+        try "RT 90"
         desc "turns the turtle clockwise by the specified angle, measured in degrees (1/360 of a circle)."
         supported #true
         obsolete #false
@@ -2673,6 +2702,7 @@ logo {
       }
       setxy {
         eg "SETXY xcor ycor"
+        try "SETXY 50 100"
         desc "moves the turtle to an absolute position in the graphics window. The two inputs are numbers, the X and Y coordinates."
         supported #true
         obsolete #false
@@ -2775,6 +2805,7 @@ logo {
     shapes {
       circle {
         eg "CIRCLE radius"
+        try "CIRCLE 100"
         desc "draws a circle with the given radius, centred on the turtle. The turtle does not move. The outline is drawn with the current pen if the pen is down, and the circle is filled if a fill colour is set (see SETFILLCOLOR), even when the pen is up."
         supported #true
         obsolete #false
@@ -2800,6 +2831,7 @@ logo {
       }
       ellipse {
         eg "ELLIPSE across along"
+        try "ELLIPSE 100 50"
         desc "draws an ellipse centred on the turtle, turned to match the turtle's heading. The first input is the radius from side to side relative to the turtle, and the second is the radius in the direction the turtle is heading, so at heading 0 they're the X and Y radii. The turtle does not move. The outline is drawn with the current pen if the pen is down, and the ellipse is filled if a fill colour is set (see SETFILLCOLOR), even when the pen is up."
         supported #true
         obsolete #false
@@ -2825,6 +2857,7 @@ logo {
         SQUARE side
         (SQUARE side corner)
         """
+        try "SQUARE 100"
         desc "draws a square with sides of the given length, centred on the turtle and turned to match the turtle's heading. With the optional third input, the corners are rounded with that radius. The turtle does not move. The outline is drawn with the current pen if the pen is down, and the square is filled if a fill colour is set (see SETFILLCOLOR), even when the pen is up."
         supported #true
         obsolete #false
@@ -2850,6 +2883,7 @@ logo {
         RECTANGLE across along
         (RECTANGLE across along corner)
         """
+        try "RECTANGLE 100 50"
         desc "draws a rectangle centred on the turtle and turned to match the turtle's heading. The first input is its full width from side to side relative to the turtle, and the second is its full length in the direction the turtle is heading, so at heading 0 they're the width and height. With the optional third input, the corners are rounded with that radius. The turtle does not move. The outline is drawn with the current pen if the pen is down, and the rectangle is filled if a fill colour is set (see SETFILLCOLOR), even when the pen is up."
         supported #true
         obsolete #false
@@ -2907,6 +2941,7 @@ logo {
       }
       ycor {
         eg "YCOR  (library procedure)"
+        try "PRINT YCOR"
         desc "outputs a number, the turtle’s Y coordinate."
         supported #true
         obsolete #false
@@ -2991,6 +3026,7 @@ logo {
         HIDETURTLE
         HT
         """
+        try "HT"
         desc "makes the turtle invisible. It’s a good idea to do this while you’re in the middle of a complicated drawing, because hiding the turtle speeds up the drawing substantially."
         supported #true
         obsolete #false
@@ -3284,6 +3320,7 @@ logo {
         PENDOWN
         PD
         """
+        try "PU FD 50 PD"
         desc "sets the pen’s position to DOWN, without changing its mode."
         supported #true
         obsolete #false
@@ -3301,6 +3338,7 @@ logo {
         PENUP
         PU
         """
+        try "PU FD 50 PD"
         desc "sets the pen’s position to UP, without changing its mode."
         supported #true
         obsolete #false
@@ -3348,6 +3386,7 @@ logo {
         SETPENCOLOR colornumber.or.rgblist
         SETPC colornumber.or.rgblist
         """
+        try "SETPC \"red"
         desc """
         sets the pen color to the given number, which must be a nonnegative integer. There are initial assignments for the first 16 colors:
 
@@ -3415,6 +3454,7 @@ logo {
       }
       setpensize {
         eg "SETPENSIZE size"
+        try "SETPENSIZE 5"
         desc "sets the thickness of the pen. The input is either a single positive integer or a list of two positive integers (for horizontal and vertical thickness). Some versions pay no attention to the second number, but always have a square pen."
         supported #true
         obsolete #false
@@ -3449,6 +3489,7 @@ logo {
         SETBACKGROUND colornumber.or.rgblist
         SETBG colornumber.or.rgblist
         """
+        try "SETBG \"navy"
         desc "set the screen background color by slot number or RGB values. See SETPENCOLOR for details."
         differs "The colour can be any of our colour forms: see SETPENCOLOR. The background is always solid, so any opacity is ignored."
         supported #true
@@ -3469,6 +3510,7 @@ logo {
         SETFILLCOLOR color
         SETFC color
         """
+        try "SETFC \"orange"
         desc """
         sets the colour that shapes (CIRCLE, ELLIPSE, SQUARE, RECTANGLE) are filled with. The colour can be any of the forms SETPENCOLOR accepts. SETFILLCOLOR "none turns filling off, and "none is the default, so shapes are drawn as outlines only. When a fill colour is set, shapes are filled even when the pen is up, so pen up with a fill colour draws a filled shape with no outline.
         """
@@ -3703,6 +3745,7 @@ logo {
     procedure-definition {
       to {
         eg "TO procname :input1 :input2 ...  (special form)"
+        try "TO SQ FD 50 RT 90 END"
         names "END"
         desc """
         command. Prepares Logo to accept a procedure definition. The procedure will be named procname and there must not already be a procedure by that name. The inputs will be called input1 etc. Any number of inputs are allowed, including none. Names of procedures and inputs are case-insensitive.
@@ -3845,6 +3888,7 @@ logo {
     variable-definition {
       make {
         eg "MAKE varname value"
+        try "MAKE \"size 100"
         desc "command. Assigns the value value to the variable named varname, which must be a word. Variable names are case-insensitive. If a variable with the same name already exists, the value of that variable is changed. If not, a new global variable is created."
         supported #true
         obsolete #false
@@ -4733,6 +4777,7 @@ logo {
       }
       repeat {
         eg "REPEAT num instructionlist"
+        try "REPEAT 4 [FD 100 RT 90]"
         desc "command. Runs the instructionlist repeatedly, num times."
         supported #true
         obsolete #false
@@ -4778,6 +4823,7 @@ logo {
       }
       repcount {
         eg "REPCOUNT"
+        try "REPEAT 4 [FD REPCOUNT * 20 RT 90]"
         names "#"
         desc """
         outputs the repetition count of the innermost current REPEAT or FOREVER, starting from 1. If no REPEAT or FOREVER is active, outputs –1.
@@ -4806,6 +4852,7 @@ logo {
         IF tf instructionlist
         (IF tf instructionlist1 instructionlist2)
         """
+        try "IF HEADING = 0 [FD 100]"
         desc """
         command. If the first input has the value TRUE, then IF runs the second input. If the first input has the value FALSE, then IF does nothing. (If given a third input, IF acts like IFELSE, as described below.) It is an error if the first input is not either TRUE or FALSE.
 
@@ -4890,6 +4937,7 @@ logo {
       }
       stop {
         eg "STOP"
+        try "IF XCOR > 100 [STOP]"
         desc "command. Ends the running of the procedure in which it appears. Control is returned to the context in which that procedure was invoked. The stopped procedure does not output a value."
         supported #true
         obsolete #false
@@ -4914,6 +4962,7 @@ logo {
         OUTPUT value
         OP value
         """
+        try "TO TWICE :n OP :n * 2 END"
         desc "command. Ends the running of the procedure in which it appears. That procedure outputs the value value to the context in which it was invoked. Don’t be confused: OUTPUT itself is a command, but the procedure that invokes OUTPUT is an operation."
         supported #true
         obsolete #false
@@ -4939,6 +4988,7 @@ logo {
       }
       catch {
         eg "CATCH tag instructionlist"
+        try "CATCH \"oops [THROW \"oops]"
         desc """
         command or operation. Runs its second input. Outputs if that instructionlist outputs. If, while running the instructionlist, a THROW instruction is executed with a tag equal to the first input (case-insensitive comparison), then the running of the instructionlist is terminated immediately. In this case the CATCH outputs if a value input is given to THROW. The tag must be a word.
 
@@ -5350,6 +5400,7 @@ logo {
         FOREACH data template  (library procedure)
         (FOREACH data1 data2 ... template)
         """
+        try "FOREACH [50 80] [FD ? RT 90]"
         desc """
         command. Evaluates the template list repeatedly, once for each member of the data list. If more than one data list are given, each of them must be the same length. (The data inputs can be words, in which case the template is evaluated once for each character.)
 
@@ -5382,6 +5433,7 @@ logo {
         MAP template data  (library procedure)
         (MAP template data1 data2 ...)
         """
+        try "SHOW MAP [? * 2] [1 2 3]"
         desc """
         outputs a word or list, depending on the type of the data input, of the same length as that data input. (If more than one data input are given, the output is of the same type as data1.) Each member of the output is the result of evaluating the template list, filling the slots with the corresponding member(s) of the data input(s). (All data inputs must be the same length.) In the case of a word output, the results of the template evaluation must be words, and they are concatenated with WORD.
 

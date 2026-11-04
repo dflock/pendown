@@ -51,6 +51,8 @@ pub struct Command {
     /// Our own description, in the help panel's markup.
     pub help: Option<String>,
     pub examples: Vec<Example>,
+    /// One line that shows it working, for an error's card: the kdl's `try`.
+    pub short_example: Option<String>,
     /// More commands for "See also" than its section gives, by name.
     pub see: Vec<String>,
     pub phase: Option<u8>,
@@ -325,6 +327,7 @@ impl Reference {
             desc: string(node, "desc").unwrap_or_default(),
             help: string(node, "help"),
             examples: examples(node),
+            short_example: string(node, "try"),
             see: strings(node, "see"),
             phase: child(node, "phase")
                 .and_then(|v| v.as_integer())

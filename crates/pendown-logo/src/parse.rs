@@ -4,7 +4,7 @@
 use std::{collections::HashMap, ops::Range, rc::Rc};
 
 use crate::{
-    error::Error,
+    error::{Error, not_enough_inputs, too_many_inputs},
     names::{Names, Sym},
     number::{format_number, parse_number},
     prims::{self, PrimId},
@@ -670,7 +670,12 @@ impl Parser<'_, '_, '_> {
                 let mut args = Vec::with_capacity(arity.default);
                 for _ in 0..arity.default {
                     if matches!(self.peek(), None | Some(Tok::RParen)) {
-                        let message = format!("Not enough inputs to {}", name.to_uppercase());
+                        let message = not_enough_inputs(
+                            &name.to_uppercase(),
+                            arity.default,
+                            true,
+                            args.len(),
+                        );
                         return Err(Error::new(message, Some(span)).about(&name));
                     }
                     args.push(self.expr(1)?);
@@ -708,18 +713,14 @@ impl Parser<'_, '_, '_> {
             let close = self.tokens[self.pos].span;
             self.pos += 1;
             let upper = name.to_uppercase();
+            let exactly = arity.max == Some(arity.min);
             if args.len() < arity.min {
-                return Err(
-                    Error::new(format!("Not enough inputs to {upper}"), Some(name_span))
-                        .about(&name),
-                );
+                let message = not_enough_inputs(&upper, arity.min, exactly, args.len());
+                return Err(Error::new(message, Some(name_span)).about(&name));
             }
-            if arity.max.is_some_and(|max| args.len() > max) {
-                return Err(Error::new(
-                    format!("Too many inputs to {upper}"),
-                    Some(open.to(close)),
-                )
-                .about(&name));
+            if let Some(max) = arity.max.filter(|max| args.len() > *max) {
+                let message = too_many_inputs(&upper, max, exactly, args.len());
+                return Err(Error::new(message, Some(open.to(close))).about(&name));
             }
             return Ok(Expr::Call(Box::new(Call {
                 target,

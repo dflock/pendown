@@ -14,6 +14,7 @@ use std::rc::Rc;
 
 use super::{Args, control::rest_of, data::members};
 use crate::{
+    error::{not_enough_inputs, too_many_inputs},
     interp::{Flow, Interpreter, Proc, Slots},
     names::Sym,
     parse::{Arity, Block, Target},
@@ -114,11 +115,17 @@ fn check_inputs(
     max: Option<usize>,
     name: &str,
 ) -> Result<(), Flow> {
+    // A template has no name to shout.
+    let shown = match name {
+        "the template" => "The template".to_string(),
+        name => name.to_uppercase(),
+    };
+    let exactly = max == Some(min);
     if n < min {
-        return Err(a.error(format!("Not enough inputs to {}", name.to_uppercase())));
+        return Err(a.error(not_enough_inputs(&shown, min, exactly, n)));
     }
-    if max.is_some_and(|max| n > max) {
-        return Err(a.error(format!("Too many inputs to {}", name.to_uppercase())));
+    if let Some(max) = max.filter(|max| n > *max) {
+        return Err(a.error(too_many_inputs(&shown, max, exactly, n)));
     }
     Ok(())
 }

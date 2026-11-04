@@ -311,7 +311,7 @@ mod tests {
         );
         assert_eq!(
             messages("REPEAT 4 [FD]"),
-            [("Not enough inputs to FD".into(), "FD".into())]
+            [("FD needs 1 input, but got none".into(), "FD".into())]
         );
         assert_eq!(
             messages("IF 1 < 2 [PRINT 1] IFELSE \"true [BOX] [FD 1]"),
@@ -319,12 +319,33 @@ mod tests {
         );
         assert_eq!(
             messages("TO SPIN\n FOREVER [RT 1 REPEAT 2 [FD]]\nEND"),
-            [("Not enough inputs to FD".into(), "FD".into())]
+            [("FD needs 1 input, but got none".into(), "FD".into())]
         );
         assert_eq!(
             messages("REPEAT 4 [BOX 10]\nTO BOX :n\nFD :n\nEND"),
             [],
             "definitions anywhere in the text count"
+        );
+        // How many inputs a command needs, and how many it got.
+        assert_eq!(
+            messages("REPEAT 4"),
+            [("REPEAT needs 2 inputs, but got 1".into(), "REPEAT".into())]
+        );
+        assert_eq!(
+            messages("REPEAT [FD 50]"),
+            [("REPEAT needs 2 inputs, but got 1".into(), "REPEAT".into())]
+        );
+        assert_eq!(
+            messages("TO SQ :n\nFD :n\nEND\nSQ"),
+            [("SQ needs 1 input, but got none".into(), "SQ".into())]
+        );
+        assert_eq!(
+            messages("(FD 1 2)"),
+            [("FD takes 1 input, but got 2".into(), "(FD 1 2)".into())]
+        );
+        assert_eq!(
+            messages("(IF \"true)"),
+            [("IF needs at least 2 inputs, but got 1".into(), "IF".into())]
         );
         // Lists that aren't instructions aren't checked.
         assert_eq!(messages("MAKE \"x [FD] SETPOS [1 2]"), []);
@@ -335,7 +356,7 @@ mod tests {
         // Phase 2's lists and templates.
         assert_eq!(
             messages("FOR [i 1 3] [FD]"),
-            [("Not enough inputs to FD".into(), "FD".into())]
+            [("FD needs 1 input, but got none".into(), "FD".into())]
         );
         assert_eq!(
             messages("WHILE [FOO] [FD 1]"),
@@ -343,7 +364,7 @@ mod tests {
         );
         assert_eq!(
             messages("SHOW MAP [SQRT] [1 2]"),
-            [("Not enough inputs to SQRT".into(), "SQRT".into())]
+            [("SQRT needs 1 input, but got none".into(), "SQRT".into())]
         );
         assert_eq!(
             messages("FOREACH [1 2] [PRINT BAR ?]"),

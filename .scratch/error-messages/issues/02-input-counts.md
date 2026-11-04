@@ -1,6 +1,6 @@
 # How many inputs were needed and given
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 
 ## What
@@ -22,3 +22,12 @@ The messages stay in `Error::message`. `.about()` stays as it is.
 - `cargo test --workspace` passes.
 
 ## Comments
+
+2026-11-04: Done. The wording comes from `not_enough_inputs` and `too_many_inputs` in `error.rs`, used by the parser and by templates.
+
+- A plain call says the usual number: `SUM 1` is "SUM needs 2 inputs, but got 1". "At least" and "at most" only come with parentheses, and only for commands that take a range: `(IF "true)` is "IF needs at least 2 inputs, but got 1". This issue's example of `SUM` saying "at least" can't happen, as `(SUM 1)` isn't an error.
+- `CS` with an input reads "CS takes no inputs, but got 1".
+- A template reads "The template needs 2 inputs, but got 1", no longer "THE TEMPLATE".
+- ADR 0001 still quotes the old wording, as a record of the decision. Left for issue 09 to note.
+
+`cargo test --workspace` passes. The scripted session passes every check except "frame intervals" for the 131,070-move tree, on the private Xvfb display (p50 = 32 ms). The same section fails the same way without this change, so that's the display.

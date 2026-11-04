@@ -385,7 +385,10 @@ fn script() -> Vec<Step> {
         // The editor sends its change event once the edit is done.
         Type("FD 10\nFOOBAR 3\nREPEAT 4 [FD]"),
         Wait(ms(100)),
-        CheckDiagnostics(&["I don't know how to FOOBAR", "Not enough inputs to FD"]),
+        CheckDiagnostics(&[
+            "I don't know how to FOOBAR",
+            "FD needs 1 input, but got none",
+        ]),
         Screenshot("errors-while-typing"),
         Type("REPEAT 4 [FD 10 RT 90]"),
         Wait(ms(100)),
@@ -724,7 +727,7 @@ fn script() -> Vec<Step> {
         CheckConsole("    in BOX (line 6)"),
         Run("FD 10\nRT", Speed::Instant),
         WaitFinished,
-        CheckConsole("Line 2: Not enough inputs to RT"),
+        CheckConsole("Line 2: RT needs 1 input, but got none"),
         Say("Phase 2: filled shapes, FOR and a template, animated"),
         Run(
             "FOR [i 3 1] [SETFC ITEM :i [red orange gold] CIRCLE :i * 50]\nPRINT MAP [? * 2] [1 2 3]",
@@ -1180,7 +1183,7 @@ fn script() -> Vec<Step> {
         OpenTeach,
         Wait(ms(800)),
         CheckTeachRows(
-            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | x TRI 40 (uses TRI) | - FD (Not enough inputs to FD) | x RT 30",
+            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | x TRI 40 (uses TRI) | - FD (FD needs 1 input, but got none) | x RT 30",
         ),
         CheckTeachPicture,
         TeachName("tri"),
@@ -1189,11 +1192,11 @@ fn script() -> Vec<Step> {
         Screenshot("teach-rows"),
         TeachAll(false),
         CheckTeachRows(
-            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | - TRI 40 (uses TRI) | - FD (Not enough inputs to FD) | - RT 30",
+            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | - TRI 40 (uses TRI) | - FD (FD needs 1 input, but got none) | - RT 30",
         ),
         TeachAll(true),
         CheckTeachRows(
-            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | x TRI 40 (uses TRI) | x FD (Not enough inputs to FD) | x RT 30",
+            "# TO TRI :n REPEAT 3 [FD :n RT 120] END | x TRI 40 (uses TRI) | x FD (FD needs 1 input, but got none) | x RT 30",
         ),
         Say("Teach Kame: Escape closes the dialog, and nothing changes"),
         Keys("escape"),

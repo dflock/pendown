@@ -358,7 +358,7 @@ fn parse_errors_are_collected_and_nothing_runs() {
         messages,
         [
             "BOX has no END",
-            "Not enough inputs to FD",
+            "FD needs 1 input, but got none",
             "I don't know how to FOO"
         ]
     );
@@ -448,7 +448,7 @@ fn minus_sign_errors() {
     let Err(RunError::Parse(errors)) = r.result else {
         panic!()
     };
-    assert_eq!(errors[0].message, "Not enough inputs to SUM");
+    assert_eq!(errors[0].message, "SUM needs 2 inputs, but got 1");
 }
 
 // 5. Spans.
@@ -557,7 +557,7 @@ fn parse_error_spans() {
     assert_eq!(
         found,
         [
-            ("Not enough inputs to RT", "RT"),
+            ("RT needs 1 input, but got none", "RT"),
             ("This ( has no matching )", "(")
         ]
     );

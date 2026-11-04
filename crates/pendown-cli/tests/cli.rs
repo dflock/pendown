@@ -105,7 +105,7 @@ fn parse_errors_are_reported_and_nothing_is_saved() {
     assert_eq!(r.status, 1);
     assert_eq!(
         r.stderr,
-        "p.logo:2:1: Not enough inputs to RT\np.logo:3:1: I don't know how to FOO\n"
+        "p.logo:2:1: RT needs 1 input, but got none\np.logo:3:1: I don't know how to FOO\n"
     );
     assert!(!d.join("p.png").exists());
 }

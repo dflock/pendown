@@ -36,6 +36,31 @@ fn runs(text: &str) -> Vec<(Range<usize>, &'static str)> {
         .collect()
 }
 
+/// Colours for a command's syntax, such as `REPEAT number [instructions]`:
+/// the words to fill in are grey italics. A word at the start is the name of
+/// a learner's procedure, which can't be seen from here, so it looks like one.
+pub(crate) fn usage_styles(
+    text: &str,
+    resolver: &dyn HighlightStyleResolver,
+) -> Vec<(Range<usize>, HighlightStyle)> {
+    let to_fill_in = HighlightStyle {
+        color: Some(rgb(0x52525b).into()),
+        font_style: Some(FontStyle::Italic),
+        ..Default::default()
+    };
+    highlight(text)
+        .into_iter()
+        .filter_map(|(range, kind)| {
+            let style = match style_name(kind) {
+                Some(name) => resolver.style(name)?,
+                None if range.start == 0 => resolver.style("function")?,
+                None => to_fill_in,
+            };
+            Some((range, style))
+        })
+        .collect()
+}
+
 /// The styles of all of `range`, from `runs`: between tokens, the default.
 fn styles(
     runs: &[(Range<usize>, &str)],
@@ -133,9 +158,9 @@ mod tests {
     use std::ops::Range;
 
     use gpui_kit::component::input::HighlightStyleResolver;
-    use gpui_kit::{FontWeight, HighlightStyle, Hsla};
+    use gpui_kit::{FontStyle, FontWeight, HighlightStyle, Hsla};
 
-    use super::program_styles;
+    use super::{program_styles, usage_styles};
 
     /// Gives each kind of token a colour of its own: a hue from its name.
     struct ByName;
@@ -156,6 +181,23 @@ mod tests {
 
     fn colour(name: &str) -> Option<Hsla> {
         ByName.style(name).unwrap().color
+    }
+
+    #[test]
+    fn usage_marks_the_words_to_fill_in() {
+        let italic = |text: &str| -> Vec<String> {
+            usage_styles(text, &ByName)
+                .into_iter()
+                .filter(|(_, style)| style.font_style == Some(FontStyle::Italic))
+                .map(|(range, _)| text[range].to_string())
+                .collect()
+        };
+        assert_eq!(italic("FD distance"), ["distance"]);
+        assert_eq!(
+            italic("REPEAT number [instructions]"),
+            ["number", "instructions"]
+        );
+        assert!(italic("SQ :n").is_empty());
     }
 
     #[test]

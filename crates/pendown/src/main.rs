@@ -9,6 +9,7 @@ mod autotest;
 mod canvas;
 mod colours_page;
 mod driving;
+mod error_card;
 mod files;
 mod gutter;
 mod help_panel;

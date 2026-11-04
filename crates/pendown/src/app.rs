@@ -32,12 +32,16 @@ use pendown::{
     speed::{INSTANT_LEVEL, level_speed, speed_level},
     teach,
 };
-use pendown_logo::{Point, RunError, SourceId, explain::explain};
+use pendown_logo::{
+    Point, RunError, SourceId, Span,
+    explain::{Explanation, explain},
+};
 use pendown_render::Mark;
 
 use crate::{
     autotest::Autotest,
     canvas::{Canvas, Overlay, TURTLE_SIZE},
+    error_card::{ErrorCard, LineError, OpenHelp},
     files::{
         After, ExportPicture, NewFile, OpenFile, PauseOrResume, Picture, ResetProgram, RunProgram,
         SaveFile, SaveFileAs, ShowHelp, SingleStep, ToggleMetrics,
@@ -164,6 +168,7 @@ pub struct App {
     breakpoint_tint: RangeDecorationCollection,
     /// The line numbers, which take breakpoints.
     pub(crate) gutter: Entity<Gutter>,
+    error_card: Entity<ErrorCard>,
     speed_slider: Entity<SliderState>,
     pub(crate) speed: Speed,
     pub(crate) canvas: Rc<RefCell<Canvas>>,
@@ -293,6 +298,7 @@ impl App {
             (tint, state.create_range_decorations_collection(vec![], cx))
         });
         let gutter = cx.new(|cx| Gutter::new(editor.clone(), cx));
+        let error_card = cx.new(|cx| ErrorCard::new(editor.clone(), cx));
         let console_output = cx.new(|cx| TextareaState::new(window, cx));
         let console_input = cx.new(|cx| {
             InputState::new(window, cx).placeholder("Type an instruction and press Enter")
@@ -329,6 +335,13 @@ impl App {
             cx.subscribe(&gutter, |this, _, _: &BreakpointsChanged, cx| {
                 this.breakpoints_changed(cx);
             }),
+            cx.subscribe_in(
+                &error_card,
+                window,
+                |this, _, event: &OpenHelp, window, cx| {
+                    this.open_help(event.0, window, cx);
+                },
+            ),
             cx.subscribe_in(
                 &console_input,
                 window,
@@ -422,6 +435,7 @@ impl App {
             console_output,
             console_input,
             editor_pane,
+            error_card,
             console_pane,
             toolbar_pane,
             main_split: cx.new(|_| ResizableState::default()),
@@ -627,7 +641,7 @@ impl App {
         self.canvas.borrow_mut().drawing.reset();
         self.console.clear();
         self.console_dirty = true;
-        self.set_diagnostics(Vec::new(), cx);
+        self.set_code_errors(&[], "", cx);
         let job = Job::Program { text, seed };
         let replay = Some(Replay { to, then });
         let stops = self.gutter.read(cx).stops(cx);
@@ -688,7 +702,7 @@ impl App {
         {
             self.print(format!("{button} cleared the procedures you defined in the console. \"Copy to editor\" keeps them."));
         }
-        self.set_diagnostics(Vec::new(), cx);
+        self.set_code_errors(&[], "", cx);
         // Run clears the variables (ADR 0006).
         self.show_watch(cx, |watched| watched.set(None));
     }
@@ -1188,6 +1202,30 @@ impl App {
         });
     }
 
+    /// Shows these errors on the code, underlined and on the card, in place
+    /// of any before. Their spans are in `text`.
+    fn set_code_errors(
+        &mut self,
+        code_errors: &[(Span, Explanation)],
+        text: &str,
+        cx: &mut Context<Self>,
+    ) {
+        let diagnostics = code_errors
+            .iter()
+            .map(|(span, explanation)| {
+                let range = position(text, span.start as usize)..position(text, span.end as usize);
+                Diagnostic::new(range, errors::markdown(explanation))
+                    .with_severity(DiagnosticSeverity::Error)
+            })
+            .collect();
+        let on_card = code_errors
+            .iter()
+            .map(|(span, explanation)| LineError::new(text, *span, explanation.clone()))
+            .collect();
+        self.error_card.update(cx, |card, cx| card.set(on_card, cx));
+        self.set_diagnostics(diagnostics, cx);
+    }
+
     fn set_diagnostics(&mut self, diagnostics: Vec<Diagnostic>, cx: &mut Context<Self>) {
         self.editor.update(cx, |state, cx| {
             let text = state.text().clone();
@@ -1197,10 +1235,6 @@ impl App {
             }
             cx.notify();
         });
-    }
-
-    fn position(&self, offset: usize) -> Position {
-        position(&self.run_text, offset)
     }
 
     /// For the scripted session: where the editor's highlight is.
@@ -1245,17 +1279,11 @@ impl App {
             self.clear_editor_highlight(cx);
         }
         let text = self.editor.read(cx).value().to_string();
-        let diagnostics = pendown_logo::syntax::check(&text)
+        let code_errors: Vec<_> = pendown_logo::syntax::check(&text)
             .into_iter()
-            .filter_map(|e| {
-                let span = e.span?;
-                let range =
-                    position(&text, span.start as usize)..position(&text, span.end as usize);
-                let message = errors::markdown(&explain(&e, &text));
-                Some(Diagnostic::new(range, message).with_severity(DiagnosticSeverity::Error))
-            })
+            .filter_map(|e| Some((e.span?, explain(&e, &text))))
             .collect();
-        self.set_diagnostics(diagnostics, cx);
+        self.set_code_errors(&code_errors, &text, cx);
     }
 
     /// Shows errors as diagnostics on the code, and in the console with
@@ -1263,7 +1291,7 @@ impl App {
     /// An error in a console entry shows only in the console; one in the
     /// editor's program also shows on the code.
     fn show_errors(&mut self, errors: Vec<pendown_logo::Error>, cx: &mut Context<Self>) {
-        let mut diagnostics = Vec::new();
+        let mut code_errors = Vec::new();
         let example = self.example.is_some();
         let explanations: Vec<_> = errors.iter().map(|e| explain(e, &self.run_text)).collect();
         self.error_help = explanations.iter().find_map(|e| e.help);
@@ -1286,15 +1314,12 @@ impl App {
                 && span.source == SourceId::Editor
                 && !example
             {
-                let range = self.position(span.start as usize)..self.position(span.end as usize);
-                diagnostics.push(
-                    Diagnostic::new(range, errors::markdown(explanation))
-                        .with_severity(DiagnosticSeverity::Error),
-                );
+                code_errors.push((span, explanation.clone()));
             }
         }
-        if !diagnostics.is_empty() {
-            self.set_diagnostics(diagnostics, cx);
+        if !code_errors.is_empty() {
+            let text = self.run_text.clone();
+            self.set_code_errors(&code_errors, &text, cx);
         }
     }
 
@@ -1779,19 +1804,31 @@ impl App {
                             // takes up any change in the window's size. Scaled
                             // with the window, they'd grow each time a
                             // maximized window opened.
-                            let editor = resizable_panel()
-                                .size(px(self.config.editor_width as f32))
-                                .fixed()
-                                .child(
-                                    h_flex()
-                                        .size_full()
-                                        // Not cached: it sets its own width,
-                                        // from the number of lines.
-                                        .child(self.gutter.clone())
-                                        .child(self.editor_pane.clone().cached(
-                                            StyleRefinement::default().h_full().flex_1().min_w_0(),
-                                        )),
-                                );
+                            let editor =
+                                resizable_panel()
+                                    .size(px(self.config.editor_width as f32))
+                                    .fixed()
+                                    .child(
+                                        h_flex()
+                                            .size_full()
+                                            // Not cached: it sets its own width,
+                                            // from the number of lines.
+                                            .child(self.gutter.clone())
+                                            .child(
+                                                // Keeps the error card in the
+                                                // pane, and gives it its corner.
+                                                div()
+                                                    .relative()
+                                                    .h_full()
+                                                    .flex_1()
+                                                    .min_w_0()
+                                                    .overflow_hidden()
+                                                    .child(self.editor_pane.clone().cached(
+                                                        StyleRefinement::default().size_full(),
+                                                    ))
+                                                    .child(self.error_card.clone()),
+                                            ),
+                                    );
                             let canvas = resizable_panel().child(canvas_area);
                             // The side panel, when it's open (phase 5). Each
                             // layout has its own id, so each remembers its

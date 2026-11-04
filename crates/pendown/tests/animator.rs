@@ -815,6 +815,27 @@ fn thoughts(src: &str, speed: Speed) -> Vec<Thinking> {
 }
 
 #[test]
+fn the_last_thought_fades_when_the_run_is_over() {
+    let (mut animator, _run) = start("RT 90", Speed::Animated(100.0));
+    while !animator.finished() {
+        frame(&mut animator, FRAME);
+    }
+    assert!(animator.thinking().current.is_some());
+
+    animator.stop_thinking();
+    let thinking = animator.thinking();
+    assert!(thinking.current.is_none());
+    assert_eq!(thinking.fading.map(|(_, left)| left), Some(1.0));
+
+    animator.fade_thinking(Duration::from_secs_f64(FADE / 2.0));
+    let left = animator.thinking().fading.expect("still fading").1;
+    assert!((left - 0.5).abs() < 0.01, "{left}");
+
+    animator.fade_thinking(Duration::from_secs_f64(FADE));
+    assert!(animator.thinking().fading.is_none());
+}
+
+#[test]
 fn kame_thinks_about_the_turn_as_it_turns() {
     let seen = thoughts("RT 90", Speed::Animated(100.0));
     let turned: Vec<f64> = seen

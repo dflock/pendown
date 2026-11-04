@@ -201,7 +201,7 @@ enum Step {
     DriveSteps(f64, f64),
     /// How many presses are waiting to play.
     CheckDriveQueue(usize),
-    /// What Kame is thinking about while driving, as `thinking()` gives it.
+    /// What Kame is thinking about, and while driving what the entry shows.
     CheckDriveThinking(&'static str),
     /// Scroll the help page this far down, in logical pixels.
     ScrollHelp(f32),
@@ -1304,6 +1304,15 @@ fn script() -> Vec<Step> {
         Screenshot("thinking-light"),
         SetSpeed(Speed::Instant),
         WaitFinished,
+        Say("When a run ends, the highlight and Kame's thinking go"),
+        Run("FD 20 RT 90", Speed::Animated(80.0)),
+        Wait(ms(100)),
+        CheckEditorHighlight(true),
+        WaitFinished,
+        Wait(ms(500)),
+        CheckEditorHighlight(false),
+        CheckDriveThinking("nothing"),
+        Screenshot("run-ended"),
         SetThinking(false),
         Say("Drive Kame: the keys make console entries, and the same key joins up"),
         Run("", Speed::Instant),

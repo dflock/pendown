@@ -24,3 +24,5 @@ Drive Kame moves and turns Kame from the arrow keys, the floor turtle's button b
 ## Note
 
 2026-11-03: Holding a key queued every repeat, and the keyboard repeats far faster than big steps play, so Kame kept going for seconds after the key came up. Now only separate presses wait their turn. Of a held key's repeats, at most one waits, and its key-up takes it back, so Kame stops when the step in progress ends. Steps still play in full, so entries stay whole multiples of the step. Holding Space flips the pen once, and holding Undo takes back one entry. A key coming down again with no key-up between is a repeat: gpui's `is_held` can't say, since it's always false on X11.
+
+2026-11-03: When a run ends, or driving stops, Kame's last thought fades, so a finished program doesn't look paused or hung. While driving, an entry keeps its thought until the next one starts, as there's no run to end and it shows what the entry means.

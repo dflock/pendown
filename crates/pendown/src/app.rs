@@ -191,6 +191,8 @@ pub struct App {
     pub(crate) editor_pane: Entity<EditorPane>,
     console_pane: Entity<ConsolePane>,
     toolbar_pane: Entity<ToolbarPane>,
+    /// When the last thought last faded, once the run is over.
+    last_fade: Option<Instant>,
     /// What the counters and variables panels show (phase 4).
     pub(crate) watched: Entity<Watched>,
     pub(crate) counters_pane: Entity<CountersPane>,
@@ -396,6 +398,7 @@ impl App {
             editor_pane,
             console_pane,
             toolbar_pane,
+            last_fade: None,
             watched,
             counters_pane,
             variables_pane,
@@ -821,6 +824,8 @@ impl App {
             self.stop_at = Some(Instant::now());
             self.print("Stopped.");
             self.report();
+            self.show_highlight(cx);
+            self.end_thinking();
             self.example_finished(cx);
         }
         cx.notify();
@@ -1190,6 +1195,8 @@ impl App {
         let Some(span) = self
             .animator
             .as_ref()
+            // Once it's over, a highlight would look like it's still going.
+            .filter(|a| !a.finished())
             .and_then(|a| a.highlight)
             .filter(|s| s.source == SourceId::Editor && same_text)
         else {
@@ -1288,8 +1295,12 @@ impl App {
                 // A replay that never got there showed nothing on the way.
                 let watch = animator.watch.clone();
                 self.show_watch(cx, |watched| watched.set(watch));
-                self.show_highlight(cx);
             }
+            self.show_highlight(cx);
+            self.end_thinking();
+            // The editor was notified mid-draw, so it redraws in the next
+            // frame: make sure there is one.
+            window.request_animation_frame();
             self.finished_at = Some(now);
             self.example_finished(cx);
             self.report();
@@ -1322,6 +1333,38 @@ impl App {
             // A press made while this one played.
             self.drive_next(cx);
         }
+        self.fade_last_thought(now, window);
+    }
+
+    /// The run is over: Kame's last thought fades, except while driving,
+    /// when it goes on showing the entry (ADR 0026).
+    pub(crate) fn end_thinking(&mut self) {
+        if self.driving.is_none()
+            && let Some(animator) = &mut self.animator
+        {
+            animator.stop_thinking();
+        }
+    }
+
+    /// With the run over there are no frames for the last thought to fade
+    /// in, so this asks for them, if it's showing.
+    fn fade_last_thought(&mut self, now: Instant, window: &mut Window) {
+        let fading = self.show_thinking
+            && self.driving.is_none()
+            && self
+                .animator
+                .as_ref()
+                .is_some_and(|a| a.finished() && a.thinking().fading.is_some());
+        if !fading {
+            self.last_fade = None;
+            return;
+        }
+        let dt = self.last_fade.map_or(Duration::ZERO, |t| now - t);
+        self.last_fade = Some(now);
+        if let Some(animator) = &mut self.animator {
+            animator.fade_thinking(dt);
+        }
+        window.request_animation_frame();
     }
 
     fn status(&self) -> String {

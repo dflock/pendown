@@ -118,6 +118,10 @@ impl App {
     /// Esc, Run, Pause and Step stop driving.
     pub(crate) fn stop_driving(&mut self, cx: &mut Context<Self>) {
         if self.driving.take().is_some() {
+            // A press still playing does this when it ends.
+            if !self.running() {
+                self.end_thinking();
+            }
             cx.notify();
         }
     }

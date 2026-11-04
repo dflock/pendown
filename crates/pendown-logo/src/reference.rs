@@ -464,6 +464,52 @@ impl Reference {
             command.obsolete.as_deref()
         }
     }
+
+    /// The generated part of tree-sitter-logo's `queries/highlights.scm`: what's
+    /// built in, for an editor's colours.
+    pub fn highlight_patterns(&self) -> String {
+        // A name in a tree-sitter `#match?` pattern is a Rust regex in a query
+        // string: the string takes one backslash off, so a regex's `\?` is
+        // written `\\?`.
+        fn escape(name: &str) -> String {
+            name.chars()
+                .flat_map(|c| {
+                    if ".?*+()[]{}|^$\\#".contains(c) {
+                        vec!['\\', '\\', c]
+                    } else {
+                        vec![c]
+                    }
+                })
+                .collect()
+        }
+        let names = |kind: Kind| {
+            let mut names: Vec<String> = self
+                .commands
+                .iter()
+                .filter(|c| c.implemented && c.kind == kind)
+                .flat_map(|c| c.names.iter())
+                .filter(|n| {
+                    n.chars()
+                        .next()
+                        .is_some_and(|c| c.is_alphabetic() || c == '.')
+                })
+                .map(|n| escape(&n.to_lowercase()))
+                .collect();
+            names.sort();
+            names.dedup();
+            names.join("|")
+        };
+        let (commands, variables) = (names(Kind::Command), names(Kind::Variable));
+        // Each list twice: what matches is built in, and everything else is a
+        // procedure of the program, or a variable, so no two patterns match the
+        // same node.
+        format!(
+            "((word) @function.builtin\n  (#match? @function.builtin \"^(?i)({commands})$\"))\n\n\
+             ((word) @function.call\n  (#not-match? @function.call \"^(?i)({commands})$\"))\n\n\
+             ((variable) @variable.builtin\n  (#match? @variable.builtin \"^:(?i)({variables})$\"))\n\n\
+             ((variable) @variable\n  (#not-match? @variable \"^:(?i)({variables})$\"))\n"
+        )
+    }
 }
 
 #[cfg(test)]

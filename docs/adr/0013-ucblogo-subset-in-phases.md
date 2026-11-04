@@ -14,7 +14,7 @@ Classic Logo assumes a full screen with no GUI or editor, so many of its command
 - **`pendown-logo.kdl` is the source of truth** for what we support. Every command from the Berkeley Logo manual is in it, organised by chapter and section, with:
   - `obsolete` and `obsolete_reason`;
   - `phase`: a number, or `#null` for obsolete commands;
-  - the manual's usage (`eg`), description (`desc`) and cross-references (`see`).
+  - the manual's usage (`usage`), description (`desc`) and cross-references (`see`).
 - **`scripts/manual_to_kdl.py`** generates `berkeley-logo.kdl` from `refs/logo/Berkeley-Logo-Reference-Manual.html`. `pendown-logo.kdl` started as a copy of that, and is now edited by hand. Never regenerate it, or the hand edits are lost.
 
 ## Consequences

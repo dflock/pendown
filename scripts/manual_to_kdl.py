@@ -258,12 +258,11 @@ def emit_entry(entry, depth, out):
     eg, desc, see = render_entry(entry)
     out.append(f"{pad}{ident(entry['name'])} {{")
     if eg is not None:
-        out.append(f"{pad}  eg {string(eg, pad + '  ')}")
+        out.append(f"{pad}  usage {string(eg, pad + '  ')}")
     if desc:
         out.append(f"{pad}  desc {string(desc, pad + '  ')}")
     if see:
         out.append(f"{pad}  see " + " ".join(quote(s) for s in dict.fromkeys(see)))
-    out.append(f"{pad}  supported #true")
     out.append(f"{pad}}}")
 
 

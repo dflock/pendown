@@ -12,14 +12,14 @@ fn document() -> KdlDocument {
         .unwrap_or_else(|e| panic!("content/reference.kdl doesn't parse: {e:?}"))
 }
 
-/// Every command node: one with an `eg` child. Chapters and sections hold
+/// Every command node: one with an `usage` child. Chapters and sections hold
 /// them at different depths.
 fn commands(nodes: &[KdlNode], out: &mut Vec<KdlNode>) {
     for node in nodes {
         let Some(children) = node.children() else {
             continue;
         };
-        if children.get("eg").is_some() {
+        if children.get("usage").is_some() {
             out.push(node.clone());
         } else {
             commands(children.nodes(), out);
@@ -36,14 +36,15 @@ fn value<'a>(node: &'a KdlNode, name: &str) -> Option<&'a kdl::KdlValue> {
 }
 
 /// The names a command is called by: the first word of each line of its
-/// `eg`, such as `FORWARD` and `FD`. Lines that show an infix form, such as
+/// `usage`, such as `FORWARD` and `FD`. Lines that show an infix form, such as
 /// `num1 + num2`, or a variable, such as `:quoted.varname`, are skipped.
 fn names(node: &KdlNode) -> Vec<String> {
     const OPERATORS: [&str; 10] = ["+", "-", "*", "/", "=", "<", ">", "<=", ">=", "<>"];
-    let eg = value(node, "eg")
+    let usage = value(node, "usage")
         .and_then(|v| v.as_string())
         .unwrap_or_default();
-    eg.lines()
+    usage
+        .lines()
         .filter_map(|line| {
             let words: Vec<_> = line
                 .trim()
@@ -68,11 +69,11 @@ fn phase(node: &KdlNode) -> Option<i128> {
 }
 
 /// Special variables, such as `CASEIGNOREDP`, are documented like commands,
-/// with `(variable)` in their `eg`.
+/// with `(variable)` in their `usage`.
 fn is_variable(node: &KdlNode) -> bool {
-    value(node, "eg")
+    value(node, "usage")
         .and_then(|v| v.as_string())
-        .is_some_and(|eg| eg.contains("(variable)"))
+        .is_some_and(|usage| usage.contains("(variable)"))
 }
 
 #[test]

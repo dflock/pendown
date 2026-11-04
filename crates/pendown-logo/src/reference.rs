@@ -11,7 +11,7 @@ use kdl::{KdlDocument, KdlNode, KdlValue};
 
 const SOURCE: &str = include_str!("../../../content/reference.kdl");
 
-/// The infix operators, which `eg` shows as `num1 + num2`.
+/// The infix operators, which `usage` shows as `num1 + num2`.
 const OPERATORS: [&str; 10] = ["+", "-", "*", "/", "=", "<", ">", "<=", ">=", "<>"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,14 +44,14 @@ pub struct Command {
     /// Infix operators that do the same, such as `+` for `SUM`.
     pub operators: Vec<String>,
     pub kind: Kind,
-    /// How to call it, a line for each form: the kdl's `eg`.
+    /// How to call it, a line for each form: the kdl's `usage`.
     pub usage: String,
     /// The manual's description, which describes UCBLogo.
     pub desc: String,
     /// Our own description, in the help panel's markup.
     pub help: Option<String>,
     pub examples: Vec<Example>,
-    /// One line that shows it working, for an error's card: the kdl's `try`.
+    /// One line that shows it working, for an error's card: the kdl's `short_example`.
     pub short_example: Option<String>,
     /// More commands for "See also" than its section gives, by name.
     pub see: Vec<String>,
@@ -293,7 +293,7 @@ impl Reference {
                 .map(|c| c.nodes())
                 .unwrap_or_default()
             {
-                if child(node, "eg").is_some() {
+                if child(node, "usage").is_some() {
                     let i = reference.add(node, Kind::Command, c, None);
                     reference.chapters[c].commands.push(i);
                     continue;
@@ -315,7 +315,7 @@ impl Reference {
     }
 
     fn add(&mut self, node: &KdlNode, kind: Kind, chapter: usize, section: Option<usize>) -> usize {
-        let usage = string(node, "eg").unwrap_or_default();
+        let usage = string(node, "usage").unwrap_or_default();
         // A syntax entry's usage shows operators and such, which are other
         // pages: it's found only by its `names`.
         let (mut names, operators) = if kind == Kind::Syntax {
@@ -346,7 +346,7 @@ impl Reference {
             desc: string(node, "desc").unwrap_or_default(),
             help: string(node, "help"),
             examples: examples(node),
-            short_example: string(node, "try"),
+            short_example: string(node, "short_example"),
             see: strings(node, "see"),
             phase: child(node, "phase")
                 .and_then(|v| v.as_integer())

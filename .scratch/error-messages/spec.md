@@ -47,8 +47,8 @@ The same message goes in the console, the card and the hover. Messages stay one 
 
 ### What the card says
 
-- **Syntax:** the `eg` line for the name the learner typed, so `FD distance`, not `FORWARD dist`, with the manual's input names turned into plain ones (`num` to `number`, `instructionlist` to `[instructions]`).
-- **Example:** the command's new `try` field in `content/reference.kdl`. A command with no `try` shows its syntax alone.
+- **Syntax:** the `usage` line for the name the learner typed, so `FD distance`, not `FORWARD dist`, with the manual's input names turned into plain ones (`num` to `number`, `instructionlist` to `[instructions]`).
+- **Example:** the command's new `short_example` field in `content/reference.kdl`. A command with no `short_example` shows its syntax alone.
 - **A learner's own procedure:** the syntax from its `TO` line, `SQ :n`, and "Defined on line 1", with no Help button.
 
 The console prints the syntax and example under the error too, as the "After Run" state of the mockup shows.
@@ -60,7 +60,7 @@ Agreed with the maintainer on 2026-11-04:
 - **The card opens by itself after a pause.** The learner shouldn't have to know to go looking. If it gets in the way in use, opening it with a key is an easy change.
 - **The underline waits for the pause on the line being typed.** Otherwise every half-typed command gets a red line under it.
 - **Messages can stop matching UCBLogo's wording.** ADR 0005 already asks for plain English.
-- **Claude drafts the `try` examples and the maintainer skims them,** starting with the commands the tutorial teaches.
+- **Claude drafts the `short_example` examples and the maintainer skims them,** starting with the commands the tutorial teaches.
 
 Settled by the proposal:
 
@@ -73,7 +73,7 @@ Settled by the proposal:
 - A button that inserts the example or fixes the line. Learners type it themselves, in keeping with ADR 0027.
 - Errors in the console's input line getting a card.
 - Warnings or style hints. Only errors, as now.
-- `try` examples for every command, in this work.
+- `short_example` examples for every command, in this work.
 
 ## Issues
 
@@ -82,7 +82,7 @@ Settled by the proposal:
 | 01 | Spike: placing a card over the editor | |
 | 02 | How many inputs were needed and given | |
 | 03 | What kind of input was wanted, and clearer wording | |
-| 04 | The `try` field, with first examples | |
+| 04 | The `short_example` field, with first examples | |
 | 05 | Explaining an error, in the console and the hover | 02, 04 |
 | 06 | The error card | 01, 05 |
 | 07 | When the card and underline show | 06 |

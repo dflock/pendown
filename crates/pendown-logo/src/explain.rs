@@ -51,7 +51,7 @@ pub fn explain(error: &Error, source: &str) -> Explanation {
     explanation
 }
 
-/// The line of a command's `eg` for the name as it was typed, in plain words.
+/// The line of a command's `usage` for the name as it was typed, in plain words.
 /// `(SUM num1 num2 num3 ...)` is the last choice, as it's the unusual form.
 fn usage_for(command: &Command, name: &str) -> Option<String> {
     let lines = command.usage_lines();

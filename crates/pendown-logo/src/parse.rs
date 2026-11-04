@@ -314,7 +314,10 @@ pub fn parse_program_partly(text: &str, source: SourceId, cx: &mut Cx) -> (Progr
             }
             None => {
                 let name = name.unwrap_or("TO").to_uppercase();
-                errors.push(Error::new(format!("{name} has no END"), Some(title)));
+                errors.push(Error::new(
+                    format!("{name} has no END. Add END after its last line"),
+                    Some(title),
+                ));
                 i = j;
             }
         }
@@ -651,7 +654,7 @@ impl Parser<'_, '_, '_> {
                 Err(Error::new("A variable name is missing after :", Some(span)))
             }
             Tok::Var(name) => Ok(Expr::Var(self.cx.names.intern(name), span)),
-            Tok::RParen => Err(Error::new("Unexpected )", Some(span))),
+            Tok::RParen => Err(Error::new("This ) has no matching (", Some(span))),
             // `?2` is `(? 2)`, the second slot of a template.
             Tok::Word(name) if slot_number(name).is_some() => {
                 let n = slot_number(name).expect("checked");

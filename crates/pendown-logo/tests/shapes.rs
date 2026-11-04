@@ -166,7 +166,7 @@ fn shape_errors() {
     assert_eq!(error("CIRCLE -1"), "CIRCLE doesn't like -1 as input");
     assert_eq!(
         error("ELLIPSE 10 \"wide"),
-        "ELLIPSE doesn't like wide as input"
+        "ELLIPSE needs a number, but got the word wide"
     );
     assert_eq!(error("(SQUARE 10 -1)"), "SQUARE doesn't like -1 as input");
     assert!(

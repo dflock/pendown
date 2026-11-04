@@ -937,14 +937,30 @@ impl Args<'_> {
         ))
     }
 
+    /// Input `i` isn't `what` the command wants, such as "a number".
+    pub fn wanted(&self, i: usize, what: &str) -> Flow {
+        let message = format!(
+            "{} needs {what}, but got {}",
+            self.call.name.to_uppercase(),
+            self.vals[i].described()
+        );
+        Flow::Error(Box::new(
+            Error::new(message, Some(self.call.args[i].span())).about(&self.call.name),
+        ))
+    }
+
     pub fn num(&self, i: usize) -> Result<f64, Flow> {
-        self.vals[i].as_num().ok_or_else(|| self.doesnt_like(i))
+        self.vals[i]
+            .as_num()
+            .ok_or_else(|| self.wanted(i, "a number"))
     }
 
     /// A number with no fractional part (ADR 0002).
     pub fn int(&self, i: usize) -> Result<i64, Flow> {
         let n = self.num(i)?;
-        if n.fract() == 0.0 && n.abs() < 2f64.powi(53) {
+        if n.fract() != 0.0 {
+            Err(self.wanted(i, "a whole number"))
+        } else if n.abs() < 2f64.powi(53) {
             Ok(n as i64)
         } else {
             Err(self.doesnt_like(i))
@@ -959,14 +975,14 @@ impl Args<'_> {
         {
             return Ok(Point { x, y });
         }
-        Err(self.doesnt_like(i))
+        Err(self.wanted(i, "a list of two numbers"))
     }
 
     pub fn word(&self, i: usize) -> Result<Rc<str>, Flow> {
         match &self.vals[i] {
             Value::Word(w) => Ok(w.clone()),
             Value::Num(n) => Ok(crate::number::format_number(*n).into()),
-            Value::List(_) | Value::Array(_) => Err(self.doesnt_like(i)),
+            Value::List(_) | Value::Array(_) => Err(self.wanted(i, "a word")),
         }
     }
 

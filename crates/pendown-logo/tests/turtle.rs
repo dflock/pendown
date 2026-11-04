@@ -121,10 +121,25 @@ fn clearscreen_goes_home_without_drawing() {
 
 #[test]
 fn errors() {
-    assert_eq!(error("SETPOS \"abc"), "SETPOS doesn't like abc as input");
-    assert_eq!(error("SETPOS [1]"), "SETPOS doesn't like [1] as input");
-    assert_eq!(error("SETPOS [1 a]"), "SETPOS doesn't like [1 a] as input");
-    assert_eq!(error("SETXY 1 \"a"), "SETXY doesn't like a as input");
-    assert_eq!(error("PRINT TOWARDS 5"), "TOWARDS doesn't like 5 as input");
-    assert_eq!(error("FD [10]"), "FD doesn't like [10] as input");
+    assert_eq!(
+        error("SETPOS \"abc"),
+        "SETPOS needs a list of two numbers, but got the word abc"
+    );
+    assert_eq!(
+        error("SETPOS [1]"),
+        "SETPOS needs a list of two numbers, but got the list [1]"
+    );
+    assert_eq!(
+        error("SETPOS [1 a]"),
+        "SETPOS needs a list of two numbers, but got the list [1 a]"
+    );
+    assert_eq!(
+        error("SETXY 1 \"a"),
+        "SETXY needs a number, but got the word a"
+    );
+    assert_eq!(
+        error("PRINT TOWARDS 5"),
+        "TOWARDS needs a list of two numbers, but got 5"
+    );
+    assert_eq!(error("FD [10]"), "FD needs a number, but got the list [10]");
 }

@@ -130,6 +130,6 @@ fn errors() {
     assert_eq!(error("PRINT ITEM 0 \"abc"), "ITEM doesn't like 0 as input");
     assert_eq!(
         error("PRINT ITEM 1.5 [a b]"),
-        "ITEM doesn't like 1.5 as input"
+        "ITEM needs a whole number, but got 1.5"
     );
 }

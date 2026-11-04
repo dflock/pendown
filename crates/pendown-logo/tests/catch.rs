@@ -26,10 +26,13 @@ fn catching_errors() {
     assert_eq!(output("CATCH \"error [FD \"x] PRINT \"after"), "after\n");
     assert_eq!(
         output("CATCH \"error [FD \"x] SHOW ERROR SHOW ERROR"),
-        "[0 FD doesn't like x as input [] 1]\n[]\n"
+        "[0 FD needs a number, but got the word x [] 1]\n[]\n"
     );
     let src = "TO F\nFD \"x\nEND\nCATCH \"error [F] SHOW ERROR";
-    assert_eq!(output(src), "[0 FD doesn't like x as input F 2]\n");
+    assert_eq!(
+        output(src),
+        "[0 FD needs a number, but got the word x F 2]\n"
+    );
     // A user error from THROW "ERROR.
     assert_eq!(
         output("CATCH \"error [(THROW \"error [bad thing])] SHOW ERROR"),
@@ -54,7 +57,7 @@ fn erract() {
     let src = "TO F :size\nMAKE \"erract [PRINT :size]\nFD \"x\nEND\nF 7";
     let r = run(src);
     assert_eq!(r.printed(), "7\n");
-    assert_eq!(r.error().message, "FD doesn't like x as input");
+    assert_eq!(r.error().message, "FD needs a number, but got the word x");
     // Not for errors that are caught.
     assert_eq!(
         output("MAKE \"erract [PRINT \"oops] CATCH \"error [FD \"x] PRINT \"fine"),

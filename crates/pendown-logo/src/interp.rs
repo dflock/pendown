@@ -343,8 +343,12 @@ fn dont_say(v: &Value, span: Span) -> Flow {
     .into()
 }
 
-fn didnt_output(name: &str, to: &str, span: Span) -> Flow {
-    let message = if to.is_empty() {
+fn no_value_message(name: &str) -> String {
+    format!(":{name} has no value yet. Give it one with MAKE \"{name} 100")
+}
+
+fn didnt_output_message(name: &str, to: &str) -> String {
+    if to.is_empty() {
         format!("{} didn't output a value", name.to_uppercase())
     } else {
         format!(
@@ -352,8 +356,19 @@ fn didnt_output(name: &str, to: &str, span: Span) -> Flow {
             name.to_uppercase(),
             to.to_uppercase()
         )
+    }
+}
+
+fn didnt_output(name: &str, to: &str, span: Span) -> Flow {
+    Error::new(didnt_output_message(name, to), Some(span)).into()
+}
+
+/// Whether `error` is `input`, a call, not outputting to `to`.
+fn forgot_brackets(error: &Error, input: &Expr, to: &str) -> bool {
+    let Expr::Call(call) = input else {
+        return false;
     };
-    Error::new(message, Some(span)).into()
+    error.span == Some(call.span) && error.message == didnt_output_message(&call.name, to)
 }
 
 impl Interpreter {
@@ -1076,18 +1091,29 @@ impl Interpreter {
                 call,
                 vals: std::slice::from_ref(&v),
             }
-            .doesnt_like(0)
+            .wanted(0, "TRUE or FALSE")
         })
     }
 
+    /// Input `i` of `call`, a list of instructions to run.
     fn eval_list(&mut self, call: &Call, i: usize) -> Result<Rc<List>, Flow> {
-        match self.eval(&call.args[i], &call.name)? {
-            Value::List(list) => Ok(list),
-            v => {
+        match self.eval(&call.args[i], &call.name) {
+            Ok(Value::List(list)) => Ok(list),
+            Ok(v) => {
                 let mut vals = vec![Value::Num(0.0); i];
                 vals.push(v);
-                Err(Args { call, vals: &vals }.doesnt_like(i))
+                Err(Args { call, vals: &vals }.wanted(i, "a list of instructions"))
             }
+            // `REPEAT 4 FD 50`: the instructions have no brackets, so the
+            // first was taken as the input.
+            Err(Flow::Error(e)) if forgot_brackets(&e, &call.args[i], &call.name) => {
+                let message = format!(
+                    "{} needs a list of instructions here. Put them in [ ]",
+                    call.name.to_uppercase()
+                );
+                Err(Error::new(message, e.span).about(&call.name).into())
+            }
+            Err(flow) => Err(flow),
         }
     }
 
@@ -1400,18 +1426,16 @@ impl Interpreter {
             Expr::Lit(v, _) => Ok(v.clone()),
             Expr::Var(sym, span) => match &self.vars[*sym as usize] {
                 Some(v) => Ok(v.clone()),
-                None => Err(Error::new(
-                    format!(":{} has no value", self.names.spelling(*sym)),
-                    Some(*span),
-                )
-                .into()),
+                None => {
+                    Err(Error::new(no_value_message(self.names.spelling(*sym)), Some(*span)).into())
+                }
             },
             Expr::Neg(operand, span) => {
                 let v = self.eval(operand, "-")?;
                 match v.as_num() {
                     Some(n) => Ok(Value::Num(-n)),
                     None => Err(Error::new(
-                        format!("- doesn't like {} as input", v.show()),
+                        format!("- needs a number, but got {}", v.described()),
                         Some(*span),
                     )
                     .into()),

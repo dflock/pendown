@@ -34,15 +34,20 @@ fn setspeed_and_speed() {
     let r = run("PRINT SPEED SETSPEED 3 PRINT SPEED");
     assert_eq!(r.printed(), "11\n3\n", "11 with no slider, as in the CLI");
     assert!(r.events.contains(&Event::SetSpeed(3)));
-    for bad in ["0", "12", "2.5", "\"fast"] {
+    for bad in ["0", "12"] {
         assert_eq!(
             error(&format!("SETSPEED {bad}")),
-            format!(
-                "SETSPEED doesn't like {} as input",
-                bad.trim_start_matches('"')
-            )
+            format!("SETSPEED doesn't like {bad} as input")
         );
     }
+    assert_eq!(
+        error("SETSPEED 2.5"),
+        "SETSPEED needs a whole number, but got 2.5"
+    );
+    assert_eq!(
+        error("SETSPEED \"fast"),
+        "SETSPEED needs a number, but got the word fast"
+    );
 }
 
 #[test]

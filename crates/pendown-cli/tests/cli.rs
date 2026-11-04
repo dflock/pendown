@@ -119,7 +119,7 @@ fn runtime_errors_save_the_picture_so_far() {
     assert_eq!(r.status, 1);
     assert_eq!(
         r.stderr,
-        "p.logo:3:6: FD doesn't like far as input\n  in BOX (line 6)\nSaved the drawing as far as it got to p.png\n"
+        "p.logo:3:6: FD needs a number, but got the word far\n  in BOX (line 6)\nSaved the drawing as far as it got to p.png\n"
     );
     assert!(d.join("p.png").exists());
 }

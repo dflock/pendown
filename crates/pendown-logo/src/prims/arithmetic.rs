@@ -176,7 +176,7 @@ fn truth(it: &mut Interpreter, a: &Args, i: usize) -> Result<bool, Flow> {
         Value::List(list) => it.run_expression(list, a.call)?,
         v => v.clone(),
     };
-    value.as_bool().ok_or_else(|| a.doesnt_like(i))
+    value.as_bool().ok_or_else(|| a.wanted(i, "TRUE or FALSE"))
 }
 
 /// Stops at the first `FALSE`, so later list inputs aren't run.

@@ -127,7 +127,7 @@ fn logic_runs_list_inputs_only_when_needed() {
 fn errors() {
     assert_eq!(
         error("PRINT REMAINDER 7.5 2"),
-        "REMAINDER doesn't like 7.5 as input"
+        "REMAINDER needs a whole number, but got 7.5"
     );
     assert_eq!(error("PRINT MODULO 7 0"), "Can't divide by zero");
     assert_eq!(error("PRINT SQRT -1"), "SQRT doesn't like -1 as input");
@@ -138,13 +138,13 @@ fn errors() {
     assert_eq!(error("PRINT POWER 10 400"), "That number is too big");
     assert_eq!(
         error("PRINT AND \"yes \"true"),
-        "AND doesn't like yes as input"
+        "AND needs TRUE or FALSE, but got the word yes"
     );
-    assert_eq!(error("PRINT NOT 5"), "NOT doesn't like 5 as input");
+    assert_eq!(error("PRINT NOT 5"), "NOT needs TRUE or FALSE, but got 5");
     assert_eq!(error("PRINT RANDOM 0"), "RANDOM doesn't like 0 as input");
     assert_eq!(
         error("PRINT RANDOM 2.5"),
-        "RANDOM doesn't like 2.5 as input"
+        "RANDOM needs a whole number, but got 2.5"
     );
     assert_eq!(
         error("PRINT (RANDOM 5 1)"),
@@ -243,7 +243,10 @@ fn phase_2_arithmetic_errors() {
     assert_eq!(error("SHOW LN 0"), "LN doesn't like 0 as input");
     assert_eq!(error("SHOW LOG10 -1"), "LOG10 doesn't like -1 as input");
     assert_eq!(error("SHOW EXP 1000"), "That number is too big");
-    assert_eq!(error("SHOW ISEQ 1 1.5"), "ISEQ doesn't like 1.5 as input");
+    assert_eq!(
+        error("SHOW ISEQ 1 1.5"),
+        "ISEQ needs a whole number, but got 1.5"
+    );
     assert_eq!(
         error("SHOW ISEQ 1 1e12"),
         "ISEQ would make more than 10000000 members"

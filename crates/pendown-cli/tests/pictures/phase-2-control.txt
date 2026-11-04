@@ -7,7 +7,7 @@ run
 [12]
 7
 2
-[0 FD doesn't like far as input [] 53]
+[0 FD needs a number, but got the word far [] 53]
 false
 [1 2 3 ...]
 [1 ...]

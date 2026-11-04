@@ -106,9 +106,9 @@ fn reading_errors() {
         other => panic!("expected a parse error, got {other:?}"),
     };
     assert_eq!(parse_error("SHOW {a b"), "This { has no matching }");
-    assert_eq!(parse_error("SHOW a}"), "Unexpected }");
-    assert_eq!(parse_error("SHOW [a}"), "Unexpected }");
-    assert_eq!(parse_error("SHOW {a]"), "Unexpected ]");
+    assert_eq!(parse_error("SHOW a}"), "This } has no matching {");
+    assert_eq!(parse_error("SHOW [a}"), "This } has no matching {");
+    assert_eq!(parse_error("SHOW {a]"), "This ] has no matching [");
     assert_eq!(
         parse_error("SHOW {a}@x"),
         "An array's origin must be a whole number, as in {a b c}@0"

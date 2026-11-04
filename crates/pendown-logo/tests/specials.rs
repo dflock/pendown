@@ -55,5 +55,8 @@ fn name_and_global() {
         output("GLOBAL \"x (GLOBAL \"y \"z) GLOBAL [a b] MAKE \"x 1 SHOW :x"),
         "1\n"
     );
-    assert_eq!(error("GLOBAL \"x SHOW :x"), ":x has no value");
+    assert_eq!(
+        error("GLOBAL \"x SHOW :x"),
+        ":x has no value yet. Give it one with MAKE \"x 100"
+    );
 }

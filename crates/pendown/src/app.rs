@@ -527,6 +527,13 @@ impl App {
         }
     }
 
+    /// `file` was just opened or saved: its folder is where the next file
+    /// dialog starts, saved at once.
+    pub(crate) fn remember_folder(&mut self, file: &std::path::Path) {
+        self.config.remember_folder(file);
+        self.config_file.save_last_folder(&self.config);
+    }
+
     /// Saves what's remembered between runs, as the window closes.
     pub(crate) fn save_config(&mut self, window: &Window, cx: &gpui_kit::App) {
         let size = |p: Pixels| f64::from(p.as_f32());

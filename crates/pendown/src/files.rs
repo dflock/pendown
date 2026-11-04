@@ -162,7 +162,7 @@ impl App {
                 // Setting the text sends no change event, so check it here.
                 self.clear_breakpoints(cx);
                 self.check_program(cx);
-                self.config.remember_folder(path);
+                self.remember_folder(path);
                 self.print(format!("Opened {}", path.display()));
             }
             Err(e) => self.print(format!("Couldn't open {}: {e}", path.display())),
@@ -205,7 +205,7 @@ impl App {
         let text = self.text(cx);
         let saved = match self.document.save_as(path, &text) {
             Ok(saved) => {
-                self.config.remember_folder(&saved);
+                self.remember_folder(&saved);
                 self.print(format!("Saved {}", saved.display()));
                 true
             }
@@ -267,7 +267,7 @@ impl App {
         };
         match std::fs::write(&path, bytes) {
             Ok(()) => {
-                self.config.remember_folder(&path);
+                self.remember_folder(&path);
                 self.print(format!("Saved the drawing to {}", path.display()));
             }
             Err(e) => self.print(format!(

@@ -70,7 +70,7 @@ While a program runs, the **Repeat counters** panel shows every `REPEAT`, `FOREV
 
 ### Settings
 
-Pendown remembers how you left it in `config.kdl`, in `~/.config/pendown` (or `$XDG_CONFIG_HOME/pendown`), or `%APPDATA%\pendown` on Windows. It's saved when the window closes and read when Pendown starts:
+Pendown remembers how you left it in `config.kdl`, in `~/.config/pendown` (or `$XDG_CONFIG_HOME/pendown`), or `%APPDATA%\pendown` on Windows. It's read when Pendown starts, and saved when the window closes, except `last-folder`, which is saved as soon as you open or save a file:
 
 ```kdl
 show-obsolete #false

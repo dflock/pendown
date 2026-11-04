@@ -227,20 +227,11 @@ impl Config {
     /// `existing`, or a new file, saying what's remembered in this. Only the
     /// remembered nodes change. `show-obsolete` is the file's to say.
     pub fn merged_into(&self, existing: Option<&str>) -> Result<String, String> {
-        let text = existing.filter(|t| !t.trim().is_empty());
-        let mut document: KdlDocument = text
-            .unwrap_or(TEMPLATE)
-            .parse()
-            .map_err(|e: kdl::KdlError| e.to_string())?;
+        let mut document = document_of(existing)?;
+        self.set_last_folder(&mut document);
         let whole = |n: f64| KdlValue::Integer(n.round() as i128);
         let text = |s: &str| KdlValue::String(s.to_string());
         let help = &self.help;
-        node(&mut document, "last-folder", |n| {
-            let folder = self.last_folder.as_deref().map(Path::to_string_lossy);
-            n.entries_mut().clear();
-            n.entries_mut()
-                .push(KdlEntry::new(folder.as_deref().unwrap_or("").to_string()));
-        });
         set(
             &mut document,
             "window",
@@ -277,6 +268,22 @@ impl Config {
             ],
         );
         Ok(document.to_string())
+    }
+
+    /// `existing`, or a new file, with only the last folder changed.
+    fn folder_merged_into(&self, existing: Option<&str>) -> Result<String, String> {
+        let mut document = document_of(existing)?;
+        self.set_last_folder(&mut document);
+        Ok(document.to_string())
+    }
+
+    fn set_last_folder(&self, document: &mut KdlDocument) {
+        node(document, "last-folder", |n| {
+            let folder = self.last_folder.as_deref().map(Path::to_string_lossy);
+            n.entries_mut().clear();
+            n.entries_mut()
+                .push(KdlEntry::new(folder.as_deref().unwrap_or("").to_string()));
+        });
     }
 
     /// The folder to start a file dialog in, if it's still there.
@@ -344,6 +351,15 @@ impl WindowedSize {
             self.latest
         }
     }
+}
+
+/// The file's text, or a new file's if it's empty or missing, to change.
+fn document_of(existing: Option<&str>) -> Result<KdlDocument, String> {
+    existing
+        .filter(|text| !text.trim().is_empty())
+        .unwrap_or(TEMPLATE)
+        .parse()
+        .map_err(|e: kdl::KdlError| e.to_string())
 }
 
 /// The node called `name`, added if it's not there, for `f` to change.
@@ -430,10 +446,20 @@ impl ConfigFile {
     /// been edited since Pendown started. A file that's no longer KDL is left
     /// alone rather than lost: fixing it is all it needs.
     pub fn save(&self, config: &Config) {
+        self.change(|existing| config.merged_into(existing));
+    }
+
+    /// Saves only the last folder, as soon as it changes, so that everything
+    /// else can wait until the window closes.
+    pub fn save_last_folder(&self, config: &Config) {
+        self.change(|existing| config.folder_merged_into(existing));
+    }
+
+    /// Replaces the file with what `merged` makes of it.
+    fn change(&self, merged: impl FnOnce(Option<&str>) -> Result<String, String>) {
         let Some(path) = &self.path else { return };
         let existing = std::fs::read_to_string(path).ok();
-        let saved = config
-            .merged_into(existing.as_deref())
+        let saved = merged(existing.as_deref())
             .and_then(|text| write(path, &text).map_err(|e| e.to_string()));
         match (saved, &self.old_folder_file) {
             (Err(e), _) => log::warn!("{}: {e}: not saving the settings", self.describe()),
@@ -621,6 +647,43 @@ mod tests {
         // A folder that's gone is no use.
         config.last_folder = Some("/no/such/folder".into());
         assert_eq!(config.last_folder(), None);
+    }
+
+    #[test]
+    fn saving_the_last_folder_changes_nothing_else() {
+        let folder =
+            std::env::temp_dir().join(format!("pendown-config-folder-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let path = folder.join("config.kdl");
+        let file = ConfigFile::at(&path);
+
+        // The window's size and so on wait until the window closes.
+        std::fs::write(&path, "// Mine.\nspeed 3 // slow\n").unwrap();
+        let mut config = remembered();
+        config.remember_folder(&folder.join("flower.logo"));
+        file.save_last_folder(&config);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("// Mine.\nspeed 3 // slow\n"), "{text}");
+        let saved = Config::parse(&text).unwrap();
+        assert_eq!(saved.last_folder(), Some(folder.clone()));
+        assert_eq!(saved.speed, 3);
+        assert_eq!(saved.window, Config::default().window);
+
+        // With no file yet, it makes one that reads as the defaults.
+        std::fs::remove_file(&path).unwrap();
+        file.save_last_folder(&config);
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("show-obsolete #false"), "{text}");
+        let saved = Config::parse(&text).unwrap();
+        assert_eq!(saved.last_folder(), Some(folder.clone()));
+        assert_eq!(saved.speed, Config::default().speed);
+
+        // A broken file is still left alone.
+        std::fs::write(&path, "window {").unwrap();
+        file.save_last_folder(&config);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "window {");
+        std::fs::remove_dir_all(&folder).unwrap();
     }
 
     #[test]
